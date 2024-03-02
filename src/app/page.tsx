@@ -24,7 +24,7 @@ export default async function Home() {
   return (
     <main className="flex flex-col">
       <div>F10 Fantasy</div>
-      <div>Welcome back! {session.user.name}!</div>
+      <div>Welcome back!! {session.user.name}!</div>
       <Tabs defaultValue="fantasy" className="w-[400px]">
         <TabsList>
           <TabsTrigger value="fantasy">Fantasy</TabsTrigger>
