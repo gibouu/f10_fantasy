@@ -4,27 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FantasyTab from "@/components/FantasyTab";
 import StandingsTab from "@/components/StandingsTab";
 
-interface User {
-  name: string;
-  email: string;
-}
-
-interface Session {
-  user?: User;
-}
 
 export default async function Home() {
-  const session: Session | null = await getServerSession(options);
-
-  if (!session || !session.user) {
-    return null;
-  }
+  const session = await getServerSession(options);
 
   // Access specific properties of the user object
   return (
     <main className="flex flex-col">
-      <div>F10 Fantasy</div>
-      <div>Welcome back!! {session.user.name}!</div>
+      <div>Welcome back!! {session?.user.name}!</div>
       <Tabs defaultValue="fantasy" className="w-[400px]">
         <TabsList>
           <TabsTrigger value="fantasy">Fantasy</TabsTrigger>

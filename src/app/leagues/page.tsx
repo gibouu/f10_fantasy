@@ -5,46 +5,86 @@ import { z } from "zod";
 import LeagueForm from "@/components/LeagueForm";
 import getSupabaseClient from "@/lib/supabaseClient";
 
+import { useToast } from "@/components/ui/use-toast";
+
 const formSchema = z.object({
-    leaguename: z.string().min(4, {
-        message: "League name must be at least 4 characters.",
-    }),
+  leaguename: z.string().min(4, {
+    message: "League name must be at least 4 characters.",
+  }),
 });
 
 export default function League() {
-    const defaultValues = {
-        leaguename: "",
-    };
+  const { toast } = useToast();
 
-    async function onSubmitCreate(values: z.infer<typeof formSchema>) {
-        console.log(values);
+  const defaultValues = {
+    leaguename: "",
+  };
 
-        const supabase  = await getSupabaseClient();
+  async function onSubmitCreate(values: z.infer<typeof formSchema>) {
+    try {
+      const { supabase, session } = await getSupabaseClient();
+      if (!session) throw new Error("Session not found. Please log in.");
 
-        const { data, error } = await supabase
-            .from("league")
-            .insert([{name: values.leaguename}])
-            .select();
+      const { data: league, error: errorCreateLeague } = await supabase
+        .from("league")
+        .insert([{ name: values.leaguename }])
+        .select();
 
-        if (error) {
-            console.log(error);
-        } else {
-            console.log(data);
-        }
+      if (errorCreateLeague) throw errorCreateLeague;
+
+      const email = session.user?.email;
+
+      // Check if the email exists and is a string; if not, throw an error.
+      if (typeof email !== "string") {
+        throw new Error(
+          "Email is not available. Please ensure you are logged in and have an email address."
+        );
+      }
+
+      // If the email is available and confirmed to be a string, proceed with the database operation.
+      const { data: user, error: userFetchError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .select();
+
+      // Proceed with your logic, for example, handling errors or working with the fetched data.
+      if (userFetchError) {
+        console.error("Error fetching user data:", userFetchError.message);
+        // Optionally, throw an error or handle it as needed
+        throw userFetchError;
+      }
+
+      const { error: joinLeagueError } = await supabase
+        .from("user_league")
+        .insert([{ user_id: user[0].id, league_id: league[0].id }]);
+
+      if (joinLeagueError) throw joinLeagueError;
+
+      // Handle success (e.g., show success message or redirect)
+    } catch (error) {
+      const message = (error as Error).message;
+      console.error(message);
+      toast({
+        title: "Uh oh! Something went wrong.",
+        variant: "destructive",
+        description: message,
+      });
     }
+  }
 
-    function onSubmitJoin(values: z.infer<typeof formSchema>) {
-        console.log(values);
-    }
+  function onSubmitJoin(values: z.infer<typeof formSchema>) {
+    console.log(values);
+  }
 
-    return (
-        <div>
-            <div>Leagues</div>
-            <LeagueForm
-                onSubmit={onSubmitCreate}
-                formSchema={formSchema}
-                defaultValues={defaultValues}
-            />
-        </div>
-    );
+  return (
+    <div>
+      <div>Leagues</div>
+      <LeagueForm
+        onSubmit={onSubmitCreate}
+        formSchema={formSchema}
+        defaultValues={defaultValues}
+      />
+    </div>
+  );
 }
