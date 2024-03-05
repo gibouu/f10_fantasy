@@ -1,27 +1,23 @@
-"use client";
-
-import { z } from "zod";
-
 import LeagueForm from "@/components/LeagueForm";
-import getSupabaseClient from "@/lib/supabaseClient";
-
-import { useToast } from "@/components/ui/use-toast";
-
-const formSchema = z.object({
-  leaguename: z.string().min(4, {
-    message: "League name must be at least 4 characters.",
-  }),
-});
 
 export default function League() {
-  const { toast } = useToast();
 
   const defaultValues = {
     leaguename: "",
   };
 
-  async function onSubmitCreate(values: z.infer<typeof formSchema>) {
-    try {
+  return (
+    <div>
+      <div>Leagues</div>
+      <LeagueForm
+        defaultValues={defaultValues} />
+    </div>
+  );
+}
+
+/*
+
+try {
       const { supabase, session } = await getSupabaseClient();
       if (!session) throw new Error("Session not found. Please log in.");
 
@@ -62,6 +58,7 @@ export default function League() {
       if (joinLeagueError) throw joinLeagueError;
 
       // Handle success (e.g., show success message or redirect)
+      router.push('/'); // Navigate to home page
     } catch (error) {
       const message = (error as Error).message;
       console.error(message);
@@ -71,20 +68,5 @@ export default function League() {
         description: message,
       });
     }
-  }
 
-  function onSubmitJoin(values: z.infer<typeof formSchema>) {
-    console.log(values);
-  }
-
-  return (
-    <div>
-      <div>Leagues</div>
-      <LeagueForm
-        onSubmit={onSubmitCreate}
-        formSchema={formSchema}
-        defaultValues={defaultValues}
-      />
-    </div>
-  );
-}
+*/
