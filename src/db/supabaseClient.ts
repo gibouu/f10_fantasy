@@ -7,10 +7,13 @@ export default async function getSupabaseClient() {
     const session = await getServerSession(options);
 
     const supabaseAccessToken = session?.supabaseAccessToken;
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
     
     const supabase = createClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+        supabaseUrl,
+        supabaseAnonKey,
         {
             global: {
                 headers: {
