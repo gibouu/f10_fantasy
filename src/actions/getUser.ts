@@ -1,7 +1,6 @@
 "use server";
 
 import getSupabaseClient from "@/db/supabaseClient";
-import { getServerSession } from "next-auth";
 
 export default async function getUser() {
   const { supabase, session } = await getSupabaseClient();

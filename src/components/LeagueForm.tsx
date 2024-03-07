@@ -18,8 +18,6 @@ import { Input } from "@/components/ui/input";
 import createLeague from "@/actions/createLeague";
 import { formSchema } from "@/schemas/leagueSchema";
 import { useToast } from "./ui/use-toast";
-import joinLeague from "@/actions/joinLeague";
-import getSupabaseClient from "@/db/supabaseClient";
 
 interface DefaultValues {
   leaguename: string;
@@ -43,24 +41,15 @@ const LeagueForm = ({ defaultValues }: Props) => {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const leagueName = values.leaguename;
-
-    const { supabase } = await getSupabaseClient();
-
-    const { data: league, error: errorCreateLeague } = await supabase
-    .from("leagues")
-    .insert([{ name: leagueName }])
-    .select();
-
     try {
-      const leagueId = await createLeague(leagueName);
+      await createLeague(leagueName);
 
-      await joinLeague(leagueId);
     } catch (error: unknown) {
       const message = (error as Error).message;
       toast({
         title: "Uh oh! Something went wrong.",
         variant: "destructive",
-        description: message ? message : "please try again",
+        description: message ? message : "Please try again",
       });
     }
   }
