@@ -4,7 +4,7 @@ export default function Loading() {
             <div
                 className="w-full h-screen flex justify-center items-center"
             >
-                HELLO
+                WELCOME TO FXRACING
             </div>
         </div>
     );
