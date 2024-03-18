@@ -1,11 +1,11 @@
+import { season } from "@/lib/constants";
 import { RaceEvent } from "../../types/f1";
 
 type Props = {
-    season: string,
     round: string
 }
 
-export default async function getRaceDetails({season, round}: Props) {
+export default async function getRaceDetails({round}: Props) {
 
     const res = await fetch(`https://ergast.com/api/f1/${season}/${round}.json`);
 

@@ -1,37 +1,39 @@
-import { Driver, Result } from "../../types/f1";
+import getLeagueRacePicks from "@/data/getLeagueRacePicks";
 import LeaguePicks from "./LeaguePicks";
 import MyPicks from "./MyPicks";
+import getInitialRaceResults from "@/data/getInitialRaceResults";
 
 type Props = {
     leagueId: string;
-    drivers: Driver[];
-    season: string;
-    round: string;
-    results: Result[] | null;
+    meetingKey: string | null;
+    raceSessionKey: string | null;
+    round: string
 };
 
 export default async function PicksTab({
     leagueId,
-    drivers,
-    season,
-    round,
-    results
+    meetingKey,
+    raceSessionKey,
+    round
 }: Props) {
+
+    const picks = await getLeagueRacePicks(leagueId, round, meetingKey);
+
+    const initialResults = await getInitialRaceResults({round, raceSessionKey});
+
     return (
         <div className="flex flex-col gap-4">
             <MyPicks
-                drivers={drivers}
                 leagueId={leagueId}
-                season={season}
                 round={round}
+                meetingKey={meetingKey}
             />
             <div className="flex flex-col gap-4">
                 <div>League Picks</div>
                 <LeaguePicks
-                    leagueId={leagueId}
-                    season={season}
-                    round={round}
-                    results={results}
+                picks={picks}
+                initialResults={initialResults}
+                raceSessionKey={raceSessionKey}
                 />
             </div>
         </div>

@@ -2,7 +2,7 @@
 
 import getSupabaseClient from "@/db/supabaseClient";
 import { redirect } from "next/navigation";
-import getUser from "./getUser";
+import getUser from "../data/getUser";
 
 export default async function joinLeague(leagueCode: string) {
     const { supabase } = await getSupabaseClient();

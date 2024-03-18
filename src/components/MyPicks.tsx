@@ -1,23 +1,29 @@
 
-import { Driver } from "../../types/f1";
+import getDrivers from "@/data/getDrivers";
 import PicksForm from "./PicksForm";
-import getUserRacePicks from "@/actions/getUserRacePicks";
+import getUserRacePicks from "@/data/getUserRacePicks";
+
+const fs = require('fs');
+
+
+
 
 
 type Props = {
-    drivers: Driver[];
     leagueId: string;
-    season: string;
     round: string;
+    meetingKey: string | null;
 };
 
 export default async function MyPicks({
-    drivers,
     leagueId,
-    season,
     round,
+    meetingKey
 }: Props) {
-    const picks = await getUserRacePicks(leagueId, season, round);
+
+    const picks = await getUserRacePicks(leagueId, round);
+
+    const drivers = await getDrivers(meetingKey);
 
     return (
         <div className="flex flex-col gap-4">
@@ -25,8 +31,8 @@ export default async function MyPicks({
             <PicksForm
                 drivers={drivers}
                 leagueId={leagueId}
-                season={season}
                 round={round}
+                meetingKey={meetingKey}
                 pick={picks[0]?.tenth_pick}
                 keyValue="tenth_pick"
                 label="10th Place"
@@ -34,8 +40,8 @@ export default async function MyPicks({
             <PicksForm
                 drivers={drivers}
                 leagueId={leagueId}
-                season={season}
                 round={round}
+                meetingKey={meetingKey}
                 pick={picks[0]?.third_pick}
                 keyValue="third_pick"
                 label="3rd Place"
@@ -43,8 +49,8 @@ export default async function MyPicks({
             <PicksForm
                 drivers={drivers}
                 leagueId={leagueId}
-                season={season}
                 round={round}
+                meetingKey={meetingKey}
                 pick={picks[0]?.dnf_pick}
                 keyValue="dnf_pick"
                 label="DNF"

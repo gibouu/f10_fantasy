@@ -1,11 +1,9 @@
-"use server";
-
 import getSupabaseClient from "@/db/supabaseClient";
 import getUser from "./getUser";
+import { season } from "@/lib/constants";
 
 export default async function getUserRacePicks(
     leagueId: string,
-    season: string,
     round: string
 ) {
     const { supabase } = await getSupabaseClient();
@@ -33,11 +31,13 @@ export default async function getUserRacePicks(
             .eq("user_id", userId);
 
         if (error) {
-            console.error("Error fetching league race picks:", error.message);
+            console.error("Error fetching user race picks:", error.message);
             throw error;
         }
 
         return data;
+
+        
     } catch (error) {
         throw error;
     }
