@@ -1,24 +1,19 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LeagueTab from "./LeagueTab";
-import getUserLeagues from "@/actions/getUserLeagues";
-import { Driver, RaceEvent } from "../../types/f1";
-import getRacesResults from "@/actions/getRacesResults";
+import getUserLeagues from "@/data/getUserLeagues";
 import { Invite } from "./Invite";
-type Props = {
-    races: RaceEvent[];
-    drivers: Driver[];
-};
+import { Suspense } from "react";
+import LeagueTabSkeleton from "./LeagueTabSkeleton";
 
-export default async function LeaguesList({ races, drivers }: Props) {
+export default async function LeaguesList() {
     const leagues = await getUserLeagues();
-    const racesResults = await getRacesResults();
 
     // Determine the default tab value based on the first league's ID
     const defaultLeagueTabValue =
         leagues.length > 0 ? `league-${leagues[0].league_id}` : "";
 
     return (
-        <Tabs defaultValue={defaultLeagueTabValue}>
+        <Tabs defaultValue={defaultLeagueTabValue} className="h-full flex flex-col gap-4">
             <TabsList>
                 {leagues.map((league) => (
                     <TabsTrigger
@@ -33,17 +28,17 @@ export default async function LeaguesList({ races, drivers }: Props) {
                 <TabsContent
                     key={league.league_id}
                     value={`league-${league.league_id}`}
+                    className="flex flex-col gap-2"
                 >
-                    <div className="text-l font-bold">
-                        {league.league?.name}
+                    <div className="flex justify-between">
+                        <div className="text-l font-bold">
+                            {league.league?.name}
+                        </div>
+                        <Invite inviteCode={league.league?.invite_code} />
                     </div>
-                    <Invite inviteCode={league.league?.invite_code} />
-                    <LeagueTab
-                        leagueId={league.league_id}
-                        races={races}
-                        drivers={drivers}
-                        racesResults={racesResults}
-                    />
+                    <Suspense fallback={<LeagueTabSkeleton />}>
+                        <LeagueTab leagueId={league.league_id} />
+                    </Suspense>
                 </TabsContent>
             ))}
         </Tabs>

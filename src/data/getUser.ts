@@ -1,5 +1,3 @@
-"use server";
-
 import getSupabaseClient from "@/db/supabaseClient";
 
 export default async function getUser() {

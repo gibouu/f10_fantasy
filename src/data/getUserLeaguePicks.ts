@@ -1,5 +1,3 @@
-"use server";
-
 import getSupabaseClient from "@/db/supabaseClient";
 
 export default async function getUserLeaguePicks(
@@ -29,7 +27,7 @@ export default async function getUserLeaguePicks(
 
             if (error) {
                 console.error(
-                    "Error fetching league race picks:",
+                    "Error fetching user league picks:",
                     error.message
                 );
                 throw error;

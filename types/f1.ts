@@ -13,6 +13,19 @@ export interface RaceEvent {
     Circuit: Circuit;
     date: string;
     time: string;
+    openF1RaceKey: string | undefined;
+    openF1QualifyingKey: string | undefined;
+    meeting_key: string;
+    Qualifying: { date: string; time: string };
+}
+
+export interface RaceEventOpenF1 {
+    year: string;
+    session_key: string;
+    session_type: string;
+    meeting_key: string;
+    date_start: string;
+    date_end: string;
 }
 
 export interface Driver {
@@ -24,6 +37,15 @@ export interface Driver {
     familyName: string;
     dateOfBirth: string;
     nationality: string;
+    driver_number: string,
+    first_name: string,
+    full_name: string,
+    headshot_url: string,
+    last_name: string,
+    meeting_key: string,
+    session_key: string,
+    team_colour: string,
+    team_name: string
 }
 
 interface Constructor {
@@ -34,10 +56,10 @@ interface Constructor {
 }
 
 interface Status {
-    status: string
+    status: string;
 }
 
-export interface Result {
+export interface RaceResultsErgast {
     number: string;
     position: string;
     positionText: string;
@@ -49,25 +71,34 @@ export interface Result {
     status: Status;
 }
 
-export interface RacesResults {
-    season: string,
-    round: string
-    Results: Result[]
+export interface RacesResultsErgast {
+    season: string;
+    round: string;
+    Results: RaceResultsErgast[];
 }
 
-export interface EventData {
-    circuit_key: string;
-    circuit_short_name: string;
-    country_code: string;
-    country_key: string;
-    country_name: string;
-    date_end: string; // ISO 8601 format
-    date_start: string; // ISO 8601 format
-    gmt_offset: string; // Could also be number if you prefer to parse it
-    location: string;
-    meeting_key: string;
+export interface RaceResultsOpenF1 {
+    driver_number: string;
+    position: string;
+    driverFullName: string;
+    date: string;
+}
+
+export interface RacesResultsOpenF1 {
+    year: string;
     session_key: string;
-    session_name: string;
-    session_type: "Practice" | "Qualifying" | "Race"; // Enum-like if you have a limited set of known session types
-    year: number;
+    session_type: string;
+    date_start: string;
+    date_end: string;
+    gmt_offset: string;
+    results: RaceResultsOpenF1[];
+}
+
+export type SessionStatus = "active" | "inactive";
+
+export interface QualifyingResultOpenF1 {
+    driver_number: string;
+    position: string;
+    driverFullName: string;
+    date: string;
 }

@@ -3,19 +3,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PicksTab from "./PicksTab";
 import QualifyingTab from "./QualifyingTab";
 import RaceTab from "./RaceTab";
-import { Driver } from "../../types/f1";
-import getRaceResults from "@/actions/getRaceResults";
+import getRaceResults from "@/data/getRaceResults";
+import getQualifyingResults from "@/data/getQualifyingResults";
 
 type Props = {
-    leagueId: string,
-    drivers: Driver[],
-    season: string,
-    round: string
-}
+    leagueId: string;
+    qualifyingSessionKey: string;
+    raceSessionKey: string;
+    meetingKey: string | null;
+    round: string;
+};
 
-export default async function RaceContentWrapper({leagueId, drivers, season, round}: Props) {
-
-    const results = await getRaceResults({round})
+export default async function RaceContentWrapper({
+    leagueId,
+    qualifyingSessionKey,
+    raceSessionKey,
+    meetingKey,
+    round
+}: Props) {
+    const { qualiResults, qualiStatus } = await getQualifyingResults({
+        initial: true,
+        session_key: qualifyingSessionKey,
+    });
+    const { raceResults, raceStatus } = await getRaceResults({
+        initial: true,
+        session_key: raceSessionKey,
+    });
 
     return (
         <Tabs defaultValue="picks">
@@ -29,17 +42,24 @@ export default async function RaceContentWrapper({leagueId, drivers, season, rou
             <TabsContent value="picks">
                 <PicksTab
                     leagueId={leagueId}
-                    drivers={drivers}
-                    season={season}
                     round={round}
-                    results={results}
+                    meetingKey={meetingKey}
+                    raceSessionKey={raceSessionKey}
                 />
             </TabsContent>
             <TabsContent value="qualifying results">
-                <QualifyingTab />
+                <QualifyingTab
+                    initialResults={qualiResults}
+                    initialStatus={qualiStatus}
+                    sessionKey={qualifyingSessionKey}
+                />
             </TabsContent>
             <TabsContent value="race results">
-                <RaceTab results={results} />
+                <RaceTab
+                    initialResults={raceResults}
+                    initialStatus={raceStatus}
+                    sessionKey={raceSessionKey}
+                />
             </TabsContent>
         </Tabs>
     );

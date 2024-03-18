@@ -1,7 +1,7 @@
 "use server";
 
 import getSupabaseClient from "@/db/supabaseClient";
-import getUser from "./getUser";
+import getUser from "../data/getUser";
 import { redirect } from "next/navigation";
 
 export default async function createLeague(leagueName: string) {
