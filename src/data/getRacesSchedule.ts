@@ -34,9 +34,10 @@ export default async function getRacesSchedule() {
     // Map each race to a promise that fetches its session key using both date and time
     const racesWithSessionKeyPromises = races.map(async (race) => {
         // Convert race date and time to a Date object, assuming race.date is in YYYY-MM-DD format and race.time in HH:MM:SS format
-        const raceDateTime = new Date(`${race.date}T${race.time}Z`); // The 'Z' denotes UTC time
+        const raceDateTime = new Date(`${race.date}T${race.time}`); // The 'Z' denotes UTC time
+        
         const qualifyingDateTime = new Date(
-            `${race.Qualifying.date}T${race.Qualifying.time}Z`
+            `${race.Qualifying.date}T${race.Qualifying.time}`
         );
 
         // Get the current time in UTC for comparison

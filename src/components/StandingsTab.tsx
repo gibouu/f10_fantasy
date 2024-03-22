@@ -130,6 +130,7 @@ export default function StandingsTab({ users, initialResults, picks }: Props) {
                                     as="tr"
                                     key={user.users?.id}
                                     value={user}
+                                    dragListener={false}
                                 >
                                     <TableCell>{user.users?.name}</TableCell>
                                     <TableCell>{user.points}</TableCell>
