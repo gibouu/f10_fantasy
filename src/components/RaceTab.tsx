@@ -91,6 +91,7 @@ export default function RaceTab({ initialResults, initialStatus, sessionKey }: P
                             as="tr"
                             key={result.driver_number}
                             value={result}
+                            dragListener={false}
                         >
                             <TableCell>{result.position}</TableCell>
                             <TableCell>{result.driverFullName}</TableCell>

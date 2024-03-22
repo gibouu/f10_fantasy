@@ -145,6 +145,7 @@ export default function LeaguePicks({
                             as="tr"
                             key={`${pick.user_id}-${pick.league_id}-${pick.season}-${pick.round}`}
                             value={pick}
+                            dragListener={false}
                         >
                             <TableCell>{pick.users?.name}</TableCell>
                             <TableCell>{pick.tenth_pick_name}</TableCell>
