@@ -6,11 +6,11 @@
     },
     {
       "path": "/api/cron/lock-picks",
-      "schedule": "* * * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/compute-scores",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 20 * * *"
     }
   ]
 }
