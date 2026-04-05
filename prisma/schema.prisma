@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Auth.js v5 required models
+// ─────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  publicUsername   String?   @unique
+  usernameSet      Boolean   @default(false)
+  favoriteTeamSlug    String?   // e.g. "mercedes" — used as leaderboard icon
+  usernameChangeUsed  Boolean   @default(false) // one-time username change used
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  pickSets         PickSet[]
+  sentRequests     FriendRequest[] @relation("SentRequests")
+  receivedRequests FriendRequest[] @relation("ReceivedRequests")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────
+// Season & Race
+// ─────────────────────────────────────────────
+
+model Season {
+  id       String  @id @default(cuid())
+  year     Int     @unique
+  isActive Boolean @default(false)
+
+  races Race[]
+}
+
+enum RaceType {
+  MAIN
+  SPRINT
+}
+
+enum RaceStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Race {
+  id                 String     @id @default(cuid())
+  seasonId           String
+  round              Int
+  name               String
+  circuitName        String
+  country            String
+  type               RaceType   @default(MAIN)
+  scheduledStartUtc  DateTime
+  lockCutoffUtc      DateTime
+  status             RaceStatus @default(UPCOMING)
+  openf1SessionKey   Int?       @unique
+  openf1MeetingKey   Int?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  season   Season      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  entries  RaceEntry[]
+  results  RaceResult[]
+  pickSets PickSet[]
+
+  @@unique([seasonId, round, type])
+}
+
+// ─────────────────────────────────────────────
+// Drivers & Constructors
+// ─────────────────────────────────────────────
+
+model Constructor {
+  id              String  @id @default(cuid())
+  name            String
+  shortName       String
+  color           String
+  openf1TeamName  String? @unique
+
+  drivers Driver[]
+}
+
+model Driver {
+  id                 String  @id @default(cuid())
+  code               String
+  firstName          String
+  lastName           String
+  number             Int
+  photoUrl           String?
+  constructorId      String
+  openf1DriverNumber Int?    @unique
+
+  constructor  Constructor  @relation(fields: [constructorId], references: [id])
+  entries      RaceEntry[]
+  results      RaceResult[]
+  tenthPicks   PickSet[]    @relation("TenthPlacePicks")
+  winnerPicks  PickSet[]    @relation("WinnerPicks")
+  dnfPicks     PickSet[]    @relation("DnfPicks")
+}
+
+// ─────────────────────────────────────────────
+// Race Entry & Result
+// ─────────────────────────────────────────────
+
+model RaceEntry {
+  id             String  @id @default(cuid())
+  raceId         String
+  driverId       String
+  isEligibleDnf  Boolean @default(true)
+
+  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@unique([raceId, driverId])
+}
+
+enum ResultStatus {
+  CLASSIFIED
+  DNF
+  DNS
+  DSQ
+}
+
+model RaceResult {
+  id          String       @id @default(cuid())
+  raceId      String
+  driverId    String
+  position    Int?
+  status      ResultStatus
+  fastestLap  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  race   Race   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@unique([raceId, driverId])
+}
+
+// ─────────────────────────────────────────────
+// Picks & Scoring
+// ─────────────────────────────────────────────
+
+model PickSet {
+  id                  String    @id @default(cuid())
+  userId              String
+  raceId              String
+  tenthPlaceDriverId  String
+  winnerDriverId      String
+  dnfDriverId         String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lockedAt            DateTime?
+
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  race              Race           @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  tenthPlaceDriver  Driver         @relation("TenthPlacePicks", fields: [tenthPlaceDriverId], references: [id])
+  winnerDriver      Driver         @relation("WinnerPicks", fields: [winnerDriverId], references: [id])
+  dnfDriver         Driver         @relation("DnfPicks", fields: [dnfDriverId], references: [id])
+  scoreBreakdown    ScoreBreakdown?
+
+  @@unique([userId, raceId])
+}
+
+model ScoreBreakdown {
+  id               String   @id @default(cuid())
+  pickSetId        String   @unique
+  tenthPlaceScore  Int
+  winnerBonus      Int
+  dnfBonus         Int
+  totalScore       Int
+  computedAt       DateTime @default(now())
+
+  pickSet PickSet @relation(fields: [pickSetId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// Social
+// ─────────────────────────────────────────────
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model FriendRequest {
+  id          String              @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  requester User @relation("SentRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("ReceivedRequests", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+}

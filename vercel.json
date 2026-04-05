@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-schedule",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/lock-picks",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/compute-scores",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

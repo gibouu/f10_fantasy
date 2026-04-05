@@ -1,6 +1,9 @@
-import NextAuth from 'next-auth'
-import { options } from './options'
+/**
+ * Auth.js v5 catch-all route.
+ *
+ * Delegates all /api/auth/* traffic to the Auth.js handler exported
+ * from the centralised @/auth config module.
+ */
+import { handlers } from "@/auth"
 
-const handler = NextAuth(options)
-
-export { handler as GET, handler as POST }
+export const { GET, POST } = handlers

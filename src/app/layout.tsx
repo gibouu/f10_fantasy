@@ -1,40 +1,37 @@
-import { Toaster } from "@/components/ui/toaster";
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import Image from "next/image";
-import NavigationMenu from "@/components/NavigationMenuSideBar";
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import { Providers } from "@/components/Providers"
+import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  // Expose as a CSS variable so Tailwind's `font-sans` utility picks it up.
+  variable: "--font-inter",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-    title: "FX Racing",
-    description: "Formula 1 P10 Fantasy",
-};
+  title: "F10 Racing",
+  description: "The F1 prediction game where 10th place matters most",
+}
 
 export default function RootLayout({
-    children,
-}: Readonly<{
-    children: React.ReactNode;
-}>) {
-    return (
-        <html lang="en">
-            <body className={`${inter.className} antialiased`}>
-                <header className="m-4 h-10 bg-inherit flex justify-between sticky items-center top-0 z-50">
-                    <div className="flex items-center gap-2">
-                        <Image
-                            src={"/icon.ico"}
-                            alt="icon"
-                            width={50}
-                            height={50}
-                        />
-                        <div>FXRACING</div>
-                    </div>
-                    {/*  <NavigationMenu /> */}
-                </header>
-                <main className="relative">{children}</main>
-                <Toaster />
-            </body>
-        </html>
-    );
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    // dark class activates Tailwind dark-mode utilities globally.
+    <html lang="en">
+      <body className={`${inter.variable} font-sans antialiased bg-background`}>
+        {/*
+         * Phone-sized container: max 430px, centered on wider viewports.
+         * min-h-screen ensures the background color fills the full viewport.
+         */}
+        <div className="max-w-[430px] mx-auto min-h-screen bg-background">
+          <Providers>{children}</Providers>
+        </div>
+      </body>
+    </html>
+  )
 }
