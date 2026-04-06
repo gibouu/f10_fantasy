@@ -3,19 +3,5 @@
     "src/app/api/cron/**": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/sync-schedule",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/lock-picks",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/ingest-results",
-      "schedule": "0 20 * * *"
-    }
-  ]
+  }
 }
