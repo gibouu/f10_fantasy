@@ -60,13 +60,13 @@ interface OpenF1Position {
   [key: string]: unknown
 }
 
-interface OpenF1RaceControl {
+interface OpenF1Stint {
   session_key: number
-  driver_number: number | null
-  /** Message text, e.g. "CAR 44 RETIRED IN PIT LANE" */
-  message: string
-  category: string
-  date: string
+  driver_number: number
+  /** First lap of this stint */
+  lap_start: number
+  /** Last lap completed in this stint */
+  lap_end: number
   [key: string]: unknown
 }
 
@@ -252,29 +252,28 @@ export class OpenF1Provider implements F1ProviderAdapter {
       }
     }
 
-    // 3. Detect retirements using lap count data.
+    // 3. Detect retirements using stint data.
     //
-    //    The race_control endpoint only has flag/safety-car messages in 2026
-    //    (no RETIRED text), so we use laps instead:
-    //    - Find each driver's last completed lap number
-    //    - Drivers who completed < 95% of the race winner's laps are DNF
-    //    - This threshold correctly catches mid-race retirements while allowing
-    //      lapped cars (which finish 1–2 laps down) to be classified.
+    //    Stints represent completed units of work (compound + lap range) and
+    //    are settled/finalized once a race is complete — more reliable than
+    //    per-lap timing rows for historical races.
+    //
+    //    Logic: find each driver's last completed lap (max lap_end across all
+    //    their stints). Drivers who completed < 90% of the race winner's laps
+    //    are marked DNF. This catches mid-race retirements while keeping lapped
+    //    cars (typically 1–2 laps down) as CLASSIFIED.
     const retiredDriverNumbers = new Set<number>()
     try {
-      interface OpenF1Lap { driver_number: number; lap_number: number }
-      const lapRaw = await openF1Fetch<OpenF1Lap>(`/laps?session_key=${sessionKey}`)
+      const stintRaw = await openF1Fetch<OpenF1Stint>(`/stints?session_key=${sessionKey}`)
 
       const lastLap = new Map<number, number>()
-      for (const lap of lapRaw) {
-        const cur = lastLap.get(lap.driver_number) ?? 0
-        if (lap.lap_number > cur) lastLap.set(lap.driver_number, lap.lap_number)
+      for (const stint of stintRaw) {
+        const cur = lastLap.get(stint.driver_number) ?? 0
+        if (stint.lap_end > cur) lastLap.set(stint.driver_number, stint.lap_end)
       }
 
       if (lastLap.size > 0) {
         const maxLaps = Math.max(...Array.from(lastLap.values()))
-        // 90% threshold: catches mid-race retirements while keeping lapped
-        // cars (typically 1-2 laps down) as CLASSIFIED.
         const threshold = maxLaps * 0.90
 
         for (const [driverNumber, laps] of Array.from(lastLap.entries())) {
@@ -282,8 +281,8 @@ export class OpenF1Provider implements F1ProviderAdapter {
         }
       }
     } catch (err) {
-      console.error(`[openf1] Lap data unavailable for session ${sessionKey} — all drivers marked CLASSIFIED:`, err)
-      // Re-ingest after data becomes available via POST /api/cron/ingest-results { raceId }
+      console.error(`[openf1] Stint data unavailable for session ${sessionKey} — all drivers marked CLASSIFIED:`, err)
+      // Re-ingest after data settles via POST /api/cron/ingest-results { raceId }
     }
 
     // 4. Compose final results

@@ -32,10 +32,21 @@ export async function POST(req: NextRequest) {
 
   let targetRaceIds: string[]
 
-  // Body may specify an explicit raceId for targeted re-ingestion
+  // Body options:
+  //   { force: true }          — re-ingest ALL completed races (fixes wrong DNF data)
+  //   { raceId: "..." }        — targeted re-ingest for one race
+  //   (no body)                — normal: ingest races with no results yet
   try {
     const body = await req.json()
-    if (typeof body?.raceId === 'string') {
+    if (body?.force === true) {
+      // Force mode: re-ingest every completed race so DNF statuses are corrected
+      const all = await db.race.findMany({
+        where: { status: 'COMPLETED', openf1SessionKey: { not: null } },
+        orderBy: { scheduledStartUtc: 'asc' },
+        select: { id: true },
+      })
+      targetRaceIds = all.map((r) => r.id)
+    } else if (typeof body?.raceId === 'string') {
       targetRaceIds = [body.raceId]
     } else {
       targetRaceIds = await findRacesNeedingIngestion()
