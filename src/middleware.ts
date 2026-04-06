@@ -4,13 +4,20 @@ import { auth } from "@/auth";
 import type { Session } from "next-auth";
 
 // Routes that are always publicly accessible (no session required).
-const PUBLIC_ROUTES = ["/signin"];
+const PUBLIC_ROUTES = ["/signin", "/races", "/leaderboard"];
+
+// Prefixes that are publicly accessible without authentication.
+// Read-only browsing: race list, race detail, leaderboard, user profiles.
+const PUBLIC_PREFIXES = ["/races/", "/profile/"];
 
 // Prefix for all Auth.js internal API routes.
 const AUTH_PREFIX = "/api/auth";
 
 // Prefix for cron endpoints — protected by secret header, not session.
 const CRON_PREFIX = "/api/cron";
+
+// Public API routes — no session needed (race schedule, user profiles, etc.)
+const PUBLIC_API_ROUTES = ["/api/races", "/api/users"];
 
 // Prefix for the onboarding flow — authenticated users without a username
 // must be allowed through here.
@@ -48,6 +55,14 @@ export default auth((req: NextAuthRequest) => {
 
   // ── 3. Public routes — always pass through ────────────────────────────
   if (PUBLIC_ROUTES.includes(pathname)) {
+    return NextResponse.next();
+  }
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // ── 3b. Public API routes — no session needed ─────────────────────────
+  if (PUBLIC_API_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
     return NextResponse.next();
   }
 

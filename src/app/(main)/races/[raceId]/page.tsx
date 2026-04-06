@@ -23,14 +23,14 @@ export default async function RacePickPage({
   params: { raceId: string }
 }) {
   const session = await auth()
-  const userId = session!.user!.id!
+  const userId = session?.user?.id ?? null
 
   const race = await getRaceById(params.raceId)
   if (!race) notFound()
 
   const [entrants, existingPick] = await Promise.all([
     getRaceEntrants(race.id),
-    getPickForRace(userId, race.id),
+    userId ? getPickForRace(userId, race.id) : Promise.resolve(null),
   ])
 
   const locked = isRaceLocked(race)
@@ -123,18 +123,41 @@ export default async function RacePickPage({
             results={heroResults}
             entrants={entrants}
           />
-          <PicksDisplay
-            pick={pickSerialized}
-            race={raceSerialized}
-            results={displayResults}
-            entrants={entrants}
-          />
+          {userId ? (
+            <PicksDisplay
+              pick={pickSerialized}
+              race={raceSerialized}
+              results={displayResults}
+              entrants={entrants}
+            />
+          ) : (
+            <div className="rounded-2xl bg-surface border border-[var(--border)] p-4 text-center">
+              <p className="text-sm text-text-secondary mb-3">Sign in to see your picks and score</p>
+              <Link
+                href={`/signin?callbackUrl=/races/${params.raceId}`}
+                className="inline-flex items-center justify-center rounded-xl bg-accent text-white text-sm font-semibold px-5 py-2.5"
+              >
+                Sign in
+              </Link>
+            </div>
+          )}
           <RaceResultsCard
             results={rawResults}
             entrants={entrants}
             raceType={race.type}
           />
         </>
+      ) : !userId ? (
+        <div className="rounded-2xl bg-surface border border-[var(--border)] p-6 text-center flex flex-col items-center gap-3">
+          <p className="text-sm font-semibold text-text-primary">Sign in to make picks</p>
+          <p className="text-xs text-text-secondary">Create an account to predict the 10th place finisher, winner, and DNF driver.</p>
+          <Link
+            href={`/signin?callbackUrl=/races/${params.raceId}`}
+            className="inline-flex items-center justify-center rounded-xl bg-accent text-white text-sm font-semibold px-5 py-2.5"
+          >
+            Sign in
+          </Link>
+        </div>
       ) : (
         <PickHero
           race={raceSerialized}

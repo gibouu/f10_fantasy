@@ -36,29 +36,46 @@ Client Components / Pages (RSC)
 ## Route Groups
 
 - `src/app/(auth)/` — signin, onboarding/username (separate layout, no nav bar)
-- `src/app/(main)/` — all authenticated pages; layout at `src/app/(main)/layout.tsx` adds sticky header + bottom tab nav
+- `src/app/(main)/` — pages; layout adds sticky header + bottom tab nav. Most pages support **guest access** (no auth required for read-only)
 - `src/app/api/cron/` — background jobs; protected by `Authorization: Bearer CRON_SECRET` header (not session)
+
+### Auth / Guest Mode
+Middleware (`src/middleware.ts`) allows unauthenticated access to:
+- `/races`, `/races/*` — race list and detail (read-only)
+- `/leaderboard` — global leaderboard only (Friends tab hidden for guests)
+- `/profile/*` — public user profiles
+- `/api/races`, `/api/users` — public API routes
+
+Auth is required for: `/profile` (own profile editing), `/picks`, POST `/api/picks`, `/api/friends`, `/onboarding/*`
+
+Pages handle `userId = null` gracefully — show sign-in CTA instead of crashing.
 
 ---
 
 ## Key Pages & Their Data Fetching
 
 ### `/races` → `src/app/(main)/races/page.tsx`
-- Fetches: `getActiveSeason()`, `getRacesForSeason(season.id)`, `getPickedRaceIds(userId, season.id)`
+- Fetches: `getActiveSeason()`, `getRacesForSeason(season.id)`, `getPickedRaceIds(userId, season.id)` (skipped for guests)
 - Shows upcoming races and completed races as `RaceCard` links
+- Renders `<OnboardingCarousel />` at top (dismisses via `localStorage`)
 
 ### `/races/[raceId]` → `src/app/(main)/races/[raceId]/page.tsx`
-- Fetches: `getRaceById`, `getRaceEntrants`, `getPickForRace`
+- Fetches: `getRaceById`, `getRaceEntrants`, `getPickForRace` (null for guests)
 - If completed: ALSO fetches `getRaceResults` → builds `heroResults` (structured) + `displayResults` (flat)
-- Active race → renders `<PickHero>` (the main pick UI with bubbles + bottom sheet)
-- Completed race → renders `<HeroVisualization>` + `<PicksDisplay>`
+- Active race → renders `<PickHero>` or sign-in CTA for guests
+- Completed race → renders `<HeroVisualization>` + `<PicksDisplay>` (or sign-in CTA) + `<RaceResultsCard>`
 - **Both `entrants` and `results` must be passed to HeroVisualization and PicksDisplay**
 
 ### `/leaderboard` → `src/app/(main)/leaderboard/page.tsx`
 - Fetches global leaderboard + user rank from `getGlobalLeaderboard` / `getUserSeasonRank`
+- Guests see global leaderboard only (no Friends tab, no FriendSearch)
 
-### `/profile` → `src/app/(main)/profile/page.tsx`
+### `/profile` → `src/app/(main)/profile/page.tsx` (auth-required)
 - Shows `TeamPicker` for selecting favourite team (stored as `favoriteTeamSlug` on User)
+
+### `/profile/[userId]` → `src/app/(main)/profile/[userId]/page.tsx` (public, client component)
+- SWR-fetches `/api/users/[userId]` — shows picks per race + season total score
+- Accessible by guests and linked from leaderboard rows + friend list
 
 ---
 
@@ -113,12 +130,21 @@ Images in `public/drivers/` are pre-cropped circular headshots — use default `
 | Service | Owns |
 |---|---|
 | `race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRaceResults`, `getRacesForSeason`, `getActiveSeason`, `getCurrentRace` |
-| `pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `createOrUpdatePick` |
-| `scoring.service.ts` | `computeAndStoreScoresForRace` — orchestrates scoring via pure formula |
+| `pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick` |
+| `ingestion.service.ts` | `ingestResultsForRace` — fetches OpenF1 final results → upserts `RaceResult`; `findRacesNeedingIngestion` |
+| `scoring.service.ts` | `computeAndStoreScoresForRace` — orchestrates scoring via pure formula (requires results already in DB) |
 | `leaderboard.service.ts` | `getGlobalLeaderboard`, `getFriendsLeaderboard`, `getUserSeasonRank` |
 | `user.service.ts` | `setUsername`, `isUsernameAvailable`, `setFavoriteTeam`, `suggestUsernames` |
 | `friendship.service.ts` | Friend request CRUD |
 | `lock.service.ts` | `isRaceLocked(race)`, `isPickSetLocked(pickSet)` |
+
+### Cron Pipeline (race completion flow)
+```
+sync-schedule  (daily 00:00) → upserts Race/Driver/Constructor/RaceEntry from OpenF1
+lock-picks     (daily 12:00) → locks PickSets past cutoff
+ingest-results (daily 20:00) → ingestResultsForRace → computeAndStoreScoresForRace
+```
+`ingest-results` replaces the old `compute-scores` cron. It runs both ingestion and scoring in sequence. The old `/api/cron/compute-scores` route remains for manual targeted reruns.
 
 ---
 

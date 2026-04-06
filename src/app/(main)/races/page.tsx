@@ -5,6 +5,7 @@ import { isRaceLocked } from "@/lib/services/lock.service"
 import Link from "next/link"
 import { CheckCircle2, Circle, Lock, Zap } from "lucide-react"
 import type { RaceSummary } from "@/types/domain"
+import { OnboardingCarousel } from "@/components/onboarding/OnboardingCarousel"
 
 // Country → flag emoji map
 const FLAG: Record<string, string> = {
@@ -92,7 +93,7 @@ function RaceCard({ race, picked, locked }: RaceCardProps) {
 
 export default async function RacesPage() {
   const session = await auth()
-  const userId = session!.user!.id!
+  const userId = session?.user?.id ?? null
 
   const season = await getActiveSeason()
   if (!season) {
@@ -105,7 +106,7 @@ export default async function RacesPage() {
 
   const [races, pickedIds] = await Promise.all([
     getRacesForSeason(season.id),
-    getPickedRaceIds(userId, season.id),
+    userId ? getPickedRaceIds(userId, season.id) : Promise.resolve(new Set<string>()),
   ])
 
   const upcoming = races.filter((r) => r.status === "UPCOMING" || r.status === "LIVE")
@@ -113,14 +114,19 @@ export default async function RacesPage() {
 
   return (
     <div className="px-4 pt-4 pb-6">
+      {/* Onboarding carousel — dismissed via localStorage */}
+      <OnboardingCarousel />
+
       {/* Season header */}
       <div className="mb-4">
         <h1 className="text-xl font-black text-text-primary tracking-tight">
           {season.year} Season
         </h1>
-        <p className="text-xs text-text-secondary mt-0.5">
-          {pickedIds.size} / {races.length} races picked
-        </p>
+        {userId && (
+          <p className="text-xs text-text-secondary mt-0.5">
+            {pickedIds.size} / {races.length} races picked
+          </p>
+        )}
       </div>
 
       {/* Upcoming races */}

@@ -6,6 +6,7 @@ import {
 } from "@/lib/services/leaderboard.service"
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList"
 import { FriendSearch } from "@/components/leaderboard/FriendSearch"
+import Link from "next/link"
 
 interface LeaderboardSearchParams {
   scope?: string
@@ -18,9 +19,10 @@ export default async function LeaderboardPage({
   searchParams: LeaderboardSearchParams
 }) {
   const session = await auth()
-  const userId = session!.user!.id!
+  const userId = session?.user?.id ?? null
 
-  const scope = searchParams.scope === "friends" ? "friends" : "global"
+  // Guests can only see global leaderboard
+  const scope = userId && searchParams.scope === "friends" ? "friends" : "global"
   const sort = searchParams.sort ?? "season"
 
   const season = await getActiveSeason()
@@ -39,10 +41,10 @@ export default async function LeaderboardPage({
 
   const [rows, userRank] = await Promise.all([
     getGlobalLeaderboard(season.id, sort, 50),
-    getUserSeasonRank(userId, season.id),
+    userId ? getUserSeasonRank(userId, season.id) : Promise.resolve(null),
   ])
 
-  const userRow = rows.find((r) => r.userId === userId) ?? null
+  const userRow = userId ? (rows.find((r) => r.userId === userId) ?? null) : null
 
   return (
     <div className="px-4 pt-4 pb-6 space-y-4">
@@ -56,8 +58,22 @@ export default async function LeaderboardPage({
         initialSort={sort}
         completedRaces={completedRaces}
         seasonYear={season.year}
+        isGuest={!userId}
       />
-      <FriendSearch currentUserId={userId} />
+      {userId ? (
+        <FriendSearch currentUserId={userId} />
+      ) : (
+        <div className="rounded-2xl bg-surface border border-[var(--border)] p-5 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm font-semibold text-text-primary">Join the competition</p>
+          <p className="text-xs text-text-secondary">Sign in to make picks, track your score, and compete with friends.</p>
+          <Link
+            href="/signin?callbackUrl=/leaderboard"
+            className="inline-flex items-center justify-center rounded-xl bg-accent text-white text-sm font-semibold px-5 py-2.5"
+          >
+            Sign in
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

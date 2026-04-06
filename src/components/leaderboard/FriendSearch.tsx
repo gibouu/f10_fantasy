@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import useSWR from 'swr'
+import Link from 'next/link'
 import { Search, UserPlus, CheckCircle2, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -119,7 +120,7 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
     <div className="flex flex-col gap-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-text-primary">Friends</h2>
+        <h2 className="text-base font-semibold text-text-primary">Manage Friends</h2>
         <span className="text-sm text-text-tertiary">{friends.length} friends</span>
       </div>
 
@@ -262,9 +263,10 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
           <h3 className="text-sm font-semibold text-text-secondary mb-2">Your Friends</h3>
           <div className="flex flex-col gap-1">
             {friends.map((friend) => (
-              <div
+              <Link
                 key={friend.id}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                href={`/profile/${friend.id}`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-elevated transition-colors"
               >
                 <Avatar
                   src={friend.avatarUrl}
@@ -275,7 +277,7 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
                   {friend.publicUsername ?? 'Anonymous'}
                 </span>
                 <CheckCircle2 className="h-4 w-4 text-[#30d158] shrink-0" />
-              </div>
+              </Link>
             ))}
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import useSWR from 'swr'
+import Link from 'next/link'
 import { UserPlus, ChevronDown } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -24,7 +25,7 @@ interface CompletedRace {
 
 interface LeaderboardListProps {
   rows: LeaderboardRow[]
-  userId: string
+  userId: string | null
   userRank: number | null
   userRow: LeaderboardRow | null
   seasonId: string
@@ -32,6 +33,7 @@ interface LeaderboardListProps {
   initialScope: Scope
   initialSort: string
   completedRaces: CompletedRace[]
+  isGuest?: boolean
 }
 
 // ─────────────────────────────────────────────
@@ -58,9 +60,10 @@ function LeaderboardRowItem({ row, isCurrentUser, isPinned }: RowProps) {
   const medalColor = MEDAL_COLORS[row.rank]
 
   return (
-    <div
+    <Link
+      href={`/profile/${row.userId}`}
       className={cn(
-        'flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors',
+        'flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors hover:bg-surface-elevated',
         isCurrentUser && 'bg-accent/5 border border-accent/20',
         isPinned && 'mt-3 border-t-0',
       )}
@@ -106,7 +109,7 @@ function LeaderboardRowItem({ row, isCurrentUser, isPinned }: RowProps) {
       >
         {row.totalScore} <span className="text-xs font-normal text-text-tertiary">pts</span>
       </span>
-    </div>
+    </Link>
   )
 }
 
@@ -167,6 +170,7 @@ export function LeaderboardList({
   initialScope,
   initialSort,
   completedRaces,
+  isGuest = false,
 }: LeaderboardListProps) {
   const [scope, setScope] = React.useState<Scope>(initialScope)
   const [sort, setSort] = React.useState<string>(initialSort)
@@ -209,14 +213,16 @@ export function LeaderboardList({
 
       {/* Controls */}
       <div className="flex flex-col gap-2">
-        <SegmentedControl
-          options={[
-            { value: 'global', label: 'Global' },
-            { value: 'friends', label: 'Friends' },
-          ]}
-          value={scope}
-          onChange={(v) => setScope(v as Scope)}
-        />
+        {!isGuest && (
+          <SegmentedControl
+            options={[
+              { value: 'global', label: 'Global' },
+              { value: 'friends', label: 'Friends' },
+            ]}
+            value={scope}
+            onChange={(v) => setScope(v as Scope)}
+          />
+        )}
         <SortDropdown
           value={sort}
           onChange={setSort}
