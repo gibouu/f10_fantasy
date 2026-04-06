@@ -273,15 +273,17 @@ export class OpenF1Provider implements F1ProviderAdapter {
 
       if (lastLap.size > 0) {
         const maxLaps = Math.max(...Array.from(lastLap.values()))
-        const threshold = maxLaps * 0.95
+        // 90% threshold: catches mid-race retirements while keeping lapped
+        // cars (typically 1-2 laps down) as CLASSIFIED.
+        const threshold = maxLaps * 0.90
 
         for (const [driverNumber, laps] of Array.from(lastLap.entries())) {
           if (laps < threshold) retiredDriverNumbers.add(driverNumber)
         }
       }
-    } catch {
-      // Lap data unavailable (e.g. live session not yet complete) — proceed
-      // without DNF detection; all drivers will be marked CLASSIFIED.
+    } catch (err) {
+      console.error(`[openf1] Lap data unavailable for session ${sessionKey} — all drivers marked CLASSIFIED:`, err)
+      // Re-ingest after data becomes available via POST /api/cron/ingest-results { raceId }
     }
 
     // 4. Compose final results

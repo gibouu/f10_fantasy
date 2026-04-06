@@ -109,7 +109,9 @@ export function computeWinnerBonus(
 }
 
 /**
- * Bonus for correctly picking a DNF.
+ * Bonus for correctly picking a driver who did not finish.
+ *
+ * Awards points for any non-classified outcome: DNF, DNS, DSQ.
  *
  * Main:   +3
  * Sprint: +1
@@ -119,7 +121,7 @@ export function computeDnfBonus(
   ctx: ScoringContext,
 ): number {
   const result = findResult(driverNumber, ctx.results)
-  if (!result || result.status !== 'DNF') return 0
+  if (!result || result.status === 'CLASSIFIED') return 0
 
   return ctx.raceType === 'MAIN' ? 3 : 1
 }
