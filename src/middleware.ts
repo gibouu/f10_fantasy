@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
 import type { Session } from "next-auth";
+
+const { auth } = NextAuth(authConfig);
 
 // Routes that are always publicly accessible (no session required).
 const PUBLIC_ROUTES = ["/signin", "/races", "/leaderboard"];
