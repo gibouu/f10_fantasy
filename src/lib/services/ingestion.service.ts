@@ -42,11 +42,11 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
   const driverNumbers = finalResults.map((r) => r.driverNumber)
 
   const dbDrivers = await db.$queryRaw<
-    Array<{ id: string; openf1_driver_number: number }>
-  >`SELECT id, openf1_driver_number FROM "Driver" WHERE openf1_driver_number = ANY(${driverNumbers}::int[])`
+    Array<{ id: string; openf1DriverNumber: number }>
+  >`SELECT id, "openf1DriverNumber" FROM "Driver" WHERE "openf1DriverNumber" = ANY(${driverNumbers}::int[])`
 
   const driverMap = new Map(
-    dbDrivers.map((d) => [d.openf1_driver_number, d.id]),
+    dbDrivers.map((d) => [d.openf1DriverNumber, d.id]),
   )
 
   let ingested = 0

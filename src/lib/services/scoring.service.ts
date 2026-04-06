@@ -82,16 +82,16 @@ export async function computeAndStoreScoresForRace(
   // Query driver numbers via the results table to avoid Prisma's Driver select
   // type conflict caused by the `constructor` relation key shadowing Object.constructor
   const driverNumbers = await db.$queryRaw<
-    Array<{ id: string; openf1_driver_number: number | null }>
-  >`SELECT id, openf1_driver_number FROM "Driver" WHERE id = ANY(${driverIds}::text[])`
+    Array<{ id: string; openf1DriverNumber: number | null }>
+  >`SELECT id, "openf1DriverNumber" FROM "Driver" WHERE id = ANY(${driverIds}::text[])`
 
   const driverMap: DriverIdToNumber = new Map(
     driverNumbers
       .filter(
-        (d): d is { id: string; openf1_driver_number: number } =>
-          d.openf1_driver_number !== null,
+        (d): d is { id: string; openf1DriverNumber: number } =>
+          d.openf1DriverNumber !== null,
       )
-      .map((d) => [d.id, d.openf1_driver_number]),
+      .map((d) => [d.id, d.openf1DriverNumber]),
   )
 
   // Helper to look up openf1DriverNumber for a DB driver id
@@ -207,16 +207,16 @@ export async function recomputeScoreForPickSet(
 
   // Use raw query to avoid Prisma's Driver select type conflict with `constructor` relation
   const driverNumbers = await db.$queryRaw<
-    Array<{ id: string; openf1_driver_number: number | null }>
-  >`SELECT id, openf1_driver_number FROM "Driver" WHERE id = ANY(${driverIds}::text[])`
+    Array<{ id: string; openf1DriverNumber: number | null }>
+  >`SELECT id, "openf1DriverNumber" FROM "Driver" WHERE id = ANY(${driverIds}::text[])`
 
   const driverMap: DriverIdToNumber = new Map(
     driverNumbers
       .filter(
-        (d): d is { id: string; openf1_driver_number: number } =>
-          d.openf1_driver_number !== null,
+        (d): d is { id: string; openf1DriverNumber: number } =>
+          d.openf1DriverNumber !== null,
       )
-      .map((d) => [d.id, d.openf1_driver_number]),
+      .map((d) => [d.id, d.openf1DriverNumber]),
   )
 
   const normalizedResults: NormalizedFinalResult[] = ps.race.results

@@ -185,10 +185,10 @@ export async function POST(req: NextRequest) {
 
   const constructorIdByTeam = new Map(
     (
-      await db.$queryRaw<Array<{ id: string; openf1_team_name: string }>>`
-        SELECT id, openf1_team_name FROM "Constructor"
+      await db.$queryRaw<Array<{ id: string; openf1TeamName: string }>>`
+        SELECT id, "openf1TeamName" FROM "Constructor"
       `
-    ).map((c) => [c.openf1_team_name, c.id]),
+    ).map((c) => [c.openf1TeamName, c.id]),
   )
 
   // ── 8. Batch upsert Drivers ────────────────────────────────────────────────
@@ -232,10 +232,10 @@ export async function POST(req: NextRequest) {
 
   const driverIdByNumber = new Map(
     (
-      await db.$queryRaw<Array<{ id: string; openf1_driver_number: number }>>`
-        SELECT id, openf1_driver_number FROM "Driver"
+      await db.$queryRaw<Array<{ id: string; openf1DriverNumber: number }>>`
+        SELECT id, "openf1DriverNumber" FROM "Driver"
       `
-    ).map((d) => [d.openf1_driver_number, d.id]),
+    ).map((d) => [d.openf1DriverNumber, d.id]),
   )
 
   // ── 9. Batch create RaceEntries (Race + Sprint sessions only) ──────────────
