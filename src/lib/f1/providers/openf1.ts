@@ -279,6 +279,14 @@ export class OpenF1Provider implements F1ProviderAdapter {
         for (const [driverNumber, laps] of Array.from(lastLap.entries())) {
           if (laps < threshold) retiredDriverNumbers.add(driverNumber)
         }
+
+        // Drivers present in position data but with no stints = DNS (never started).
+        // OpenF1 includes DNS drivers in /position at their grid slot.
+        for (const driverNumber of Array.from(latestByDriver.keys())) {
+          if (!lastLap.has(driverNumber)) {
+            retiredDriverNumbers.add(driverNumber)
+          }
+        }
       }
     } catch (err) {
       console.error(`[openf1] Stint data unavailable for session ${sessionKey} — all drivers marked CLASSIFIED:`, err)
