@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "src/app/api/cron/**": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/sync-schedule",
