@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
   }
 
   await db.$transaction(
-    [...uniqueConstructors.values()].map((c) =>
+    Array.from(uniqueConstructors.values()).map((c) =>
       db.constructor.upsert({
         where: { openf1TeamName: c.teamName },
         create: {
@@ -207,7 +207,7 @@ export async function POST(req: NextRequest) {
   }
 
   await db.$transaction(
-    [...uniqueDrivers.values()].map((d) =>
+    Array.from(uniqueDrivers.values()).map((d) =>
       db.driver.upsert({
         where: { openf1DriverNumber: d.driverNumber },
         create: {
