@@ -268,66 +268,65 @@ export function OnboardingCarousel({
   const SlideComponent = SLIDES[slide]
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/55 backdrop-blur-sm">
-      <div className="mx-auto flex h-full max-w-[430px] flex-col bg-background/95">
-        <div
-          className="flex-1 overflow-y-auto px-6 pb-6 pt-8 select-none"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex gap-1.5">
-              {SLIDES.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSlide(i)}
-                  className={cn(
-                    'h-1.5 rounded-full transition-all',
-                    i === slide ? 'bg-accent w-8' : 'bg-surface-elevated w-2',
-                  )}
-                  aria-label={`Go to tutorial slide ${i + 1}`}
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => void dismiss()}
-              disabled={isSubmitting}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated transition-colors hover:bg-surface-elevated/80 disabled:opacity-50"
-              aria-label="Dismiss tutorial"
-            >
-              <X className="h-4 w-4 text-text-tertiary" />
-            </button>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4">
+      <div
+        className="w-full max-w-[400px] overflow-hidden rounded-[28px] bg-surface shadow-[0_32px_96px_rgba(0,0,0,0.5)] select-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Header: progress dots + dismiss */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <div className="flex gap-1.5">
+            {SLIDES.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSlide(i)}
+                className={cn(
+                  'h-1.5 rounded-full transition-all',
+                  i === slide ? 'bg-accent w-8' : 'bg-surface-elevated w-2',
+                )}
+                aria-label={`Go to tutorial slide ${i + 1}`}
+              />
+            ))}
           </div>
-
-          <div className="rounded-[28px] border border-[var(--border)] bg-surface p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-            <SlideComponent />
-          </div>
+          <button
+            type="button"
+            onClick={() => void dismiss()}
+            disabled={isSubmitting}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated transition-colors hover:bg-surface-elevated/80 disabled:opacity-50"
+            aria-label="Dismiss tutorial"
+          >
+            <X className="h-4 w-4 text-text-tertiary" />
+          </button>
         </div>
 
-        <div className="border-t border-[var(--border)] bg-surface-elevated/60 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setSlide(Math.max(0, slide - 1))}
-              className={cn(
-                'text-sm font-medium text-text-tertiary transition-opacity',
-                slide === 0 && 'pointer-events-none opacity-0',
-              )}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => void next()}
-              disabled={isSubmitting}
-              className="flex items-center gap-1.5 text-sm font-bold text-accent disabled:opacity-50"
-            >
-              {slide === SLIDES.length - 1 ? "Let's go" : 'Next'}
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+        {/* Slide content */}
+        <div className="px-5 pb-5">
+          <SlideComponent />
+        </div>
+
+        {/* Footer: Back / Next — inside the card */}
+        <div className="flex items-center justify-between border-t border-[var(--border)] bg-surface-elevated/40 px-5 py-4">
+          <button
+            type="button"
+            onClick={() => setSlide(Math.max(0, slide - 1))}
+            className={cn(
+              'text-sm font-medium text-text-secondary transition-opacity',
+              slide === 0 && 'pointer-events-none opacity-0',
+            )}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={() => void next()}
+            disabled={isSubmitting}
+            className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {slide === SLIDES.length - 1 ? "Let's go" : 'Next'}
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>
