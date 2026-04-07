@@ -8,6 +8,7 @@ import { UserPlus, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import { SegmentedControl } from '@/components/ui/segmented-control'
+import { FriendSearch } from '@/components/leaderboard/FriendSearch'
 import type { LeaderboardRow } from '@/types/domain'
 
 // ─────────────────────────────────────────────
@@ -80,7 +81,7 @@ function LeaderboardRowItem({ row, isCurrentUser, isPinned }: RowProps) {
 
       {/* Avatar — shows team logo if user has set a favourite team */}
       <Avatar
-        src={row.avatarUrl}
+        src={null}
         name={row.publicUsername ?? row.userId}
         size="sm"
         teamLogoUrl={row.teamLogoUrl}
@@ -290,6 +291,11 @@ export function LeaderboardList({
             No scores yet — picks are scored after each race.
           </p>
         </div>
+      )}
+
+      {/* Manage Friends — only on Friends tab */}
+      {scope === 'friends' && userId && (
+        <FriendSearch currentUserId={userId} />
       )}
     </div>
   )

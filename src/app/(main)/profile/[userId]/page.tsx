@@ -7,6 +7,8 @@ import useSWR from 'swr'
 import { ChevronLeft } from 'lucide-react'
 
 import { Avatar } from '@/components/ui/avatar'
+import { TEAMS } from '@/lib/f1/teams'
+import type { TeamSlug } from '@/lib/f1/teams'
 import {
   Sheet,
   SheetContent,
@@ -327,9 +329,11 @@ export default function FriendProfilePage() {
 
         <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-surface px-4 py-4">
           <Avatar
-            src={user.avatarUrl}
+            src={null}
             name={user.publicUsername ?? user.id}
             size="lg"
+            teamLogoUrl={user.favoriteTeamSlug ? (TEAMS[user.favoriteTeamSlug as TeamSlug]?.logoUrl ?? null) : null}
+            teamColor={user.favoriteTeamSlug ? (TEAMS[user.favoriteTeamSlug as TeamSlug]?.color ?? null) : null}
           />
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-bold text-text-primary">

@@ -3,6 +3,7 @@ import { db } from '@/lib/db/client'
 import { redirect } from 'next/navigation'
 import { TeamPicker } from './TeamPicker'
 import { UsernameChangeForm } from './UsernameChangeForm'
+import { SignOutButton } from './SignOutButton'
 import { TEAM_LIST } from '@/lib/f1/teams'
 
 export default async function ProfilePage() {
@@ -48,6 +49,8 @@ export default async function ProfilePage() {
           initialSlug={user?.favoriteTeamSlug ?? null}
         />
       </div>
+
+      <SignOutButton />
     </div>
   )
 }

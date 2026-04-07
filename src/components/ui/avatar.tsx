@@ -17,23 +17,24 @@ const SIZE_MAP = {
 type AvatarSize = keyof typeof SIZE_MAP
 
 // ─────────────────────────────────────────────
-// Deterministic gradient from name string
+// Deterministic muted color from name string
 // ─────────────────────────────────────────────
 
-const GRADIENTS = [
-  'from-[#FF6B6B] to-[#FF8E53]',
-  'from-[#4FACFE] to-[#00F2FE]',
-  'from-[#43E97B] to-[#38F9D7]',
-  'from-[#FA709A] to-[#FEE140]',
-  'from-[#A18CD1] to-[#FBC2EB]',
-  'from-[#FD746C] to-[#FF9068]',
-  'from-[#667EEA] to-[#764BA2]',
-  'from-[#F093FB] to-[#F5576C]',
-  'from-[#4481EB] to-[#04BEFE]',
-  'from-[#0BA360] to-[#3CBA92]',
+/** Muted flat colors inspired by F1 team palette backgrounds */
+const MUTED_COLORS = [
+  '#D4A5A5', // muted red
+  '#A5B4D4', // muted blue
+  '#A5D4BC', // muted teal
+  '#D4C5A5', // muted orange/sand
+  '#C5A5D4', // muted purple
+  '#A5C5D4', // muted cyan
+  '#D4A5C5', // muted pink
+  '#B4D4A5', // muted green
+  '#D4B4A5', // muted coral
+  '#A5A5D4', // muted indigo
 ]
 
-/** Simple djb2-inspired hash to pick a gradient deterministically. */
+/** Simple djb2-inspired hash to pick a color deterministically. */
 function nameHash(name: string): number {
   let hash = 5381
   for (let i = 0; i < name.length; i++) {
@@ -42,8 +43,8 @@ function nameHash(name: string): number {
   return Math.abs(hash)
 }
 
-function gradientForName(name: string): string {
-  return GRADIENTS[nameHash(name) % GRADIENTS.length]
+function colorForName(name: string): string {
+  return MUTED_COLORS[nameHash(name) % MUTED_COLORS.length]
 }
 
 // ─────────────────────────────────────────────
@@ -125,12 +126,8 @@ export function Avatar({
         </div>
       ) : (
         <div
-          className={cn(
-            'w-full h-full flex items-center justify-center bg-gradient-to-br',
-            gradientForName(name),
-            fontSize,
-            'font-semibold text-white',
-          )}
+          className={cn('w-full h-full flex items-center justify-center', fontSize, 'font-semibold')}
+          style={{ backgroundColor: colorForName(name), color: '#1a1a1a' }}
         >
           {getInitials(name)}
         </div>

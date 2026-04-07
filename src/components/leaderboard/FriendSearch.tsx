@@ -19,6 +19,8 @@ type SearchResult = {
   id: string
   publicUsername: string | null
   avatarUrl: string | null
+  teamLogoUrl?: string | null
+  teamColor?: string | null
 }
 
 type FriendsData = {
@@ -156,9 +158,11 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-elevated transition-colors"
                 >
                   <Avatar
-                    src={user.avatarUrl}
+                    src={null}
                     name={user.publicUsername ?? user.id}
                     size="md"
+                    teamLogoUrl={user.teamLogoUrl}
+                    teamColor={user.teamColor}
                   />
                   <span className="flex-1 text-sm text-text-primary truncate">
                     {user.publicUsername ?? 'Anonymous'}
@@ -201,7 +205,7 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-elevated border border-[var(--border)]"
               >
                 <Avatar
-                  src={req.requesterAvatar}
+                  src={null}
                   name={req.requesterUsername ?? req.requesterId}
                   size="md"
                 />
@@ -232,31 +236,6 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
         </div>
       )}
 
-      {/* Pending sent requests */}
-      {pendingSent.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-text-secondary mb-2">Sent Requests</h3>
-          <div className="flex flex-col gap-1">
-            {pendingSent.map((req) => (
-              <div
-                key={req.id}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-              >
-                <Avatar
-                  src={null}
-                  name={req.addresseeId}
-                  size="md"
-                />
-                <span className="flex-1 text-sm text-text-secondary truncate">
-                  {req.addresseeId}
-                </span>
-                <span className="text-xs text-text-tertiary">Pending</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Current friends list */}
       {friends.length > 0 && (
         <div>
@@ -269,9 +248,11 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-elevated transition-colors"
               >
                 <Avatar
-                  src={friend.avatarUrl}
+                  src={null}
                   name={friend.publicUsername ?? friend.id}
                   size="md"
+                  teamLogoUrl={friend.teamLogoUrl}
+                  teamColor={friend.teamColor}
                 />
                 <span className="flex-1 text-sm text-text-primary truncate">
                   {friend.publicUsername ?? 'Anonymous'}

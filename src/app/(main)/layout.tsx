@@ -5,6 +5,7 @@ import type { TeamSlug } from "@/lib/f1/teams"
 import { UserAvatarMenu } from "./UserAvatarMenu"
 import { TabBarLink } from "./TabBarLink"
 import { Flag, Trophy } from "lucide-react"
+import Link from "next/link"
 
 export default async function MainLayout({
   children,
@@ -30,14 +31,14 @@ export default async function MainLayout({
       <header className="sticky top-0 z-50 glass border-b border-black/[0.07] rounded-b-[22px]">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Wordmark */}
-          <div className="flex items-baseline gap-1.5">
+          <Link href="/races" className="flex items-baseline gap-1.5">
             <span className="text-accent font-black text-xl tracking-tight leading-none">
               FX
             </span>
             <span className="text-text-secondary font-medium text-sm tracking-widest uppercase">
               Racing
             </span>
-          </div>
+          </Link>
 
           {/* User menu — client component */}
           <UserAvatarMenu

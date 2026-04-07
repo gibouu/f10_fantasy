@@ -8,6 +8,8 @@
 import { db } from '@/lib/db/client'
 import type { FriendRequestData } from '@/types/domain'
 import { FriendRequestStatus } from '@/types/domain'
+import { TEAMS } from '@/lib/f1/teams'
+import type { TeamSlug } from '@/lib/f1/teams'
 
 // ─────────────────────────────────────────────
 // Internal mappers
@@ -49,7 +51,7 @@ function mapFriendRequest(fr: {
 export async function searchUsers(
   query: string,
   currentUserId: string,
-): Promise<Array<{ id: string; publicUsername: string | null; avatarUrl: string | null }>> {
+): Promise<Array<{ id: string; publicUsername: string | null; avatarUrl: string | null; teamLogoUrl: string | null; teamColor: string | null }>> {
   // Find user IDs that already have a relationship with the current user
   const existingRelationships = await db.friendRequest.findMany({
     where: {
@@ -73,15 +75,20 @@ export async function searchUsers(
         mode: 'insensitive',
       },
     },
-    select: { id: true, publicUsername: true, image: true },
+    select: { id: true, publicUsername: true, image: true, favoriteTeamSlug: true },
     take: 10,
   })
 
-  return users.map((u) => ({
-    id: u.id,
-    publicUsername: u.publicUsername,
-    avatarUrl: u.image,
-  }))
+  return users.map((u) => {
+    const teamInfo = u.favoriteTeamSlug ? (TEAMS[u.favoriteTeamSlug as TeamSlug] ?? null) : null
+    return {
+      id: u.id,
+      publicUsername: u.publicUsername,
+      avatarUrl: u.image,
+      teamLogoUrl: teamInfo?.logoUrl ?? null,
+      teamColor: teamInfo?.color ?? null,
+    }
+  })
 }
 
 /**
@@ -222,26 +229,27 @@ export async function getPendingRequests(
  */
 export async function getFriends(
   userId: string,
-): Promise<Array<{ id: string; publicUsername: string | null; avatarUrl: string | null }>> {
+): Promise<Array<{ id: string; publicUsername: string | null; avatarUrl: string | null; teamLogoUrl: string | null; teamColor: string | null }>> {
   const accepted = await db.friendRequest.findMany({
     where: {
       status: 'ACCEPTED',
       OR: [{ requesterId: userId }, { addresseeId: userId }],
     },
     include: {
-      requester: { select: { id: true, publicUsername: true, image: true } },
-      addressee: { select: { id: true, publicUsername: true, image: true } },
+      requester: { select: { id: true, publicUsername: true, image: true, favoriteTeamSlug: true } },
+      addressee: { select: { id: true, publicUsername: true, image: true, favoriteTeamSlug: true } },
     },
   })
 
   return accepted.map((fr) => {
-    // Return whichever party is not the current user
-    const friend =
-      fr.requesterId === userId ? fr.addressee : fr.requester
+    const friend = fr.requesterId === userId ? fr.addressee : fr.requester
+    const teamInfo = friend.favoriteTeamSlug ? (TEAMS[friend.favoriteTeamSlug as TeamSlug] ?? null) : null
     return {
       id: friend.id,
       publicUsername: friend.publicUsername,
       avatarUrl: friend.image,
+      teamLogoUrl: teamInfo?.logoUrl ?? null,
+      teamColor: teamInfo?.color ?? null,
     }
   })
 }

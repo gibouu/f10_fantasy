@@ -6,7 +6,6 @@ import {
   getUserSeasonRank,
 } from "@/lib/services/leaderboard.service"
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList"
-import { FriendSearch } from "@/components/leaderboard/FriendSearch"
 import Link from "next/link"
 
 interface LeaderboardSearchParams {
@@ -63,9 +62,7 @@ export default async function LeaderboardPage({
         seasonYear={season.year}
         isGuest={!userId}
       />
-      {userId ? (
-        <FriendSearch currentUserId={userId} />
-      ) : (
+      {!userId && (
         <div className="rounded-2xl bg-surface border border-[var(--border)] p-5 flex flex-col items-center gap-3 text-center">
           <p className="text-sm font-semibold text-text-primary">Join the competition</p>
           <p className="text-xs text-text-secondary">Sign in to make picks, track your score, and compete with friends.</p>

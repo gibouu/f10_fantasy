@@ -53,7 +53,7 @@ export const TEAMS: Record<TeamSlug, TeamInfo> = {
   cadillac: {
     slug: 'cadillac',
     name: 'Cadillac',
-    color: '#FFFFFF',
+    color: '#2B2B2B',
     logoUrl: '/teamlogos/cadillac.webp',
     dbMatch: ['cadillac'],
   },
