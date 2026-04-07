@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { getActiveSeason, getRacesForSeason } from "@/lib/services/race.service"
 import {
+  getFriendsLeaderboard,
   getGlobalLeaderboard,
   getUserSeasonRank,
 } from "@/lib/services/leaderboard.service"
@@ -40,7 +41,9 @@ export default async function LeaderboardPage({
     .map((r) => ({ id: r.id, round: r.round, name: r.name, type: r.type }))
 
   const [rows, userRank] = await Promise.all([
-    getGlobalLeaderboard(season.id, sort, 50),
+    scope === "friends" && userId
+      ? getFriendsLeaderboard(userId, season.id, sort)
+      : getGlobalLeaderboard(season.id, sort, 50),
     userId ? getUserSeasonRank(userId, season.id) : Promise.resolve(null),
   ])
 

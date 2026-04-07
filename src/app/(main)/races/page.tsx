@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { getActiveSeason, getRacesForSeason } from "@/lib/services/race.service"
 import { getPickedRaceIds } from "@/lib/services/pick.service"
+import { hasDismissedTutorial } from "@/lib/services/user.service"
 import { isRaceLocked } from "@/lib/services/lock.service"
 import Link from "next/link"
 import { CheckCircle2, Circle, Lock, Zap } from "lucide-react"
@@ -94,6 +95,7 @@ function RaceCard({ race, picked, locked }: RaceCardProps) {
 export default async function RacesPage() {
   const session = await auth()
   const userId = session?.user?.id ?? null
+  const tutorialDismissed = userId ? await hasDismissedTutorial(userId) : false
 
   const season = await getActiveSeason()
   if (!season) {
@@ -114,8 +116,10 @@ export default async function RacesPage() {
 
   return (
     <div className="px-4 pt-4 pb-6">
-      {/* Onboarding carousel — dismissed via localStorage */}
-      <OnboardingCarousel />
+      <OnboardingCarousel
+        initialVisible={!tutorialDismissed}
+        mode={userId ? "authenticated" : "guest"}
+      />
 
       {/* Season header */}
       <div className="mb-4">

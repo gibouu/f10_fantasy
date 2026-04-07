@@ -138,7 +138,7 @@ export default function UsernameOnboardingPage() {
       // Refresh the Auth.js session so usernameSet becomes true in the token.
       // The middleware will then allow navigation beyond /onboarding.
       await update({ usernameSet: true, publicUsername: username })
-      router.push("/picks")
+      router.push("/races")
     } catch {
       setError("Network error — please try again")
     } finally {

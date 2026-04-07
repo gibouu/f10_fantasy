@@ -1,7 +1,24 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
+import { resolveTeam } from '@/lib/f1/teams'
 import { getPicksForSeason } from '@/lib/services/pick.service'
 import { getActiveSeason } from '@/lib/services/race.service'
+
+type SlotDriver = {
+  id: string
+  code: string
+  firstName: string
+  lastName: string
+  teamName: string
+  teamColor: string
+  logoUrl: string | null
+}
+
+function getScoreCaps(raceType: string) {
+  return raceType === 'SPRINT'
+    ? { p10: 10, winner: 2, dnf: 1 }
+    : { p10: 25, winner: 5, dnf: 3 }
+}
 
 /**
  * GET /api/users/[userId]
@@ -55,15 +72,86 @@ export async function GET(
 
   // Raw query avoids Prisma type conflict with `constructor` relation key
   const drivers = await db.$queryRaw<
-    Array<{ id: string; code: string; first_name: string; last_name: string }>
-  >`SELECT id, code, first_name, last_name FROM "Driver" WHERE id = ANY(${Array.from(driverIds)}::text[])`
+    Array<{
+      id: string
+      code: string
+      first_name: string
+      last_name: string
+      constructor_name: string
+      constructor_short_name: string
+      constructor_color: string
+    }>
+  >`
+    SELECT
+      d.id,
+      d.code,
+      d.first_name,
+      d.last_name,
+      c.name AS constructor_name,
+      c.short_name AS constructor_short_name,
+      c.color AS constructor_color
+    FROM "Driver" d
+    JOIN "Constructor" c ON c.id = d."constructorId"
+    WHERE d.id = ANY(${Array.from(driverIds)}::text[])
+  `
 
   const driverMap = new Map(
-    drivers.map((d) => [d.id, { id: d.id, code: d.code, firstName: d.first_name, lastName: d.last_name }]),
+    drivers.map((d) => {
+      const team =
+        resolveTeam(`${d.constructor_name} ${d.constructor_short_name}`) ??
+        resolveTeam(d.constructor_name) ??
+        resolveTeam(d.constructor_short_name)
+
+      return [
+        d.id,
+        {
+          id: d.id,
+          code: d.code,
+          firstName: d.first_name,
+          lastName: d.last_name,
+          teamName: team?.name ?? d.constructor_name,
+          teamColor: team?.color ?? d.constructor_color,
+          logoUrl: team?.logoUrl ?? null,
+        } satisfies SlotDriver,
+      ]
+    }),
   )
 
   // Serialize — dates to ISO strings so Next.js can send as JSON
   const serializedPicks = picks.map((ps) => ({
+    ...(() => {
+      const caps = getScoreCaps(ps.race.type)
+      const p10Score = ps.scoreBreakdown?.tenthPlaceScore ?? 0
+      const winnerScore = ps.scoreBreakdown?.winnerBonus ?? 0
+      const dnfScore = ps.scoreBreakdown?.dnfBonus ?? 0
+      const isPending = ps.scoreBreakdown === null
+
+      return {
+        slotSummaries: {
+          p10: {
+            driver: driverMap.get(ps.tenthPlaceDriverId) ?? null,
+            score: p10Score,
+            status: isPending
+              ? 'pending'
+              : p10Score === caps.p10
+              ? 'exact'
+              : p10Score > 0
+              ? 'partial'
+              : 'miss',
+          },
+          winner: {
+            driver: driverMap.get(ps.winnerDriverId) ?? null,
+            score: winnerScore,
+            status: isPending ? 'pending' : winnerScore === caps.winner ? 'correct' : 'miss',
+          },
+          dnf: {
+            driver: driverMap.get(ps.dnfDriverId) ?? null,
+            score: dnfScore,
+            status: isPending ? 'pending' : dnfScore === caps.dnf ? 'correct' : 'miss',
+          },
+        },
+      }
+    })(),
     id: ps.id,
     raceId: ps.raceId,
     race: {

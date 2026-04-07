@@ -7,7 +7,7 @@ import type { Session } from "next-auth";
 const { auth } = NextAuth(authConfig);
 
 // Routes that are always publicly accessible (no session required).
-const PUBLIC_ROUTES = ["/signin", "/races", "/leaderboard"];
+const PUBLIC_ROUTES = ["/", "/signin", "/races", "/leaderboard"];
 
 // Prefixes that are publicly accessible without authentication.
 // Read-only browsing: race list, race detail, leaderboard, user profiles.
@@ -73,7 +73,7 @@ export default auth((req: NextAuthRequest) => {
   if (!session) {
     const signInUrl = new URL("/signin", nextUrl.origin);
     // Preserve the intended destination so we can redirect back after login.
-    signInUrl.searchParams.set("callbackUrl", pathname);
+    signInUrl.searchParams.set("callbackUrl", `${pathname}${nextUrl.search}`);
     return NextResponse.redirect(signInUrl);
   }
 
@@ -89,7 +89,7 @@ export default auth((req: NextAuthRequest) => {
 
   // ── 6. Username already set but visiting onboarding → send home ───────
   if (session.user.usernameSet && pathname.startsWith(ONBOARDING_PREFIX)) {
-    return NextResponse.redirect(new URL("/picks", nextUrl.origin));
+    return NextResponse.redirect(new URL("/races", nextUrl.origin));
   }
 
   // ── 7. All checks passed — allow the request ──────────────────────────

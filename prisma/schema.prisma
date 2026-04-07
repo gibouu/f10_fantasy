@@ -16,6 +16,7 @@ model User {
   image              String?
   publicUsername     String?         @unique
   usernameSet        Boolean         @default(false)
+  tutorialDismissedAt DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   favoriteTeamSlug   String?

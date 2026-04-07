@@ -1,6 +1,7 @@
 "use client"
 
 import { signIn } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
 
 function GoogleIcon() {
@@ -23,6 +24,13 @@ function AppleIcon() {
 }
 
 export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }) {
+  const searchParams = useSearchParams()
+  const callbackUrlParam = searchParams.get("callbackUrl")
+  const callbackUrl =
+    callbackUrlParam && callbackUrlParam.startsWith("/") && !callbackUrlParam.startsWith("//")
+      ? callbackUrlParam
+      : "/races"
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-6 relative overflow-hidden">
       {/* Subtle radial accent at top */}
@@ -52,7 +60,7 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
         {/* Auth buttons */}
         <div className="w-full flex flex-col gap-3">
           <button
-            onClick={() => signIn("google", { callbackUrl: "/picks" })}
+            onClick={() => signIn("google", { callbackUrl })}
             className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl
                        bg-white text-text-primary font-semibold text-sm border border-black/10
                        shadow-sm transition-opacity active:opacity-80 hover:opacity-90"
@@ -63,7 +71,7 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
 
           {appleEnabled && (
             <button
-              onClick={() => signIn("apple", { callbackUrl: "/picks" })}
+              onClick={() => signIn("apple", { callbackUrl })}
               className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl
                          bg-white text-text-primary font-semibold text-sm border border-black/10
                          shadow-sm transition-opacity active:opacity-80 hover:opacity-90"

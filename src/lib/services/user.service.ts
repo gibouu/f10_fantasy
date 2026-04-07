@@ -199,6 +199,34 @@ export async function setFavoriteTeam(
 }
 
 /**
+ * Returns whether the tutorial has been dismissed for the given user.
+ */
+export async function hasDismissedTutorial(userId: string): Promise<boolean> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { tutorialDismissedAt: true },
+  })
+  return user?.tutorialDismissedAt != null
+}
+
+/**
+ * Persist that a signed-in user has completed the tutorial overlay.
+ */
+export async function dismissTutorial(userId: string): Promise<Date> {
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { tutorialDismissedAt: new Date() },
+    select: { tutorialDismissedAt: true },
+  })
+
+  if (!user.tutorialDismissedAt) {
+    throw new Error('Failed to persist tutorial dismissal')
+  }
+
+  return user.tutorialDismissedAt
+}
+
+/**
  * Generate 3 unique username suggestions in the format `<Adjective><Noun><NN>`.
  * e.g. "BlueFalcon27", "TurboViper14", "ApexShark93"
  *
