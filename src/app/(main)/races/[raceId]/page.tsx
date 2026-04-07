@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { getRaceById, getRaceEntrants, getRaceResults } from "@/lib/services/race.service"
 import { getPickForRace } from "@/lib/services/pick.service"
+import { resolvePickAgainstEntrants } from "@/lib/services/pick-resolution"
 import { isRaceLocked } from "@/lib/services/lock.service"
 import { PickHero } from "@/components/picks/PickHero"
 import { HeroVisualization } from "@/components/race/HeroVisualization"
@@ -32,6 +33,8 @@ export default async function RacePickPage({
     getRaceEntrants(race.id),
     userId ? getPickForRace(userId, race.id) : Promise.resolve(null),
   ])
+  const resolvedPick =
+    existingPick ? resolvePickAgainstEntrants(existingPick, entrants) : null
 
   const locked = isRaceLocked(race)
 
@@ -46,21 +49,21 @@ export default async function RacePickPage({
     lockCutoffUtc: race.lockCutoffUtc.toISOString(),
   }
 
-  const pickSerialized: SerializedPickSetWithScore | null = existingPick
+  const pickSerialized: SerializedPickSetWithScore | null = resolvedPick
     ? {
-        ...existingPick,
-        createdAt: existingPick.createdAt.toISOString(),
-        updatedAt: existingPick.updatedAt.toISOString(),
-        lockedAt: existingPick.lockedAt?.toISOString() ?? null,
+        ...resolvedPick,
+        createdAt: resolvedPick.createdAt.toISOString(),
+        updatedAt: resolvedPick.updatedAt.toISOString(),
+        lockedAt: resolvedPick.lockedAt?.toISOString() ?? null,
         race: {
-          ...existingPick.race,
-          scheduledStartUtc: existingPick.race.scheduledStartUtc.toISOString(),
-          lockCutoffUtc: existingPick.race.lockCutoffUtc.toISOString(),
+          ...resolvedPick.race,
+          scheduledStartUtc: resolvedPick.race.scheduledStartUtc.toISOString(),
+          lockCutoffUtc: resolvedPick.race.lockCutoffUtc.toISOString(),
         },
-        scoreBreakdown: existingPick.scoreBreakdown
+        scoreBreakdown: resolvedPick.scoreBreakdown
           ? {
-              ...existingPick.scoreBreakdown,
-              computedAt: existingPick.scoreBreakdown.computedAt.toISOString(),
+              ...resolvedPick.scoreBreakdown,
+              computedAt: resolvedPick.scoreBreakdown.computedAt.toISOString(),
             }
           : null,
       }

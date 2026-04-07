@@ -13,6 +13,63 @@ import {
 } from '@/lib/scoring/formula'
 import type { ScoreBreakdownData } from '@/types/domain'
 import type { NormalizedFinalResult } from '@/lib/f1/types'
+import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
+import { resolveTeam } from '@/lib/f1/teams'
+
+function toSeatAwareDriver(driver: {
+  id: string
+  code: string
+  number: number
+  constructor: {
+    id: string
+    name: string
+    shortName: string
+  }
+}) {
+  const team =
+    resolveTeam(`${driver.constructor.name} ${driver.constructor.shortName}`) ??
+    resolveTeam(driver.constructor.name) ??
+    resolveTeam(driver.constructor.shortName)
+
+  return {
+    id: driver.id,
+    code: driver.code,
+    number: driver.number,
+    teamId: driver.constructor.id,
+    teamSlug: team?.slug ?? null,
+  }
+}
+
+function resolveSeatKey(
+  storedSeatKey: string | null,
+  driver: {
+    id: string
+    code: string
+    number: number
+    constructor: {
+      id: string
+      name: string
+      shortName: string
+    }
+  },
+): string | null {
+  if (storedSeatKey) return storedSeatKey
+  return inferSeatKeyFromDriver(toSeatAwareDriver(driver))
+}
+
+function resolveEffectiveDriverId(
+  seatKeyToDriverId: Map<string, string>,
+  entrantIds: Set<string>,
+  seatKey: string | null,
+  fallbackDriverId: string,
+): string | null {
+  if (seatKey) {
+    const activeDriverId = seatKeyToDriverId.get(seatKey)
+    if (activeDriverId) return activeDriverId
+  }
+
+  return entrantIds.has(fallbackDriverId) ? fallbackDriverId : null
+}
 
 // ─────────────────────────────────────────────
 // Public API
@@ -33,16 +90,17 @@ export async function computeAndStoreScoresForRace(
   // 1. Load the race with its type (MAIN | SPRINT) and stored results
   const race = await db.race.findUnique({
     where: { id: raceId },
-    select: {
-      id: true,
-      type: true,
-      results: {
-        select: {
-          driverId: true,
-          position: true,
-          status: true,
+    include: {
+      entries: {
+        include: {
+          driver: {
+            include: {
+              constructor: true,
+            },
+          },
         },
       },
+      results: true,
     },
   })
 
@@ -59,11 +117,22 @@ export async function computeAndStoreScoresForRace(
   // 2. Load all pick sets for the race
   const pickSets = await db.pickSet.findMany({
     where: { raceId },
-    select: {
-      id: true,
-      tenthPlaceDriverId: true,
-      winnerDriverId: true,
-      dnfDriverId: true,
+    include: {
+      tenthPlaceDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      winnerDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      dnfDriver: {
+        include: {
+          constructor: true,
+        },
+      },
     },
   })
 
@@ -71,13 +140,41 @@ export async function computeAndStoreScoresForRace(
 
   // 3. Build a Map<driverDbId, openf1DriverNumber> for formula lookup.
   //    We need the OpenF1 driver number because NormalizedFinalResult uses it.
+  const entrantLookup = buildSeatLookup(
+    race.entries.map((entry) => toSeatAwareDriver(entry.driver)),
+  )
+  const entrantIds = new Set(race.entries.map((entry) => entry.driver.id))
+
+  const resolvedPickSets = pickSets.map((pickSet) => ({
+    id: pickSet.id,
+    tenthPlaceDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(pickSet.tenthPlaceSeatKey, pickSet.tenthPlaceDriver),
+      pickSet.tenthPlaceDriverId,
+    ),
+    winnerDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(pickSet.winnerSeatKey, pickSet.winnerDriver),
+      pickSet.winnerDriverId,
+    ),
+    dnfDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(pickSet.dnfSeatKey, pickSet.dnfDriver),
+      pickSet.dnfDriverId,
+    ),
+  }))
+
   const driverIds = Array.from(
     new Set([
-      ...pickSets.map((ps) => ps.tenthPlaceDriverId),
-      ...pickSets.map((ps) => ps.winnerDriverId),
-      ...pickSets.map((ps) => ps.dnfDriverId),
+      ...resolvedPickSets.map((ps) => ps.tenthPlaceDriverId),
+      ...resolvedPickSets.map((ps) => ps.winnerDriverId),
+      ...resolvedPickSets.map((ps) => ps.dnfDriverId),
     ]),
-  )
+  ).filter((driverId): driverId is string => driverId !== null)
+  
 
   // Query driver numbers via the results table to avoid Prisma's Driver select
   // type conflict caused by the `constructor` relation key shadowing Object.constructor
@@ -122,12 +219,12 @@ export async function computeAndStoreScoresForRace(
   const now = new Date()
   let count = 0
 
-  for (const ps of pickSets) {
+  for (const ps of resolvedPickSets) {
     const score = computeRaceScore(
       {
-        tenthPlaceDriverId: ps.tenthPlaceDriverId,
-        winnerDriverId: ps.winnerDriverId,
-        dnfDriverId: ps.dnfDriverId,
+        tenthPlaceDriverId: ps.tenthPlaceDriverId ?? '',
+        winnerDriverId: ps.winnerDriverId ?? '',
+        dnfDriverId: ps.dnfDriverId ?? '',
       },
       driverMap,
       scoringCtx,
@@ -170,22 +267,34 @@ export async function recomputeScoreForPickSet(
 ): Promise<ScoreBreakdownData> {
   const ps = await db.pickSet.findUnique({
     where: { id: pickSetId },
-    select: {
-      id: true,
-      tenthPlaceDriverId: true,
-      winnerDriverId: true,
-      dnfDriverId: true,
+    include: {
+      tenthPlaceDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      winnerDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      dnfDriver: {
+        include: {
+          constructor: true,
+        },
+      },
       race: {
-        select: {
-          id: true,
-          type: true,
-          results: {
-            select: {
-              driverId: true,
-              position: true,
-              status: true,
+        include: {
+          entries: {
+            include: {
+              driver: {
+                include: {
+                  constructor: true,
+                },
+              },
             },
           },
+          results: true,
         },
       },
     },
@@ -199,11 +308,35 @@ export async function recomputeScoreForPickSet(
   }
 
   // Resolve driver numbers for the three picks
+  const entrantLookup = buildSeatLookup(
+    ps.race.entries.map((entry) => toSeatAwareDriver(entry.driver)),
+  )
+  const entrantIds = new Set(ps.race.entries.map((entry) => entry.driver.id))
+  const resolvedPicks = {
+    tenthPlaceDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(ps.tenthPlaceSeatKey, ps.tenthPlaceDriver),
+      ps.tenthPlaceDriverId,
+    ),
+    winnerDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(ps.winnerSeatKey, ps.winnerDriver),
+      ps.winnerDriverId,
+    ),
+    dnfDriverId: resolveEffectiveDriverId(
+      entrantLookup.seatKeyToDriverId,
+      entrantIds,
+      resolveSeatKey(ps.dnfSeatKey, ps.dnfDriver),
+      ps.dnfDriverId,
+    ),
+  }
   const driverIds = [
-    ps.tenthPlaceDriverId,
-    ps.winnerDriverId,
-    ps.dnfDriverId,
-  ]
+    resolvedPicks.tenthPlaceDriverId,
+    resolvedPicks.winnerDriverId,
+    resolvedPicks.dnfDriverId,
+  ].filter((driverId): driverId is string => driverId !== null)
 
   // Use raw query to avoid Prisma's Driver select type conflict with `constructor` relation
   const driverNumbers = await db.$queryRaw<
@@ -234,9 +367,9 @@ export async function recomputeScoreForPickSet(
 
   const score = computeRaceScore(
     {
-      tenthPlaceDriverId: ps.tenthPlaceDriverId,
-      winnerDriverId: ps.winnerDriverId,
-      dnfDriverId: ps.dnfDriverId,
+      tenthPlaceDriverId: resolvedPicks.tenthPlaceDriverId ?? '',
+      winnerDriverId: resolvedPicks.winnerDriverId ?? '',
+      dnfDriverId: resolvedPicks.dnfDriverId ?? '',
     },
     driverMap,
     {

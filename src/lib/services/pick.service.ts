@@ -14,6 +14,8 @@ import { isRaceLocked, isPickSetLocked } from './lock.service'
 import { z } from 'zod'
 import type { PickSetData, PickSetWithScore, RaceSummary } from '@/types/domain'
 import { RaceStatus, RaceType } from '@/types/domain'
+import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
+import { resolveTeam } from '@/lib/f1/teams'
 
 // ─────────────────────────────────────────────
 // Validation schema
@@ -50,8 +52,11 @@ function mapPickSetToData(
     userId: string
     raceId: string
     tenthPlaceDriverId: string
+    tenthPlaceSeatKey: string | null
     winnerDriverId: string
+    winnerSeatKey: string | null
     dnfDriverId: string
+    dnfSeatKey: string | null
     createdAt: Date
     updatedAt: Date
     lockedAt: Date | null
@@ -62,8 +67,11 @@ function mapPickSetToData(
     userId: ps.userId,
     raceId: ps.raceId,
     tenthPlaceDriverId: ps.tenthPlaceDriverId,
+    tenthPlaceSeatKey: ps.tenthPlaceSeatKey,
     winnerDriverId: ps.winnerDriverId,
+    winnerSeatKey: ps.winnerSeatKey,
     dnfDriverId: ps.dnfDriverId,
+    dnfSeatKey: ps.dnfSeatKey,
     createdAt: ps.createdAt,
     updatedAt: ps.updatedAt,
     lockedAt: ps.lockedAt,
@@ -94,6 +102,47 @@ function mapRaceToSummary(race: {
     lockCutoffUtc: race.lockCutoffUtc,
     status: race.status as RaceStatus,
   }
+}
+
+function toSeatAwareDriver(driver: {
+  id: string
+  code: string
+  number: number
+  constructor: {
+    id: string
+    name: string
+    shortName: string
+  }
+}) {
+  const team =
+    resolveTeam(`${driver.constructor.name} ${driver.constructor.shortName}`) ??
+    resolveTeam(driver.constructor.name) ??
+    resolveTeam(driver.constructor.shortName)
+
+  return {
+    id: driver.id,
+    code: driver.code,
+    number: driver.number,
+    teamId: driver.constructor.id,
+    teamSlug: team?.slug ?? null,
+  }
+}
+
+function resolveStoredSeatKey(
+  storedSeatKey: string | null,
+  driver: {
+    id: string
+    code: string
+    number: number
+    constructor: {
+      id: string
+      name: string
+      shortName: string
+    }
+  },
+): string | null {
+  if (storedSeatKey) return storedSeatKey
+  return inferSeatKeyFromDriver(toSeatAwareDriver(driver))
 }
 
 // ─────────────────────────────────────────────
@@ -146,14 +195,18 @@ export async function createOrUpdatePick(
   ]
 
   const entries = await db.raceEntry.findMany({
-    where: {
-      raceId: validated.raceId,
-      driverId: { in: pickedIds },
+    where: { raceId: validated.raceId },
+    include: {
+      driver: {
+        include: {
+          constructor: true,
+        },
+      },
     },
-    select: { driverId: true },
   })
 
-  const entrantIds = new Set(entries.map((e) => e.driverId))
+  const seatAwareEntrants = entries.map((entry) => toSeatAwareDriver(entry.driver))
+  const entrantIds = new Set(seatAwareEntrants.map((driver) => driver.id))
   const invalidPicks = pickedIds.filter((id) => !entrantIds.has(id))
 
   if (invalidPicks.length > 0) {
@@ -161,6 +214,8 @@ export async function createOrUpdatePick(
       `The following driver IDs are not registered entrants for this race: ${invalidPicks.join(', ')}`,
     )
   }
+
+  const seatLookup = buildSeatLookup(seatAwareEntrants)
 
   // 5. If an existing pick set exists, ensure it hasn't been individually locked
   const existing = await db.pickSet.findUnique({
@@ -181,13 +236,25 @@ export async function createOrUpdatePick(
       userId,
       raceId: validated.raceId,
       tenthPlaceDriverId: validated.tenthPlaceDriverId,
+      tenthPlaceSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.tenthPlaceDriverId) ?? null,
       winnerDriverId: validated.winnerDriverId,
+      winnerSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.winnerDriverId) ?? null,
       dnfDriverId: validated.dnfDriverId,
+      dnfSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
     },
     update: {
       tenthPlaceDriverId: validated.tenthPlaceDriverId,
+      tenthPlaceSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.tenthPlaceDriverId) ?? null,
       winnerDriverId: validated.winnerDriverId,
+      winnerSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.winnerDriverId) ?? null,
       dnfDriverId: validated.dnfDriverId,
+      dnfSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
     },
   })
 
@@ -209,13 +276,42 @@ export async function getPickForRace(
     include: {
       scoreBreakdown: true,
       race: true,
+      tenthPlaceDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      winnerDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      dnfDriver: {
+        include: {
+          constructor: true,
+        },
+      },
     },
   })
 
   if (!pickSet) return null
 
   return {
-    ...mapPickSetToData(pickSet),
+    ...mapPickSetToData({
+      ...pickSet,
+      tenthPlaceSeatKey: resolveStoredSeatKey(
+        pickSet.tenthPlaceSeatKey,
+        pickSet.tenthPlaceDriver,
+      ),
+      winnerSeatKey: resolveStoredSeatKey(
+        pickSet.winnerSeatKey,
+        pickSet.winnerDriver,
+      ),
+      dnfSeatKey: resolveStoredSeatKey(
+        pickSet.dnfSeatKey,
+        pickSet.dnfDriver,
+      ),
+    }),
     race: mapRaceToSummary(pickSet.race),
     scoreBreakdown: pickSet.scoreBreakdown
       ? {
@@ -245,6 +341,21 @@ export async function getPicksForSeason(
     include: {
       scoreBreakdown: true,
       race: true,
+      tenthPlaceDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      winnerDriver: {
+        include: {
+          constructor: true,
+        },
+      },
+      dnfDriver: {
+        include: {
+          constructor: true,
+        },
+      },
     },
     orderBy: {
       race: { round: 'asc' },
@@ -252,7 +363,15 @@ export async function getPicksForSeason(
   })
 
   return pickSets.map((ps) => ({
-    ...mapPickSetToData(ps),
+    ...mapPickSetToData({
+      ...ps,
+      tenthPlaceSeatKey: resolveStoredSeatKey(
+        ps.tenthPlaceSeatKey,
+        ps.tenthPlaceDriver,
+      ),
+      winnerSeatKey: resolveStoredSeatKey(ps.winnerSeatKey, ps.winnerDriver),
+      dnfSeatKey: resolveStoredSeatKey(ps.dnfSeatKey, ps.dnfDriver),
+    }),
     race: mapRaceToSummary(ps.race),
     scoreBreakdown: ps.scoreBreakdown
       ? {

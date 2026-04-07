@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { resolveTeam } from '@/lib/f1/teams'
 import { getPicksForSeason } from '@/lib/services/pick.service'
-import { getActiveSeason } from '@/lib/services/race.service'
+import { getActiveSeason, getRaceEntrants } from '@/lib/services/race.service'
+import { resolvePickAgainstEntrants } from '@/lib/services/pick-resolution'
 
 type SlotDriver = {
   id: string
@@ -62,10 +63,19 @@ export async function GET(
   }
 
   const picks = await getPicksForSeason(userId, season.id)
+  const raceIds = Array.from(new Set(picks.map((pick) => pick.raceId)))
+  const entrantsByRace = new Map(
+    await Promise.all(
+      raceIds.map(async (raceId) => [raceId, await getRaceEntrants(raceId)] as const),
+    ),
+  )
+  const resolvedPicks = picks.map((pick) =>
+    resolvePickAgainstEntrants(pick, entrantsByRace.get(pick.raceId) ?? []),
+  )
 
   // Build a driver lookup so the UI can resolve driver codes
   const driverIds = new Set<string>()
-  for (const pick of picks) {
+  for (const pick of resolvedPicks) {
     driverIds.add(pick.tenthPlaceDriverId)
     driverIds.add(pick.winnerDriverId)
     driverIds.add(pick.dnfDriverId)
@@ -122,7 +132,7 @@ export async function GET(
   )
 
   // Serialize — dates to ISO strings so Next.js can send as JSON
-  const serializedPicks = picks.map((ps) => ({
+  const serializedPicks = resolvedPicks.map((ps) => ({
     ...(() => {
       const caps = getScoreCaps(ps.race.type)
       const p10Score = ps.scoreBreakdown?.tenthPlaceScore ?? 0

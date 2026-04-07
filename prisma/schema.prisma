@@ -149,8 +149,11 @@ model PickSet {
   userId             String
   raceId             String
   tenthPlaceDriverId String
+  tenthPlaceSeatKey  String?
   winnerDriverId     String
+  winnerSeatKey      String?
   dnfDriverId        String
+  dnfSeatKey         String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   lockedAt           DateTime?

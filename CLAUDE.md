@@ -138,13 +138,27 @@ Images in `public/drivers/` are pre-cropped circular headshots — use default `
 | `friendship.service.ts` | Friend request CRUD |
 | `lock.service.ts` | `isRaceLocked(race)`, `isPickSetLocked(pickSet)` |
 
-### Cron Pipeline (race completion flow)
+### Cron Infrastructure
+Cron jobs are **NOT Vercel crons**. They are AWS Lambda functions configured externally that POST to the Next.js API routes on a schedule. Each route validates the `Authorization: Bearer CRON_SECRET` header.
+
+**To add a new cron:**
+1. Create (or reuse) an API route under `src/app/api/cron/`
+2. Configure a new AWS Lambda scheduled trigger to `POST https://<domain>/api/cron/<route>` with `Authorization: Bearer <CRON_SECRET>`
+
+There is no cron config file in this repo — schedules live entirely in AWS.
+
+### Cron Pipeline
 ```
-sync-schedule  (daily 00:00) → upserts Race/Driver/Constructor/RaceEntry from OpenF1
-lock-picks     (daily 12:00) → locks PickSets past cutoff
-ingest-results (daily 20:00) → ingestResultsForRace → computeAndStoreScoresForRace
+sync-schedule  (weekly)       → full season sync: upserts Race/Driver/Constructor/RaceEntry from OpenF1
+sync-entries   (hourly)       → lightweight: refreshes RaceEntry only for non-completed races; handles substitutes
+lock-picks     (daily 12:00)  → locks PickSets past cutoff
+ingest-results (daily 20:00)  → ingestResultsForRace → computeAndStoreScoresForRace
 ```
-`ingest-results` replaces the old `compute-scores` cron. It runs both ingestion and scoring in sequence. The old `/api/cron/compute-scores` route remains for manual targeted reruns.
+
+- `sync-schedule` fetches all sessions + meetings for the year — run weekly, not daily.
+- `sync-entries` is the pre-race refresh. It only queries races already in the DB (no full year fetch), upserts any new drivers/constructors (for substitutes), and rebuilds RaceEntry rows. Safe to run hourly.
+- `ingest-results` replaces the old `compute-scores` cron. The old `/api/cron/compute-scores` route remains for manual targeted reruns.
+- Completed races are never touched by `sync-schedule` or `sync-entries` — their grids are final.
 
 ---
 

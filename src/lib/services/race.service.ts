@@ -10,6 +10,7 @@ import { db } from '@/lib/db/client'
 import type { RaceSummary, DriverSummary, RaceResultRecord } from '@/types/domain'
 import { RaceType, RaceStatus, ResultStatus } from '@/types/domain'
 import { resolveTeam, DRIVER_PHOTOS } from '@/lib/f1/teams'
+import { buildSeatLookup } from '@/lib/f1/seats'
 
 // ─────────────────────────────────────────────
 // Internal mappers
@@ -173,7 +174,7 @@ export async function getRaceEntrants(
     },
   })
 
-  return entries.map((entry) => {
+  const entrants = entries.map((entry) => {
     const team = resolveTeam(entry.driver.constructor.name)
     return {
       id: entry.driver.id,
@@ -182,6 +183,7 @@ export async function getRaceEntrants(
       lastName: entry.driver.lastName,
       number: entry.driver.number,
       photoUrl: DRIVER_PHOTOS[entry.driver.number] ?? entry.driver.photoUrl,
+      seatKey: null,
       constructor: {
         id: entry.driver.constructor.id,
         name: entry.driver.constructor.name,
@@ -192,6 +194,21 @@ export async function getRaceEntrants(
       },
     }
   })
+
+  const seatLookup = buildSeatLookup(
+    entrants.map((entrant) => ({
+      id: entrant.id,
+      code: entrant.code,
+      number: entrant.number,
+      teamId: entrant.constructor.id,
+      teamSlug: entrant.constructor.slug,
+    })),
+  )
+
+  return entrants.map((entrant) => ({
+    ...entrant,
+    seatKey: seatLookup.driverIdToSeatKey.get(entrant.id) ?? null,
+  }))
 }
 
 /**

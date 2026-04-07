@@ -44,6 +44,8 @@ export type DriverSummary = {
   lastName: string
   number: number
   photoUrl: string | null
+  /** Stable constructor seat key, e.g. "ferrari:2" */
+  seatKey: string | null
   constructor: {
     id: string
     name: string
@@ -92,8 +94,11 @@ export type PickSetData = {
   userId: string
   raceId: string
   tenthPlaceDriverId: string
+  tenthPlaceSeatKey: string | null
   winnerDriverId: string
+  winnerSeatKey: string | null
   dnfDriverId: string
+  dnfSeatKey: string | null
   createdAt: Date
   updatedAt: Date
   /** Set when the pick set is locked; null means still editable */

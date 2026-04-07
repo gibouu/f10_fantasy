@@ -258,7 +258,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true })
+  const refreshedRaceIds = Array.from(new Set(raceEntries.map((entry) => entry.raceId)))
+
+  await db.$transaction([
+    db.raceEntry.deleteMany({
+      where: { raceId: { in: refreshedRaceIds } },
+    }),
+    db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
+  ])
 
   return NextResponse.json({ synced, year })
 }
