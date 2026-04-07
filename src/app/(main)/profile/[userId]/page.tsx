@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR from 'swr'
@@ -154,7 +153,7 @@ function PickBubble({
     >
       <div
         className={cn(
-          'relative flex items-center justify-center rounded-full bg-surface-elevated text-text-primary transition-transform active:scale-95',
+          'relative flex items-center justify-center overflow-hidden rounded-full bg-surface-elevated text-text-primary transition-transform active:scale-95',
           bubbleSize,
         )}
         style={{
@@ -162,12 +161,11 @@ function PickBubble({
         }}
       >
         {driver?.photoUrl ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={driver.photoUrl}
             alt={driver.code}
-            fill
-            className="object-cover"
-            sizes={size === 'lg' ? '64px' : '56px'}
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
           <span className={cn('font-black tracking-wide', codeSize)}>
@@ -388,12 +386,11 @@ export default function FriendProfilePage() {
                   }}
                 >
                   {selectedDetail.driver.photoUrl ? (
-                    <Image
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
                       src={selectedDetail.driver.photoUrl}
                       alt={selectedDetail.driver.code}
-                      fill
-                      className="object-cover"
-                      sizes="56px"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm font-black text-text-primary">
