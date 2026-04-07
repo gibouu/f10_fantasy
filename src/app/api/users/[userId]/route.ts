@@ -9,6 +9,7 @@ type SlotDriver = {
   code: string
   firstName: string
   lastName: string
+  photoUrl: string | null
   teamName: string
   teamColor: string
   logoUrl: string | null
@@ -77,6 +78,7 @@ export async function GET(
       code: string
       first_name: string
       last_name: string
+      photo_url: string | null
       constructor_name: string
       constructor_short_name: string
       constructor_color: string
@@ -85,10 +87,11 @@ export async function GET(
     SELECT
       d.id,
       d.code,
-      d.first_name,
-      d.last_name,
+      d."firstName" AS first_name,
+      d."lastName" AS last_name,
+      d."photoUrl" AS photo_url,
       c.name AS constructor_name,
-      c.short_name AS constructor_short_name,
+      c."shortName" AS constructor_short_name,
       c.color AS constructor_color
     FROM "Driver" d
     JOIN "Constructor" c ON c.id = d."constructorId"
@@ -109,6 +112,7 @@ export async function GET(
           code: d.code,
           firstName: d.first_name,
           lastName: d.last_name,
+          photoUrl: d.photo_url,
           teamName: team?.name ?? d.constructor_name,
           teamColor: team?.color ?? d.constructor_color,
           logoUrl: team?.logoUrl ?? null,

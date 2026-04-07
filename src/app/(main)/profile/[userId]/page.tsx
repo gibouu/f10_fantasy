@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import useSWR from 'swr'
@@ -21,6 +22,7 @@ type SlotDriver = {
   code: string
   firstName: string
   lastName: string
+  photoUrl: string | null
   teamName: string
   teamColor: string
   logoUrl: string | null
@@ -159,9 +161,19 @@ function PickBubble({
           boxShadow: `0 0 0 2px ${driver?.teamColor ?? 'rgba(255,255,255,0.12)'}`,
         }}
       >
-        <span className={cn('font-black tracking-wide', codeSize)}>
-          {driver?.code ?? '—'}
-        </span>
+        {driver?.photoUrl ? (
+          <Image
+            src={driver.photoUrl}
+            alt={driver.code}
+            fill
+            className="object-cover"
+            sizes={size === 'lg' ? '64px' : '56px'}
+          />
+        ) : (
+          <span className={cn('font-black tracking-wide', codeSize)}>
+            {driver?.code ?? '—'}
+          </span>
+        )}
         {showBadge && slot.status !== 'pending' ? (
           <BubbleBadge score={slot.score} tone={hitTone} isHit={isHit} />
         ) : null}
@@ -368,12 +380,34 @@ export default function FriendProfilePage() {
 
           <div className="mt-6 rounded-2xl border border-[var(--border)] bg-surface-elevated p-4">
             {selectedDetail?.driver ? (
-              <>
-                <p className="text-base font-bold text-text-primary">
-                  {selectedDetail.driver.firstName} {selectedDetail.driver.lastName}
-                </p>
-                <p className="mt-1 text-sm text-text-secondary">{selectedDetail.driver.teamName}</p>
-              </>
+              <div className="flex items-center gap-3">
+                <div
+                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full bg-surface"
+                  style={{
+                    boxShadow: `0 0 0 2px ${selectedDetail.driver.teamColor}`,
+                  }}
+                >
+                  {selectedDetail.driver.photoUrl ? (
+                    <Image
+                      src={selectedDetail.driver.photoUrl}
+                      alt={selectedDetail.driver.code}
+                      fill
+                      className="object-cover"
+                      sizes="56px"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm font-black text-text-primary">
+                      {selectedDetail.driver.code}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="text-base font-bold text-text-primary">
+                    {selectedDetail.driver.firstName} {selectedDetail.driver.lastName}
+                  </p>
+                  <p className="mt-1 text-sm text-text-secondary">{selectedDetail.driver.teamName}</p>
+                </div>
+              </div>
             ) : (
               <p className="text-sm text-text-secondary">No driver selected.</p>
             )}
