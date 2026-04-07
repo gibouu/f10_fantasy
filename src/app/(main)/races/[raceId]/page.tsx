@@ -147,23 +147,13 @@ export default async function RacePickPage({
             raceType={race.type}
           />
         </>
-      ) : !userId ? (
-        <div className="rounded-2xl bg-surface border border-[var(--border)] p-6 text-center flex flex-col items-center gap-3">
-          <p className="text-sm font-semibold text-text-primary">Sign in to make picks</p>
-          <p className="text-xs text-text-secondary">Create an account to predict the 10th place finisher, winner, and DNF driver.</p>
-          <Link
-            href={`/signin?callbackUrl=/races/${params.raceId}`}
-            className="inline-flex items-center justify-center rounded-xl bg-accent text-white text-sm font-semibold px-5 py-2.5"
-          >
-            Sign in
-          </Link>
-        </div>
       ) : (
         <PickHero
           race={raceSerialized}
           entrants={entrants}
           existingPick={pickDataSerialized}
           isLocked={locked}
+          requiresSignIn={!userId}
         />
       )}
     </div>

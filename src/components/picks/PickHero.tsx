@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import { Lock, X, Check, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LockCountdown } from '@/components/race/LockCountdown'
@@ -257,6 +258,7 @@ export interface PickHeroProps {
   entrants: DriverSummary[]
   existingPick: SerializedPickSetData | null
   isLocked: boolean
+  requiresSignIn?: boolean
   // Actual race results — populated once race is scored
   actualTenth?: DriverSummary | null
   actualWinner?: DriverSummary | null
@@ -268,6 +270,7 @@ export function PickHero({
   entrants,
   existingPick,
   isLocked,
+  requiresSignIn = false,
   actualTenth = null,
   actualWinner = null,
   actualDnf = null,
@@ -302,6 +305,15 @@ export function PickHero({
 
   const handleSave = async () => {
     if (!canSave) return
+
+    if (requiresSignIn) {
+      setErrorMsg(null)
+      setSaveStatus('loading')
+      await signIn('google', { callbackUrl: `/races/${race.id}` })
+      setSaveStatus('idle')
+      return
+    }
+
     setSaveStatus('loading')
     setErrorMsg(null)
 
@@ -425,11 +437,20 @@ export function PickHero({
             className="btn-primary w-full"
           >
             {saveStatus === 'loading'
-              ? 'Saving…'
+              ? requiresSignIn
+                ? 'Signing In…'
+                : 'Saving…'
+              : requiresSignIn
+              ? 'Save and Sign In'
               : existingPick
               ? 'Update Picks'
               : 'Save Picks'}
           </button>
+          {requiresSignIn && (
+            <p className="text-center text-xs text-text-secondary">
+              Pick your drivers first, then sign in with Google to save them.
+            </p>
+          )}
         </div>
       )}
 
