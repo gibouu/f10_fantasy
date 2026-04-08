@@ -19,9 +19,6 @@ const AUTH_PREFIX = "/api/auth";
 // Prefix for cron endpoints — protected by secret header, not session.
 const CRON_PREFIX = "/api/cron";
 
-// Public API routes — no session needed (race schedule, user profiles, etc.)
-const PUBLIC_API_ROUTES = ["/api/races", "/api/users"];
-
 // Prefix for the onboarding flow — authenticated users without a username
 // must be allowed through here.
 const ONBOARDING_PREFIX = "/onboarding";
@@ -32,6 +29,22 @@ const API_PREFIX = "/api";
 // Auth.js v5 injects `auth` (the Session or null) onto the request object
 // when `auth()` is used as a middleware wrapper.
 type NextAuthRequest = NextRequest & { auth: Session | null };
+
+function isPublicApiRoute(pathname: string, method: string): boolean {
+  if (pathname === "/api/races" || pathname.startsWith("/api/races/")) {
+    return method === "GET";
+  }
+
+  if (pathname === "/api/users/suggest-usernames") {
+    return method === "GET";
+  }
+
+  if (pathname === "/api/users/username") {
+    return method === "GET";
+  }
+
+  return method === "GET" && /^\/api\/users\/[^/]+$/.test(pathname);
+}
 
 export default auth((req: NextAuthRequest) => {
   const { nextUrl, auth: session } = req;
@@ -65,7 +78,7 @@ export default auth((req: NextAuthRequest) => {
   }
 
   // ── 3b. Public API routes — no session needed ─────────────────────────
-  if (PUBLIC_API_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
+  if (isPublicApiRoute(pathname, req.method)) {
     return NextResponse.next();
   }
 

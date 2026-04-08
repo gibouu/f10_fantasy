@@ -24,7 +24,7 @@ if (process.env.APPLE_ID && process.env.APPLE_SECRET) {
   );
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const nextAuth = NextAuth({
   ...authConfig,
 
   adapter: PrismaAdapter(db),
@@ -39,6 +39,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
+const rawAuth = nextAuth.auth as (...args: any[]) => Promise<any>;
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+export const auth = (async (...args: any[]) => {
+  const session = await rawAuth(...args);
+
+  if (!session?.user?.id) {
+    return session;
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { sessionValidAfter: true },
+  });
+
+  const sessionIssuedAtMs = session.user.sessionIssuedAtMs;
+
+  if (
+    user?.sessionValidAfter &&
+    typeof sessionIssuedAtMs === "number" &&
+    sessionIssuedAtMs < user.sessionValidAfter.getTime()
+  ) {
+    return null;
+  }
+
+  return session;
+}) as typeof rawAuth;
+
 // ─────────────────────────────────────────────
 // Module augmentation — extend Auth.js types with our custom fields
 // ─────────────────────────────────────────────
@@ -49,6 +78,7 @@ declare module "next-auth" {
       id: string;
       publicUsername: string | null;
       usernameSet: boolean;
+      sessionIssuedAtMs: number | null;
     } & DefaultSession["user"];
   }
 

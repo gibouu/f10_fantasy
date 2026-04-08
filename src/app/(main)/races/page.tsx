@@ -93,11 +93,10 @@ function RaceCard({ race, picked, locked }: RaceCardProps) {
 }
 
 export default async function RacesPage() {
-  const session = await auth()
+  // Run auth + season fetch in parallel — they're independent.
+  const [session, season] = await Promise.all([auth(), getActiveSeason()])
   const userId = session?.user?.id ?? null
-  const tutorialDismissed = userId ? await hasDismissedTutorial(userId) : false
 
-  const season = await getActiveSeason()
   if (!season) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] px-6 text-center">
@@ -106,9 +105,11 @@ export default async function RacesPage() {
     )
   }
 
-  const [races, pickedIds] = await Promise.all([
+  // Batch all per-user and per-season queries together.
+  const [races, pickedIds, tutorialDismissed] = await Promise.all([
     getRacesForSeason(season.id),
     userId ? getPickedRaceIds(userId, season.id) : Promise.resolve(new Set<string>()),
+    userId ? hasDismissedTutorial(userId) : Promise.resolve(false),
   ])
 
   const upcoming = races.filter((r) => r.status === "UPCOMING" || r.status === "LIVE")

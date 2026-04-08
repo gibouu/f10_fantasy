@@ -226,6 +226,16 @@ export async function dismissTutorial(userId: string): Promise<Date> {
   return user.tutorialDismissedAt
 }
 
+export async function revokeUserSessions(userId: string): Promise<Date> {
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { sessionValidAfter: new Date() },
+    select: { sessionValidAfter: true },
+  })
+
+  return user.sessionValidAfter
+}
+
 /**
  * Generate 3 unique username suggestions in the format `<Adjective><Noun><NN>`.
  * e.g. "BlueFalcon27", "TurboViper14", "ApexShark93"

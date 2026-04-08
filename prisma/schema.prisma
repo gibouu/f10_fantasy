@@ -16,6 +16,7 @@ model User {
   image              String?
   publicUsername     String?         @unique
   usernameSet        Boolean         @default(false)
+  sessionValidAfter  DateTime        @default(now())
   tutorialDismissedAt DateTime?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt

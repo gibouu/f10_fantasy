@@ -7,6 +7,7 @@ import {
   isUsernameAvailable,
   changeUsername,
 } from "@/lib/services/user.service"
+import { getClientIp, rateLimit } from "@/lib/security/rate-limit"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/users/username — set username during onboarding
@@ -103,12 +104,38 @@ export async function PATCH(req: NextRequest) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  const limit = rateLimit({
+    key: `username-check:${getClientIp(req)}`,
+    limit: 30,
+    windowMs: 60 * 1000,
+  })
+
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many username checks. Please retry shortly." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(limit.retryAfterSeconds),
+          "X-RateLimit-Limit": "30",
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    )
+  }
+
   const username = req.nextUrl.searchParams.get("username")
 
   if (!username) {
     return NextResponse.json(
       { error: "Missing required query parameter: username" },
-      { status: 400 },
+      {
+        status: 400,
+        headers: {
+          "X-RateLimit-Limit": "30",
+          "X-RateLimit-Remaining": String(limit.remaining),
+        },
+      },
     )
   }
 
@@ -116,9 +143,25 @@ export async function GET(req: NextRequest) {
   const formatCheck = validateUsernameFormat(username)
   if (!formatCheck.valid) {
     // An invalid format is technically "unavailable" from the user's perspective
-    return NextResponse.json({ available: false, reason: formatCheck.error })
+    return NextResponse.json(
+      { available: false, reason: formatCheck.error },
+      {
+        headers: {
+          "X-RateLimit-Limit": "30",
+          "X-RateLimit-Remaining": String(limit.remaining),
+        },
+      },
+    )
   }
 
   const available = await isUsernameAvailable(username)
-  return NextResponse.json({ available })
+  return NextResponse.json(
+    { available },
+    {
+      headers: {
+        "X-RateLimit-Limit": "30",
+        "X-RateLimit-Remaining": String(limit.remaining),
+      },
+    },
+  )
 }

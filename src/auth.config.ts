@@ -8,7 +8,14 @@ import type { NextAuthConfig } from "next-auth";
  * Providers and the adapter are added only in the full `auth.ts` config.
  */
 export const authConfig: NextAuthConfig = {
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60 * 8,
+    updateAge: 60 * 60,
+  },
+  jwt: {
+    maxAge: 60 * 60 * 8,
+  },
 
   providers: [],
 
@@ -37,6 +44,8 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.id as string;
         session.user.publicUsername = (token.publicUsername as string | null) ?? null;
         session.user.usernameSet = (token.usernameSet as boolean) ?? false;
+        session.user.sessionIssuedAtMs =
+          typeof token.iat === "number" ? token.iat * 1000 : null;
       }
       return session;
     },

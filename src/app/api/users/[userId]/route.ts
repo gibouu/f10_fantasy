@@ -63,13 +63,15 @@ export async function GET(
   }
 
   const picks = await getPicksForSeason(userId, season.id)
-  const raceIds = Array.from(new Set(picks.map((pick) => pick.raceId)))
+  const now = new Date()
+  const visiblePicks = picks.filter((pick) => pick.race.lockCutoffUtc <= now)
+  const raceIds = Array.from(new Set(visiblePicks.map((pick) => pick.raceId)))
   const entrantsByRace = new Map(
     await Promise.all(
       raceIds.map(async (raceId) => [raceId, await getRaceEntrants(raceId)] as const),
     ),
   )
-  const resolvedPicks = picks.map((pick) =>
+  const resolvedPicks = visiblePicks.map((pick) =>
     resolvePickAgainstEntrants(pick, entrantsByRace.get(pick.raceId) ?? []),
   )
 
