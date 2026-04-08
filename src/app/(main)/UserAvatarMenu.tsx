@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { User } from "lucide-react"
 import type { Session } from "next-auth"
 
 type User = Session["user"] | null
@@ -21,7 +22,21 @@ interface UserAvatarMenuProps {
 }
 
 export function UserAvatarMenu({ user, teamLogoUrl, teamColor }: UserAvatarMenuProps) {
-  if (!user) return null
+  if (!user) {
+    return (
+      <Link
+        href="/signin"
+        className="w-8 h-8 rounded-full bg-surface-elevated border border-[var(--border)]
+                   flex items-center justify-center
+                   transition-opacity active:opacity-70 focus-visible:ring-2
+                   focus-visible:ring-accent focus-visible:ring-offset-2
+                   focus-visible:ring-offset-background"
+        aria-label="Sign in"
+      >
+        <User className="w-4 h-4 text-text-tertiary" />
+      </Link>
+    )
+  }
 
   const initials = getInitials(user)
   const teamBg = teamColor ? `${teamColor}40` : "#1c1c1e"
