@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getActiveSeason, getRacesForSeason } from '@/lib/services/race.service'
 
+export const dynamic = 'force-dynamic'
+
 // No auth required — race schedule is public
 export async function GET() {
   const season = await getActiveSeason()
