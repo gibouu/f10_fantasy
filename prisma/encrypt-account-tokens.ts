@@ -49,7 +49,6 @@ function loadEnvFile(filename: string) {
 }
 
 loadEnvFile(".env");
-loadEnvFile(".env.local");
 
 const prisma = new PrismaClient({
   log: ["error"],
