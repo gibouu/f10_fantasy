@@ -115,8 +115,10 @@ export const config = {
    *   - Next.js internals: _next/static, _next/image
    *   - favicon.ico
    *   - Everything inside /public (images, fonts, etc.)
+   *   - /api/auth/* — Auth.js handles these internally via the route handler;
+   *     the edge-only authConfig (providers: []) cannot process OAuth callbacks.
    */
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|api/auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };
