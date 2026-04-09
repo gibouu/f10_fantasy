@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db/client'
 import { redirect } from 'next/navigation'
 import { TeamPicker } from './TeamPicker'
+import { UsernameSetForm } from './UsernameSetForm'
 import { UsernameChangeForm } from './UsernameChangeForm'
 import { SignOutButton } from './SignOutButton'
 import { TEAM_LIST } from '@/lib/f1/teams'
@@ -20,6 +21,7 @@ export default async function ProfilePage() {
     },
   })
 
+  const needsUsername = !user?.usernameSet
   const canChangeUsername = user?.usernameSet && !user?.usernameChangeUsed
 
   return (
@@ -30,6 +32,17 @@ export default async function ProfilePage() {
           <p className="text-xs text-text-secondary mt-0.5">@{user.publicUsername}</p>
         )}
       </div>
+
+      {/* Initial username setup — for users who skipped or bypassed onboarding */}
+      {needsUsername && (
+        <div>
+          <p className="text-sm font-semibold text-text-primary mb-1">Set your username</p>
+          <p className="text-xs text-text-secondary mb-3">
+            Choose a username so other players can find you.
+          </p>
+          <UsernameSetForm />
+        </div>
+      )}
 
       {/* Username change — one-time, only if not used yet */}
       {canChangeUsername && (
