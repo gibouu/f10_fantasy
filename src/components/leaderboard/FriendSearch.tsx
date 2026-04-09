@@ -236,6 +236,35 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
         </div>
       )}
 
+      {/* Pending sent requests */}
+      {pendingSent.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text-secondary mb-2">
+            Pending ({pendingSent.length})
+          </h3>
+          <div className="flex flex-col gap-1">
+            {pendingSent.map((req) => (
+              <div
+                key={req.id}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-elevated transition-colors"
+              >
+                <Avatar
+                  src={null}
+                  name={req.addresseeUsername ?? req.addresseeId}
+                  size="md"
+                  teamLogoUrl={(req as any).teamLogoUrl}
+                  teamColor={(req as any).teamColor}
+                />
+                <span className="flex-1 text-sm text-text-primary truncate">
+                  {req.addresseeUsername ?? 'Anonymous'}
+                </span>
+                <span className="text-xs text-text-tertiary">Pending</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Current friends list */}
       {friends.length > 0 && (
         <div>

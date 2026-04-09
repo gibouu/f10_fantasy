@@ -6,6 +6,8 @@ import {
   getPendingRequests,
   searchUsers,
 } from '@/lib/services/friendship.service'
+import { TEAMS } from '@/lib/f1/teams'
+import type { TeamSlug } from '@/lib/f1/teams'
 
 // ─────────────────────────────────────────────
 // GET /api/friends
@@ -48,19 +50,29 @@ export async function GET(request: NextRequest) {
       status: true,
       createdAt: true,
       requester: { select: { publicUsername: true, image: true } },
+      addressee: { select: { publicUsername: true, image: true, favoriteTeamSlug: true } },
     },
     orderBy: { createdAt: 'desc' },
   })
 
-  const pendingSent = sentRaw.map((r) => ({
-    id: r.id,
-    requesterId: r.requesterId,
-    requesterUsername: r.requester.publicUsername,
-    requesterAvatar: r.requester.image,
-    addresseeId: r.addresseeId,
-    status: r.status as 'PENDING',
-    createdAt: r.createdAt,
-  }))
+  const pendingSent = sentRaw.map((r) => {
+    const teamInfo = r.addressee.favoriteTeamSlug
+      ? TEAMS[r.addressee.favoriteTeamSlug as TeamSlug]
+      : null
+    return {
+      id: r.id,
+      requesterId: r.requesterId,
+      requesterUsername: r.requester.publicUsername,
+      requesterAvatar: r.requester.image,
+      addresseeId: r.addresseeId,
+      addresseeUsername: r.addressee.publicUsername,
+      addresseeAvatar: r.addressee.image,
+      teamLogoUrl: teamInfo?.logoUrl ?? null,
+      teamColor: teamInfo?.color ?? null,
+      status: r.status as 'PENDING',
+      createdAt: r.createdAt,
+    }
+  })
 
   return NextResponse.json({ friends, pendingReceived, pendingSent })
 }

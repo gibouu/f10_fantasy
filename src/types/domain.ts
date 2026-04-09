@@ -153,6 +153,9 @@ export type FriendRequestData = {
   requesterUsername: string | null
   requesterAvatar: string | null
   addresseeId: string
+  addresseeUsername?: string | null
+  addresseeAvatar?: string | null
+  addresseeTeamSlug?: string | null
   status: FriendRequestStatus
   createdAt: Date
 }
