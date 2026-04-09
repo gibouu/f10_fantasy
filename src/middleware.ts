@@ -91,11 +91,12 @@ export default auth((req: NextAuthRequest) => {
   }
 
   // ── 5. Authenticated but username not set → enforce onboarding ────────
-  // Allow API calls through so onboarding pages can still fetch data.
+  // Allow API calls, the profile page, and onboarding itself through.
   if (
     !session.user.usernameSet &&
     !pathname.startsWith(ONBOARDING_PREFIX) &&
-    !pathname.startsWith(API_PREFIX)
+    !pathname.startsWith(API_PREFIX) &&
+    pathname !== "/profile"
   ) {
     return NextResponse.redirect(new URL("/onboarding/username", nextUrl.origin));
   }
