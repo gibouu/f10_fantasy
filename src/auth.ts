@@ -1,31 +1,11 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import type { Adapter } from "next-auth/adapters";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
 import type { Provider } from "next-auth/providers";
 
 import { db } from "@/lib/db/client";
 import { authConfig } from "./auth.config";
-
-// Wrap every adapter method to log the real error on failure.
-// Auth.js swallows adapter errors behind a generic "AdapterError" message.
-function debugAdapter(adapter: Adapter): Adapter {
-  const wrapped = { ...adapter };
-  for (const [key, fn] of Object.entries(adapter)) {
-    if (typeof fn === "function") {
-      (wrapped as Record<string, unknown>)[key] = async (...args: unknown[]) => {
-        try {
-          return await (fn as (...a: unknown[]) => Promise<unknown>)(...args);
-        } catch (err) {
-          console.error(`[auth] adapter.${key} failed:`, err);
-          throw err;
-        }
-      };
-    }
-  }
-  return wrapped;
-}
 
 // Build provider list at startup — Apple is optional until credentials are set.
 const providers: Provider[] = [
@@ -47,7 +27,7 @@ if (process.env.APPLE_ID && process.env.APPLE_SECRET) {
 const nextAuth = NextAuth({
   ...authConfig,
 
-  adapter: debugAdapter(PrismaAdapter(db)),
+  adapter: PrismaAdapter(db),
   providers,
 
   callbacks: {
