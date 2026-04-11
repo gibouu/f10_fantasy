@@ -157,16 +157,21 @@ export function FriendSearch({ currentUserId }: FriendSearchProps) {
                   key={user.id}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-elevated transition-colors"
                 >
-                  <Avatar
-                    src={null}
-                    name={user.publicUsername ?? user.id}
-                    size="md"
-                    teamLogoUrl={user.teamLogoUrl}
-                    teamColor={user.teamColor}
-                  />
-                  <span className="flex-1 text-sm text-text-primary truncate">
-                    {user.publicUsername ?? 'Anonymous'}
-                  </span>
+                  <Link
+                    href={`/profile/${user.id}`}
+                    className="flex flex-1 min-w-0 items-center gap-3"
+                  >
+                    <Avatar
+                      src={null}
+                      name={user.publicUsername ?? user.id}
+                      size="md"
+                      teamLogoUrl={user.teamLogoUrl}
+                      teamColor={user.teamColor}
+                    />
+                    <span className="flex-1 text-sm text-text-primary truncate">
+                      {user.publicUsername ?? 'Anonymous'}
+                    </span>
+                  </Link>
                   {isFriend ? (
                     <span className="text-xs text-[#30d158] font-medium flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" />

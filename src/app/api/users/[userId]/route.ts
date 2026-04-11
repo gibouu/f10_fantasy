@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
+import { auth } from '@/auth'
 import { resolveTeam } from '@/lib/f1/teams'
 import { getPicksForSeason } from '@/lib/services/pick.service'
 import { getActiveSeason, getRaceEntrants } from '@/lib/services/race.service'
@@ -22,12 +23,26 @@ function getScoreCaps(raceType: string) {
     : { p10: 25, winner: 5, dnf: 3 }
 }
 
+async function areFriends(viewerId: string, profileUserId: string): Promise<boolean> {
+  const friendship = await db.friendRequest.findFirst({
+    where: {
+      status: 'ACCEPTED',
+      OR: [
+        { requesterId: viewerId, addresseeId: profileUserId },
+        { requesterId: profileUserId, addresseeId: viewerId },
+      ],
+    },
+    select: { id: true },
+  })
+  return friendship !== null
+}
+
 /**
  * GET /api/users/[userId]
  *
- * Public profile endpoint — returns username, avatar, and scored picks
- * for the active season. No auth required (picks are intentionally public
- * after race lock so friends can compare).
+ * Returns user info + picks for the active season.
+ * Picks are only visible to the profile owner or accepted friends.
+ * Unauthenticated viewers and non-friends see { canViewPicks: false, picks: [] }.
  */
 export async function GET(
   _req: Request,
@@ -35,31 +50,44 @@ export async function GET(
 ) {
   const { userId } = params
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      publicUsername: true,
-      image: true,
-      favoriteTeamSlug: true,
-    },
-  })
+  const [user, session] = await Promise.all([
+    db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        publicUsername: true,
+        image: true,
+        favoriteTeamSlug: true,
+      },
+    }),
+    auth(),
+  ])
 
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
+  const viewerId = session?.user?.id ?? null
+  const isOwner = viewerId === userId
+
+  // Picks are only visible to the profile owner or accepted friends
+  const canViewPicks =
+    isOwner || (viewerId !== null && (await areFriends(viewerId, userId)))
+
+  const userPayload = {
+    id: user.id,
+    publicUsername: user.publicUsername,
+    avatarUrl: user.image,
+    favoriteTeamSlug: user.favoriteTeamSlug,
+  }
+
+  if (!canViewPicks) {
+    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: false })
+  }
+
   const season = await getActiveSeason()
   if (!season) {
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        publicUsername: user.publicUsername,
-        avatarUrl: user.image,
-        favoriteTeamSlug: user.favoriteTeamSlug,
-      },
-      picks: [],
-    })
+    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: true })
   }
 
   const picks = await getPicksForSeason(userId, season.id)
@@ -83,32 +111,37 @@ export async function GET(
     driverIds.add(pick.dnfDriverId)
   }
 
+  const driverIdList = Array.from(driverIds)
+
   // Raw query avoids Prisma type conflict with `constructor` relation key
-  const drivers = await db.$queryRaw<
-    Array<{
-      id: string
-      code: string
-      first_name: string
-      last_name: string
-      photo_url: string | null
-      constructor_name: string
-      constructor_short_name: string
-      constructor_color: string
-    }>
-  >`
-    SELECT
-      d.id,
-      d.code,
-      d."firstName" AS first_name,
-      d."lastName" AS last_name,
-      d."photoUrl" AS photo_url,
-      c.name AS constructor_name,
-      c."shortName" AS constructor_short_name,
-      c.color AS constructor_color
-    FROM "Driver" d
-    JOIN "Constructor" c ON c.id = d."constructorId"
-    WHERE d.id = ANY(${Array.from(driverIds)}::text[])
-  `
+  const drivers =
+    driverIdList.length > 0
+      ? await db.$queryRaw<
+          Array<{
+            id: string
+            code: string
+            first_name: string
+            last_name: string
+            photo_url: string | null
+            constructor_name: string
+            constructor_short_name: string
+            constructor_color: string
+          }>
+        >`
+          SELECT
+            d.id,
+            d.code,
+            d."firstName" AS first_name,
+            d."lastName" AS last_name,
+            d."photoUrl" AS photo_url,
+            c.name AS constructor_name,
+            c."shortName" AS constructor_short_name,
+            c.color AS constructor_color
+          FROM "Driver" d
+          JOIN "Constructor" c ON c.id = d."constructorId"
+          WHERE d.id = ANY(${driverIdList}::text[])
+        `
+      : []
 
   const driverMap = new Map(
     drivers.map((d) => {
@@ -192,13 +225,5 @@ export async function GET(
       : null,
   }))
 
-  return NextResponse.json({
-    user: {
-      id: user.id,
-      publicUsername: user.publicUsername,
-      avatarUrl: user.image,
-      favoriteTeamSlug: user.favoriteTeamSlug,
-    },
-    picks: serializedPicks,
-  })
+  return NextResponse.json({ user: userPayload, picks: serializedPicks, canViewPicks: true })
 }

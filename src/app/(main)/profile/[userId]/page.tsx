@@ -70,6 +70,7 @@ type ProfileData = {
     favoriteTeamSlug: string | null
   }
   picks: PickEntry[]
+  canViewPicks: boolean
 }
 
 type DetailState = {
@@ -310,7 +311,7 @@ export default function FriendProfilePage() {
     )
   }
 
-  const { user, picks } = data
+  const { user, picks, canViewPicks } = data
   const scored = picks.filter((p) => p.scoreBreakdown !== null)
   const total = totalScore(picks)
   const upcomingLocked = picks.filter((p) => p.race.status !== 'COMPLETED')
@@ -349,7 +350,14 @@ export default function FriendProfilePage() {
           </div>
         </div>
 
-        {picks.length > 0 ? (
+        {!canViewPicks ? (
+          <div className="rounded-2xl border border-[var(--border)] bg-surface p-6 text-center">
+            <p className="text-sm font-semibold text-text-primary mb-1">Picks are private</p>
+            <p className="text-xs text-text-secondary">
+              Add {user.publicUsername ?? 'this player'} as a friend to see their picks.
+            </p>
+          </div>
+        ) : picks.length > 0 ? (
           <div className="flex flex-col gap-4">
             <Section
               title="Upcoming / Locked"
