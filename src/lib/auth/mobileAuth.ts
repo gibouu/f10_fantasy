@@ -40,12 +40,13 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   }
 
   // next-auth may store user id under `id` (custom) or `sub` (standard JWT claim)
-  const userId = ((token?.id ?? token?.sub) as string | undefined) ?? null
-  console.log('[mobileAuth] decoded token keys:', token ? Object.keys(token) : null, 'userId:', userId)
+  const payload = token as Record<string, unknown> | null
+  const userId = ((payload?.id ?? payload?.sub) as string | undefined) ?? null
+  console.log('[mobileAuth] decoded token keys:', payload ? Object.keys(payload) : null, 'userId:', userId)
   if (!userId) return null
 
   const sessionIssuedAtMs =
-    typeof token?.iat === 'number' ? token.iat * 1000 : null
+    typeof payload?.iat === 'number' ? (payload.iat as number) * 1000 : null
 
   // Apply revocation check — if the DB is unavailable, allow the session
   // rather than locking out all mobile users during a transient outage.
@@ -69,15 +70,15 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   return {
     user: {
       id: userId,
-      name: (token?.name as string | null) ?? null,
-      email: (token?.email as string | null) ?? null,
-      image: (token?.picture as string | null) ?? null,
-      publicUsername: (token?.publicUsername as string | null) ?? null,
-      usernameSet: Boolean(token?.usernameSet),
+      name: (payload?.name as string | null) ?? null,
+      email: (payload?.email as string | null) ?? null,
+      image: (payload?.picture as string | null) ?? null,
+      publicUsername: (payload?.publicUsername as string | null) ?? null,
+      usernameSet: Boolean(payload?.usernameSet),
       sessionIssuedAtMs,
     },
     expires: new Date(
-      ((token?.exp as number) ?? 0) * 1000,
+      ((payload?.exp as number) ?? 0) * 1000,
     ).toISOString(),
   } as Session
 }
