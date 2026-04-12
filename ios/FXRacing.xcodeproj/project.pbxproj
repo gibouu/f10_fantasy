@@ -1,0 +1,616 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		004F22631D613FD77C80FFAD /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */; };
+		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
+		13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB930FED2C9918990560892D /* ProfileView.swift */; };
+		15A35EDF463399B42FDE98C4 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14286D0206D40A69C9846583 /* SignInView.swift */; };
+		17D7CD514BB71E2F6255E7B7 /* FriendProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */; };
+		1DD4EA9E035803F319F37F9B /* FXRacingApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED3FE402EF77A443F5B4130 /* FXRacingApp.swift */; };
+		2025CA7B03FD1CA4E7AFC81F /* RaceCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */; };
+		23E4413C716A3129EE421446 /* FriendProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D9ED40A530B447C0BD977D /* FriendProfileView.swift */; };
+		277EBDD4E9B0D0BA9121656F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347020C4691D77E3D65C73AD /* SettingsView.swift */; };
+		2AB55EB21797F2EDBBF7CA3C /* RacesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEE3B16ED8A558720015BBC /* RacesListView.swift */; };
+		41D0450A3F881B8BE8F4889E /* UsernamePickerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */; };
+		44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */; };
+		4910736C5D57D38F2CF3F583 /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD2B9A43E8C1180E3F9501CC /* APIEndpoint.swift */; };
+		49EB1EDEB1B9BBC2721FDCEF /* FriendRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A66EEF950DDE3B010020CD /* FriendRequest.swift */; };
+		511F1F49CD522269236712CE /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B7FEB54C964FBE6925BC26 /* APIError.swift */; };
+		530C91AB5B30FB9DA188B9A7 /* FriendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */; };
+		5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC608F5043DC5E71554B62 /* Pick.swift */; };
+		63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729249B04B9379843CF60133 /* FXTheme.swift */; };
+		6C5745BF80FDDB2A207E96CE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3E751E777A6941A1B94279 /* APIClient.swift */; };
+		6CDA97F174415BB802878078 /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */; };
+		6D4FB8B0E17AE0B635CC694A /* FriendSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */; };
+		730F85A4392CF36F04644DAD /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */; };
+		787538A847C0C72104EA9282 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38466ACFC9DCC1DC84C22141 /* Haptics.swift */; };
+		7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */; };
+		7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */; };
+		7FD635CF8E30583403E0B972 /* DriverPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */; };
+		8B8AB2951A95CDB31ECBBCB4 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4720C738BF9514BC3A4EEF9 /* Extensions.swift */; };
+		8BC2E9265A05CA69BCC2AB0A /* SignInViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB14888FFB5F6A3AEEB8C6B4 /* SignInViewModel.swift */; };
+		8DDEC8406C5A0D7FACC61884 /* LeaderboardRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79ED2E04D9D0A55566BB0D71 /* LeaderboardRowView.swift */; };
+		8E17976ED088A9AFDB1D7282 /* GuestProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */; };
+		928081846B311B94C143DB60 /* DriverBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */; };
+		93AB6EEB22878BFAA5B2DC3D /* SignInPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27964BA90CCF80BCB440B253 /* SignInPromptView.swift */; };
+		97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26E8B8213C775919164F61D6 /* TutorialStore.swift */; };
+		9F4CB010F34803172181F256 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14BE2DAC50E1A3F315CC644F /* SyncManager.swift */; };
+		A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E706759022F3FFAC680CFAB /* Config.swift */; };
+		A5232EDCA0F08EC91B7878C3 /* Driver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494452DD6B3E19BC8F850FF2 /* Driver.swift */; };
+		B539AE28DBF60E6E6BD3B539 /* FriendProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89D6F2921C74496E154358E /* FriendProfile.swift */; };
+		B7287621224A9D77F438B14B /* RacesListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */; };
+		B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411961C10248D3714B7E98 /* UsernamePickerView.swift */; };
+		C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */; };
+		C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7BA543FEF70B178E45B2E /* LeaderboardViewModel.swift */; };
+		C9BDAEED60343EF79CFCD65D /* Race.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957CB0DDA5D11B3C6694D4CD /* Race.swift */; };
+		CED85355FAC48D6EF2BC8FC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */; };
+		D5225AA736C9F73800DDBCD0 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40A855BDB590560551CE328 /* User.swift */; };
+		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
+		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
+		F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */; };
+		FBB3B3C9E8BAEDF5EE0D4303 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E895B67C753E0E25B5AFBCD8 /* RootView.swift */; };
+		FF43C9A1A5AE13D40A09CE15 /* SkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66A8C5469F03FB290BFFA5D /* SkeletonView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0D3E751E777A6941A1B94279 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		0E706759022F3FFAC680CFAB /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		0ED3FE402EF77A443F5B4130 /* FXRacingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRacingApp.swift; sourceTree = "<group>"; };
+		14286D0206D40A69C9846583 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		14BE2DAC50E1A3F315CC644F /* SyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncManager.swift; sourceTree = "<group>"; };
+		156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardRow.swift; sourceTree = "<group>"; };
+		26E8B8213C775919164F61D6 /* TutorialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialStore.swift; sourceTree = "<group>"; };
+		27964BA90CCF80BCB440B253 /* SignInPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInPromptView.swift; sourceTree = "<group>"; };
+		32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestProfileView.swift; sourceTree = "<group>"; };
+		347020C4691D77E3D65C73AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		38466ACFC9DCC1DC84C22141 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		494452DD6B3E19BC8F850FF2 /* Driver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Driver.swift; sourceTree = "<group>"; };
+		511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverBubbleView.swift; sourceTree = "<group>"; };
+		5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailView.swift; sourceTree = "<group>"; };
+		6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		68411961C10248D3714B7E98 /* UsernamePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernamePickerView.swift; sourceTree = "<group>"; };
+		6AEE3B16ED8A558720015BBC /* RacesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacesListView.swift; sourceTree = "<group>"; };
+		729249B04B9379843CF60133 /* FXTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXTheme.swift; sourceTree = "<group>"; };
+		77E7BA543FEF70B178E45B2E /* LeaderboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardViewModel.swift; sourceTree = "<group>"; };
+		79ED2E04D9D0A55566BB0D71 /* LeaderboardRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardRowView.swift; sourceTree = "<group>"; };
+		7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendSearchView.swift; sourceTree = "<group>"; };
+		883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialCard.swift; sourceTree = "<group>"; };
+		88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
+		8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
+		8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernamePickerViewModel.swift; sourceTree = "<group>"; };
+		957CB0DDA5D11B3C6694D4CD /* Race.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Race.swift; sourceTree = "<group>"; };
+		96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModel.swift; sourceTree = "<group>"; };
+		99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsViewModel.swift; sourceTree = "<group>"; };
+		9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
+		9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacesListViewModel.swift; sourceTree = "<group>"; };
+		9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileViewModel.swift; sourceTree = "<group>"; };
+		B3F3F8E414C88D0CD0398908 /* FXRacing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FXRacing.entitlements; sourceTree = "<group>"; };
+		B4B7FEB54C964FBE6925BC26 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		B5DC608F5043DC5E71554B62 /* Pick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pick.swift; sourceTree = "<group>"; };
+		B66A8C5469F03FB290BFFA5D /* SkeletonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonView.swift; sourceTree = "<group>"; };
+		B89D6F2921C74496E154358E /* FriendProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfile.swift; sourceTree = "<group>"; };
+		BB14888FFB5F6A3AEEB8C6B4 /* SignInViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInViewModel.swift; sourceTree = "<group>"; };
+		C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickStore.swift; sourceTree = "<group>"; };
+		C4D9ED40A530B447C0BD977D /* FriendProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileView.swift; sourceTree = "<group>"; };
+		C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverPickerSheet.swift; sourceTree = "<group>"; };
+		CD2B9A43E8C1180E3F9501CC /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
+		D1A66EEF950DDE3B010020CD /* FriendRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendRequest.swift; sourceTree = "<group>"; };
+		D4720C738BF9514BC3A4EEF9 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
+		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
+		EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceCardView.swift; sourceTree = "<group>"; };
+		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		04BE360E306E44D161B0D8D7 /* Races */ = {
+			isa = PBXGroup;
+			children = (
+				C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */,
+				EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */,
+				5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */,
+				96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */,
+				6AEE3B16ED8A558720015BBC /* RacesListView.swift */,
+				9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */,
+			);
+			path = Races;
+			sourceTree = "<group>";
+		};
+		09325C077E9BD23A6C06A2B3 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				14BE2DAC50E1A3F315CC644F /* SyncManager.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		28BFB8ED4A7831B6E625B61A /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				EA877484EEF85B2D263F7702 /* GuestStore.swift */,
+				C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */,
+				26E8B8213C775919164F61D6 /* TutorialStore.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		57D0716A52540373DFEFC5DA = {
+			isa = PBXGroup;
+			children = (
+				ABBA52FB5E86C53DA9270EDE /* FXRacing */,
+				934ABC9FB8C164612B3D6941 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		57DC197FCDEDA4369E60A518 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				68411961C10248D3714B7E98 /* UsernamePickerView.swift */,
+				8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		70F999EB96023DB0DF08E34E /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				C4D9ED40A530B447C0BD977D /* FriendProfileView.swift */,
+				9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */,
+				32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */,
+				DB930FED2C9918990560892D /* ProfileView.swift */,
+				347020C4691D77E3D65C73AD /* SettingsView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		748FB6C612D8EAD69C71A759 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				27964BA90CCF80BCB440B253 /* SignInPromptView.swift */,
+				14286D0206D40A69C9846583 /* SignInView.swift */,
+				BB14888FFB5F6A3AEEB8C6B4 /* SignInViewModel.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		83CC0082E982A4927641974B /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				748FB6C612D8EAD69C71A759 /* Auth */,
+				57DC197FCDEDA4369E60A518 /* Onboarding */,
+				70F999EB96023DB0DF08E34E /* Profile */,
+				04BE360E306E44D161B0D8D7 /* Races */,
+				B438F8AE1EAF1B598BD6A2F4 /* Rankings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		88C24DF974A1FDBAC4BF1DE8 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */,
+				3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		934ABC9FB8C164612B3D6941 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A0A57EBC108BE8B1902D2E4F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				494452DD6B3E19BC8F850FF2 /* Driver.swift */,
+				B89D6F2921C74496E154358E /* FriendProfile.swift */,
+				D1A66EEF950DDE3B010020CD /* FriendRequest.swift */,
+				156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */,
+				B5DC608F5043DC5E71554B62 /* Pick.swift */,
+				957CB0DDA5D11B3C6694D4CD /* Race.swift */,
+				F40A855BDB590560551CE328 /* User.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A0CF17B22FD178A73F915888 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				0D3E751E777A6941A1B94279 /* APIClient.swift */,
+				CD2B9A43E8C1180E3F9501CC /* APIEndpoint.swift */,
+				B4B7FEB54C964FBE6925BC26 /* APIError.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		ABBA52FB5E86C53DA9270EDE /* FXRacing */ = {
+			isa = PBXGroup;
+			children = (
+				B8BE02D7B47B9C7059A28A66 /* Core */,
+				FAE9B2EC426C7A5975FDCF4C /* DesignSystem */,
+				83CC0082E982A4927641974B /* Features */,
+				9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */,
+				B3F3F8E414C88D0CD0398908 /* FXRacing.entitlements */,
+				0ED3FE402EF77A443F5B4130 /* FXRacingApp.swift */,
+				D66381CE286FF95DF2FD9FCE /* Info.plist */,
+				E895B67C753E0E25B5AFBCD8 /* RootView.swift */,
+			);
+			path = FXRacing;
+			sourceTree = "<group>";
+		};
+		B438F8AE1EAF1B598BD6A2F4 /* Rankings */ = {
+			isa = PBXGroup;
+			children = (
+				7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */,
+				99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */,
+				79ED2E04D9D0A55566BB0D71 /* LeaderboardRowView.swift */,
+				9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */,
+				77E7BA543FEF70B178E45B2E /* LeaderboardViewModel.swift */,
+			);
+			path = Rankings;
+			sourceTree = "<group>";
+		};
+		B8BE02D7B47B9C7059A28A66 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				88C24DF974A1FDBAC4BF1DE8 /* Auth */,
+				A0A57EBC108BE8B1902D2E4F /* Models */,
+				A0CF17B22FD178A73F915888 /* Networking */,
+				28BFB8ED4A7831B6E625B61A /* Storage */,
+				09325C077E9BD23A6C06A2B3 /* Sync */,
+				0E706759022F3FFAC680CFAB /* Config.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		FAE9B2EC426C7A5975FDCF4C /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */,
+				88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */,
+				D4720C738BF9514BC3A4EEF9 /* Extensions.swift */,
+				729249B04B9379843CF60133 /* FXTheme.swift */,
+				38466ACFC9DCC1DC84C22141 /* Haptics.swift */,
+				B66A8C5469F03FB290BFFA5D /* SkeletonView.swift */,
+				8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */,
+				883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		91A9AFF1D4F94F457CF14F2D /* FXRacing */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ABF3E395D7FFDCA0B0B40A72 /* Build configuration list for PBXNativeTarget "FXRacing" */;
+			buildPhases = (
+				CE68E441E9002087D2F01246 /* Sources */,
+				C7BE8FD0EA6DE2735D5943BE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FXRacing;
+			packageProductDependencies = (
+			);
+			productName = FXRacing;
+			productReference = D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		076FF39B4D45FE80F0EF35CE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					91A9AFF1D4F94F457CF14F2D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = B7F550A96F627BF8D325EA95 /* Build configuration list for PBXProject "FXRacing" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 57D0716A52540373DFEFC5DA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 934ABC9FB8C164612B3D6941 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				91A9AFF1D4F94F457CF14F2D /* FXRacing */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C7BE8FD0EA6DE2735D5943BE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CED85355FAC48D6EF2BC8FC8 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CE68E441E9002087D2F01246 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C5745BF80FDDB2A207E96CE /* APIClient.swift in Sources */,
+				4910736C5D57D38F2CF3F583 /* APIEndpoint.swift in Sources */,
+				511F1F49CD522269236712CE /* APIError.swift in Sources */,
+				04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */,
+				A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */,
+				A5232EDCA0F08EC91B7878C3 /* Driver.swift in Sources */,
+				928081846B311B94C143DB60 /* DriverBubbleView.swift in Sources */,
+				7FD635CF8E30583403E0B972 /* DriverPickerSheet.swift in Sources */,
+				6CDA97F174415BB802878078 /* ErrorBanner.swift in Sources */,
+				8B8AB2951A95CDB31ECBBCB4 /* Extensions.swift in Sources */,
+				1DD4EA9E035803F319F37F9B /* FXRacingApp.swift in Sources */,
+				63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */,
+				B539AE28DBF60E6E6BD3B539 /* FriendProfile.swift in Sources */,
+				23E4413C716A3129EE421446 /* FriendProfileView.swift in Sources */,
+				17D7CD514BB71E2F6255E7B7 /* FriendProfileViewModel.swift in Sources */,
+				49EB1EDEB1B9BBC2721FDCEF /* FriendRequest.swift in Sources */,
+				6D4FB8B0E17AE0B635CC694A /* FriendSearchView.swift in Sources */,
+				530C91AB5B30FB9DA188B9A7 /* FriendsViewModel.swift in Sources */,
+				8E17976ED088A9AFDB1D7282 /* GuestProfileView.swift in Sources */,
+				DA114802501720E26721CB6D /* GuestStore.swift in Sources */,
+				787538A847C0C72104EA9282 /* Haptics.swift in Sources */,
+				004F22631D613FD77C80FFAD /* KeychainService.swift in Sources */,
+				DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */,
+				8DDEC8406C5A0D7FACC61884 /* LeaderboardRowView.swift in Sources */,
+				44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */,
+				C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */,
+				7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */,
+				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
+				13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */,
+				C9BDAEED60343EF79CFCD65D /* Race.swift in Sources */,
+				2025CA7B03FD1CA4E7AFC81F /* RaceCardView.swift in Sources */,
+				F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */,
+				C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */,
+				2AB55EB21797F2EDBBF7CA3C /* RacesListView.swift in Sources */,
+				B7287621224A9D77F438B14B /* RacesListViewModel.swift in Sources */,
+				FBB3B3C9E8BAEDF5EE0D4303 /* RootView.swift in Sources */,
+				277EBDD4E9B0D0BA9121656F /* SettingsView.swift in Sources */,
+				93AB6EEB22878BFAA5B2DC3D /* SignInPromptView.swift in Sources */,
+				15A35EDF463399B42FDE98C4 /* SignInView.swift in Sources */,
+				8BC2E9265A05CA69BCC2AB0A /* SignInViewModel.swift in Sources */,
+				FF43C9A1A5AE13D40A09CE15 /* SkeletonView.swift in Sources */,
+				730F85A4392CF36F04644DAD /* StatusBadge.swift in Sources */,
+				9F4CB010F34803172181F256 /* SyncManager.swift in Sources */,
+				7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */,
+				97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */,
+				D5225AA736C9F73800DDBCD0 /* User.swift in Sources */,
+				B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */,
+				41D0450A3F881B8BE8F4889E /* UsernamePickerViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		102A4DEB5E7AF5C38474D0FA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = FXRacing/FXRacing.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = FXRacing/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		2F2A4A28F1B81CA829E3A4A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AE9CB9676DAAF82895268ED2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		E17FF1391055F64897634107 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = FXRacing/FXRacing.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = FXRacing/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		ABF3E395D7FFDCA0B0B40A72 /* Build configuration list for PBXNativeTarget "FXRacing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E17FF1391055F64897634107 /* Debug */,
+				102A4DEB5E7AF5C38474D0FA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B7F550A96F627BF8D325EA95 /* Build configuration list for PBXProject "FXRacing" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2F2A4A28F1B81CA829E3A4A4 /* Debug */,
+				AE9CB9676DAAF82895268ED2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 076FF39B4D45FE80F0EF35CE /* Project object */;
+}
