@@ -58,13 +58,6 @@ struct SignInView: View {
                         }
                     }
 
-                    #if DEBUG
-                    Button("Dev Login (Simulator)") {
-                        authManager.signInAsDev()
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    #endif
                 }
                 .padding(.horizontal, FXTheme.Spacing.lg)
                 .padding(.bottom, 48)

@@ -7,7 +7,7 @@ import type { Session } from "next-auth";
 const { auth } = NextAuth(authConfig);
 
 // Routes that are always publicly accessible (no session required).
-const PUBLIC_ROUTES = ["/", "/signin", "/races", "/leaderboard"];
+const PUBLIC_ROUTES = ["/", "/signin", "/races", "/leaderboard", "/privacy"];
 
 // Prefixes that are publicly accessible without authentication.
 // Read-only browsing: race list, race detail, leaderboard, user profiles.

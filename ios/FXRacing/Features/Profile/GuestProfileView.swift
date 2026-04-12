@@ -85,6 +85,20 @@ struct GuestProfileView: View {
                 .pickerStyle(.segmented)
             }
 
+            // Legal
+            Section {
+                Link(destination: URL(string: "https://fxracing.ca/privacy")!) {
+                    HStack {
+                        Text("Privacy Policy")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             // Sign-in CTA
             Section {
                 Button {

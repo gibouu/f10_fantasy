@@ -102,26 +102,6 @@ final class AuthManager {
         state = .unauthenticated
     }
 
-    // MARK: - Dev helpers (DEBUG only)
-
-    #if DEBUG
-    /// Bypasses real Apple sign-in for simulator/UI testing.
-    /// Sets a mock authenticated state without a real token.
-    func signInAsDev() {
-        state = .authenticated(User(
-            id: "dev-user-001",
-            name: "Dev Player",
-            email: "dev@fxracing.ca",
-            avatarUrl: nil,
-            publicUsername: "DevPlayer",
-            usernameSet: true,
-            usernameChangeUsed: false,
-            favoriteTeamSlug: "ferrari",
-            tutorialDismissedAt: nil,
-            createdAt: Date()
-        ))
-    }
-    #endif
 
     // MARK: - Convenience
 

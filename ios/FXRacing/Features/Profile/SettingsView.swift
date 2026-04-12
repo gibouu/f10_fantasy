@@ -62,6 +62,19 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Legal") {
+                    Link(destination: URL(string: "https://fxracing.ca/privacy")!) {
+                        HStack {
+                            Text("Privacy Policy")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Section {
                     Button("Sign Out", role: .destructive) {
                         showSignOutConfirm = true
