@@ -77,7 +77,8 @@ struct FriendProfileView: View {
     @ViewBuilder
     private func addFriendButton(_ profile: FriendProfile) -> some View {
         if let currentUser = authManager.authenticatedUser,
-           currentUser.id != profile.user.id {
+           currentUser.id != profile.user.id,
+           !profile.isFriend {
             if vm.requestSent {
                 Text("Requested")
                     .font(.caption.weight(.medium))

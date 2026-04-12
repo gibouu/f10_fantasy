@@ -5,6 +5,7 @@ struct FriendProfile: Decodable, Sendable {
     let user: ProfileUser
     let picks: [ProfilePick]
     let canViewPicks: Bool
+    let isFriend: Bool
 }
 
 struct ProfileUser: Decodable, Sendable {
@@ -55,11 +56,15 @@ struct SlotDriver: Decodable, Sendable {
     let logoUrl: String?
 
     var photoFullURL: URL? {
-        photoUrl.flatMap { URL(string: Config.apiBaseURL.absoluteString + $0) }
+        guard let path = photoUrl else { return nil }
+        if path.hasPrefix("http") { return URL(string: path) }
+        return URL(string: Config.apiBaseURL.absoluteString + path)
     }
 
     var teamLogoFullURL: URL? {
-        logoUrl.flatMap { URL(string: Config.apiBaseURL.absoluteString + $0) }
+        guard let path = logoUrl else { return nil }
+        if path.hasPrefix("http") { return URL(string: path) }
+        return URL(string: Config.apiBaseURL.absoluteString + path)
     }
 
     var color: Color { Color(hex: teamColor) ?? .gray }

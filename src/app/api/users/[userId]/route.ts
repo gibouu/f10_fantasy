@@ -71,9 +71,11 @@ export async function GET(
   const viewerId = session?.user?.id ?? null
   const isOwner = viewerId === userId
 
+  const isFriend =
+    !isOwner && viewerId !== null ? await areFriends(viewerId, userId) : false
+
   // Picks are only visible to the profile owner or accepted friends
-  const canViewPicks =
-    isOwner || (viewerId !== null && (await areFriends(viewerId, userId)))
+  const canViewPicks = isOwner || isFriend
 
   const userPayload = {
     id: user.id,
@@ -83,12 +85,12 @@ export async function GET(
   }
 
   if (!canViewPicks) {
-    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: false })
+    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: false, isFriend: false })
   }
 
   const season = await getActiveSeason()
   if (!season) {
-    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: true })
+    return NextResponse.json({ user: userPayload, picks: [], canViewPicks: true, isFriend })
   }
 
   const picks = await getPicksForSeason(userId, season.id)
@@ -224,5 +226,5 @@ export async function GET(
       : null,
   }))
 
-  return NextResponse.json({ user: userPayload, picks: serializedPicks, canViewPicks: true })
+  return NextResponse.json({ user: userPayload, picks: serializedPicks, canViewPicks: true, isFriend })
 }

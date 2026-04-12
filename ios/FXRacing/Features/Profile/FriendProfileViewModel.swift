@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class FriendProfileViewModel {
     var profile: FriendProfile? = nil
-    var isLoading = false
+    var isLoading = true
     var errorMessage: String? = nil
     var isSendingRequest = false
     var requestSent = false
