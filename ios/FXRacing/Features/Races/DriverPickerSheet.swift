@@ -23,7 +23,7 @@ struct DriverPickerSheet: View {
         }
         return Dictionary(grouping: entrants, by: key)
             .sorted { $0.key < $1.key }
-            .compactMap { group -> (name: String, color: Color, drivers: [DriverSummary])? in
+            .compactMap { group -> (name: String, color: Color, drivers: [Driver])? in
                 guard let first = group.value.first else { return nil }
                 return (
                     name: displayName(first),
