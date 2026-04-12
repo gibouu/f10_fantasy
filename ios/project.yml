@@ -34,8 +34,6 @@ targets:
           - UIInterfaceOrientationPortrait
         UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
-        NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
     entitlements:
       path: FXRacing/FXRacing.entitlements
       properties:

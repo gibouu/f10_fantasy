@@ -23,11 +23,14 @@ struct DriverPickerSheet: View {
         }
         return Dictionary(grouping: entrants, by: key)
             .sorted { $0.key < $1.key }
-            .map { (
-                name: displayName($0.value.first!),
-                color: $0.value.first?.teamColor ?? .gray,
-                drivers: $0.value.sorted { $0.number < $1.number }
-            )}
+            .compactMap { group -> (name: String, color: Color, drivers: [DriverSummary])? in
+                guard let first = group.value.first else { return nil }
+                return (
+                    name: displayName(first),
+                    color: first.teamColor,
+                    drivers: group.value.sorted { $0.number < $1.number }
+                )
+            }
     }
 
     var body: some View {
