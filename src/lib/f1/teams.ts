@@ -130,6 +130,7 @@ export const DRIVER_PHOTOS: Record<number, string> = {
   14: '/drivers/alonso.png',
   16: '/drivers/leclerc.png',
   18: '/drivers/stroll.png',
+  // 7: lindblad — no photo available yet, falls back to team color
   // 22: tsunoda — no photo available, falls back to team color
   23: '/drivers/albon.png',
   27: '/drivers/hulkenberg.png',

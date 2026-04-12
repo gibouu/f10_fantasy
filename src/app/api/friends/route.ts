@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
   sendFriendRequest,
   getFriends,
@@ -16,7 +17,7 @@ import type { TeamSlug } from '@/lib/f1/teams'
 // ─────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(request))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
 // ─────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(request))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { mobileAuth } from '@/lib/auth/mobileAuth'
 import { setFavoriteTeam } from '@/lib/services/user.service'
 import type { TeamSlug } from '@/lib/f1/teams'
 
 export async function PATCH(req: Request) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(req))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

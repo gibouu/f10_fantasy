@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
   getGlobalLeaderboard,
   getFriendsLeaderboard,
@@ -9,7 +10,7 @@ import { getActiveSeason } from '@/lib/services/race.service'
 
 export async function GET(request: NextRequest) {
   // Auth check
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(request))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

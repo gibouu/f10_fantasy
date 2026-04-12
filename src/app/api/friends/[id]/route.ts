@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
+import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
   acceptFriendRequest,
   rejectFriendRequest,
@@ -9,7 +10,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(request))
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

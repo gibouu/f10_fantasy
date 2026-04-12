@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { auth } from "@/auth"
+import { mobileAuth } from "@/lib/auth/mobileAuth"
 import {
   validateUsernameFormat,
   setUsername,
@@ -14,7 +15,7 @@ import { getClientIp, rateLimit } from "@/lib/security/rate-limit"
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(req))
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function PATCH(req: NextRequest) {
-  const session = await auth()
+  const session = (await auth()) ?? (await mobileAuth(req))
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

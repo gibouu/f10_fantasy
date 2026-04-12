@@ -9,24 +9,24 @@ datasource db {
 }
 
 model User {
-  id                 String          @id @default(cuid())
-  name               String?
-  email              String          @unique
-  emailVerified      DateTime?
-  image              String?
-  publicUsername     String?         @unique
-  usernameSet        Boolean         @default(false)
-  sessionValidAfter  DateTime        @default(now())
+  id                  String          @id @default(cuid())
+  name                String?
+  email               String          @unique
+  emailVerified       DateTime?
+  image               String?
+  publicUsername      String?         @unique
+  usernameSet         Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  favoriteTeamSlug    String?
+  usernameChangeUsed  Boolean         @default(false)
   tutorialDismissedAt DateTime?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  favoriteTeamSlug   String?
-  usernameChangeUsed Boolean         @default(false)
-  accounts           Account[]
-  receivedRequests   FriendRequest[] @relation("ReceivedRequests")
-  sentRequests       FriendRequest[] @relation("SentRequests")
-  pickSets           PickSet[]
-  sessions           Session[]
+  sessionValidAfter   DateTime        @default(now())
+  accounts            Account[]
+  receivedRequests    FriendRequest[] @relation("ReceivedRequests")
+  sentRequests        FriendRequest[] @relation("SentRequests")
+  pickSets            PickSet[]
+  sessions            Session[]
 }
 
 model Account {
@@ -150,14 +150,14 @@ model PickSet {
   userId             String
   raceId             String
   tenthPlaceDriverId String
-  tenthPlaceSeatKey  String?
   winnerDriverId     String
-  winnerSeatKey      String?
   dnfDriverId        String
-  dnfSeatKey         String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   lockedAt           DateTime?
+  dnfSeatKey         String?
+  tenthPlaceSeatKey  String?
+  winnerSeatKey      String?
   dnfDriver          Driver          @relation("DnfPicks", fields: [dnfDriverId], references: [id])
   race               Race            @relation(fields: [raceId], references: [id], onDelete: Cascade)
   tenthPlaceDriver   Driver          @relation("TenthPlacePicks", fields: [tenthPlaceDriverId], references: [id])

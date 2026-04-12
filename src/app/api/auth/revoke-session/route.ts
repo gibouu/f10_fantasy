@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 
 import { auth } from "@/auth"
+import { mobileAuth } from "@/lib/auth/mobileAuth"
 import { revokeUserSessions } from "@/lib/services/user.service"
 
-export async function POST() {
-  const session = await auth()
+export async function POST(req: Request) {
+  const session = (await auth()) ?? (await mobileAuth(req))
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

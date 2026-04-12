@@ -84,6 +84,15 @@ export default auth((req: NextAuthRequest) => {
 
   // ── 4. Unauthenticated users → redirect to /signin ────────────────────
   if (!session) {
+    // API requests that carry a Bearer token are authenticated in the route
+    // handler itself via mobileAuth(req). Let them through without redirect.
+    if (
+      pathname.startsWith(API_PREFIX) &&
+      req.headers.get("authorization")?.startsWith("Bearer ")
+    ) {
+      return NextResponse.next();
+    }
+
     const signInUrl = new URL("/signin", nextUrl.origin);
     // Preserve the intended destination so we can redirect back after login.
     signInUrl.searchParams.set("callbackUrl", `${pathname}${nextUrl.search}`);
