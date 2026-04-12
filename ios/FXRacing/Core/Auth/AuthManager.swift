@@ -88,6 +88,13 @@ final class AuthManager {
         state = .authenticated(user)
     }
 
+    func setFavoriteTeam(_ slug: String?) async throws {
+        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
+        let _: TeamResponse = try await api.request(.setFavoriteTeam(slug), token: token)
+        let user: User = try await api.request(.me, token: token)
+        state = .authenticated(user)
+    }
+
     // MARK: - Sign out
 
     func signOut() {
@@ -143,4 +150,8 @@ private struct ExchangeResponse: Decodable, Sendable {
 private struct UsernameSetResponse: Decodable, Sendable {
     let ok: Bool
     let username: String
+}
+
+private struct TeamResponse: Decodable, Sendable {
+    let ok: Bool
 }
