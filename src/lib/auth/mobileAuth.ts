@@ -34,12 +34,14 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
       secret: process.env.AUTH_SECRET!,
       salt: MOBILE_JWT_SALT,
     })
-  } catch {
+  } catch (e) {
+    console.error('[mobileAuth] decode threw:', e)
     return null
   }
 
   // next-auth may store user id under `id` (custom) or `sub` (standard JWT claim)
   const userId = ((token?.id ?? token?.sub) as string | undefined) ?? null
+  console.log('[mobileAuth] decoded token keys:', token ? Object.keys(token) : null, 'userId:', userId)
   if (!userId) return null
 
   const sessionIssuedAtMs =
