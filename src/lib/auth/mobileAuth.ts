@@ -27,23 +27,31 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   const bearer = authHeader.slice(7).trim()
   if (!bearer) return null
 
+  let token: Awaited<ReturnType<typeof decode>>
   try {
-    const token = await decode({
+    token = await decode({
       token: bearer,
       secret: process.env.AUTH_SECRET!,
       salt: MOBILE_JWT_SALT,
     })
+  } catch {
+    return null
+  }
 
-    if (!token?.id) return null
+  // next-auth may store user id under `id` (custom) or `sub` (standard JWT claim)
+  const userId = ((token?.id ?? token?.sub) as string | undefined) ?? null
+  if (!userId) return null
 
-    // Apply the same revocation check that auth.ts applies for cookie sessions.
+  const sessionIssuedAtMs =
+    typeof token?.iat === 'number' ? token.iat * 1000 : null
+
+  // Apply revocation check — if the DB is unavailable, allow the session
+  // rather than locking out all mobile users during a transient outage.
+  try {
     const user = await db.user.findUnique({
-      where: { id: token.id as string },
+      where: { id: userId },
       select: { sessionValidAfter: true },
     })
-
-    const sessionIssuedAtMs =
-      typeof token.iat === 'number' ? token.iat * 1000 : null
 
     if (
       user?.sessionValidAfter &&
@@ -52,22 +60,22 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
     ) {
       return null // Token has been revoked via POST /api/auth/revoke-session
     }
-
-    return {
-      user: {
-        id: token.id as string,
-        name: (token.name as string | null) ?? null,
-        email: (token.email as string | null) ?? null,
-        image: (token.picture as string | null) ?? null,
-        publicUsername: (token.publicUsername as string | null) ?? null,
-        usernameSet: Boolean(token.usernameSet),
-        sessionIssuedAtMs,
-      },
-      expires: new Date(
-        ((token.exp as number) ?? 0) * 1000,
-      ).toISOString(),
-    } as Session
   } catch {
-    return null
+    // DB unavailable — skip revocation check, proceed with token claims
   }
+
+  return {
+    user: {
+      id: userId,
+      name: (token?.name as string | null) ?? null,
+      email: (token?.email as string | null) ?? null,
+      image: (token?.picture as string | null) ?? null,
+      publicUsername: (token?.publicUsername as string | null) ?? null,
+      usernameSet: Boolean(token?.usernameSet),
+      sessionIssuedAtMs,
+    },
+    expires: new Date(
+      ((token?.exp as number) ?? 0) * 1000,
+    ).toISOString(),
+  } as Session
 }
