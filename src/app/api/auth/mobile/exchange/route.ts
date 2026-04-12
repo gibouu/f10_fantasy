@@ -24,10 +24,9 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createRemoteJWKSet, jwtVerify } from 'jose'
-import { encode } from 'next-auth/jwt'
+import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose'
 import { db } from '@/lib/db/client'
-import { MOBILE_JWT_SALT } from '@/lib/auth/mobileAuth'
+import { mobileSigningKey } from '@/lib/auth/mobileAuth'
 
 const MOBILE_TOKEN_MAX_AGE = 60 * 60 * 8 // 8 hours — same as web session
 
@@ -236,21 +235,20 @@ export async function POST(req: Request) {
   // Find or create user (same behavior as NextAuth OAuth adapter)
   const user = await findOrCreateUser(provider, claims)
 
-  // Issue a mobile JWT using the same AUTH_SECRET as NextAuth, with a
-  // distinct salt so mobile tokens are separate from web session cookies.
-  const accessToken = await encode({
-    token: {
-      id: user.id,
-      name: user.name ?? undefined,
-      email: user.email,
-      picture: user.image ?? undefined,
-      publicUsername: user.publicUsername,
-      usernameSet: user.usernameSet,
-    },
-    secret: process.env.AUTH_SECRET!,
-    salt: MOBILE_JWT_SALT,
-    maxAge: MOBILE_TOKEN_MAX_AGE,
+  // Issue a signed mobile JWT using jose directly (avoids next-auth JWE
+  // key-derivation quirks that cause "Decryption failed" on decode).
+  const accessToken = await new SignJWT({
+    id: user.id,
+    name: user.name ?? undefined,
+    email: user.email,
+    picture: user.image ?? undefined,
+    publicUsername: user.publicUsername,
+    usernameSet: user.usernameSet,
   })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${MOBILE_TOKEN_MAX_AGE}s`)
+    .sign(mobileSigningKey())
 
   return NextResponse.json({
     accessToken,
