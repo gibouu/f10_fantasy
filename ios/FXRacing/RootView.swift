@@ -3,6 +3,15 @@ import SwiftUI
 struct RootView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(TutorialStore.self) private var tutorialStore
+    @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
+
+    private var preferredColorScheme: ColorScheme? {
+        switch colorSchemePreference {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
 
     var body: some View {
         Group {
@@ -23,6 +32,7 @@ struct RootView: View {
                 MainTabView()
             }
         }
+        .preferredColorScheme(preferredColorScheme)
         .onChange(of: authManager.isAuthenticated) { _, isAuth in
             if isAuth { tutorialStore.markAllSeen() }
         }

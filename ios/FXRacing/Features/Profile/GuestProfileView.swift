@@ -4,6 +4,7 @@ import SwiftUI
 /// Local username and team avatar are stored in GuestStore (UserDefaults).
 struct GuestProfileView: View {
     @Environment(GuestStore.self) private var guestStore
+    @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
     @State private var showSignIn = false
     @State private var showTeamPicker = false
     @State private var usernameInput = ""
@@ -72,6 +73,16 @@ struct GuestProfileView: View {
                     }
                     .padding(.vertical, 4)
                 }
+            }
+
+            // Appearance
+            Section("Appearance") {
+                Picker("Theme", selection: $colorSchemePreference) {
+                    Text("System").tag("system")
+                    Text("Light").tag("light")
+                    Text("Dark").tag("dark")
+                }
+                .pickerStyle(.segmented)
             }
 
             // Sign-in CTA
