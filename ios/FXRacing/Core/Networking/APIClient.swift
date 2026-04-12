@@ -36,6 +36,10 @@ struct APIClient: Sendable {
                 throw APIError.decodingFailed(error)
             }
         case 401:
+            let message = (try? JSONDecoder.api.decode(APIErrorBody.self, from: data))?.error
+            if let message {
+                throw APIError.serverError(401, message)
+            }
             throw APIError.unauthorized
         case 404:
             throw APIError.notFound

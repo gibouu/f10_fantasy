@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 enum Haptics {
     /// Light tap — selecting a driver in the picker.
     static func select() {
@@ -30,7 +31,8 @@ enum Haptics {
     static func scoreReveal() {
         let gen = UIImpactFeedbackGenerator(style: .rigid)
         gen.impactOccurred()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 80_000_000)
             gen.impactOccurred(intensity: 0.5)
         }
     }

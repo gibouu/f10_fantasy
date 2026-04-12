@@ -30,7 +30,7 @@ final class FriendProfileViewModel {
     func sendFriendRequest(token: String?) async {
         isSendingRequest = true
         do {
-            try await client.request(
+            _ = try await client.request(
                 .sendFriendRequest(addresseeId: userId),
                 token: token
             ) as EmptyResponse

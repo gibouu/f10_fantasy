@@ -72,7 +72,7 @@ final class FriendsViewModel {
     func sendFriendRequest(to userId: String, token: String?) async {
         sentRequestIds.insert(userId)
         do {
-            try await client.request(.sendFriendRequest(addresseeId: userId), token: token) as EmptyResponse
+            _ = try await client.request(.sendFriendRequest(addresseeId: userId), token: token) as EmptyResponse
         } catch {
             sentRequestIds.remove(userId)
             errorMessage = error.localizedDescription
@@ -89,7 +89,7 @@ final class FriendsViewModel {
 
     private func respond(to requestId: String, action: String, token: String?) async {
         do {
-            try await client.request(
+            _ = try await client.request(
                 .respondToFriendRequest(id: requestId, action: action),
                 token: token
             ) as EmptyResponse
