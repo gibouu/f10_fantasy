@@ -2,10 +2,11 @@ import Foundation
 
 enum Config {
     #if DEBUG
-    /// Point at your local dev server when running in the simulator.
-    /// If you want to test against production, change this to https://fxracing.ca
-    static let apiBaseURL = URL(string: "https://fxracing.ca")!
+    /// Use the canonical production host. Avoid the apex domain here:
+    /// if it redirects to `www`, URLSession may drop the Authorization header
+    /// on the redirected request and mobile Bearer auth will fail.
+    static let apiBaseURL = URL(string: "https://www.fxracing.ca")!
     #else
-    static let apiBaseURL = URL(string: "https://fxracing.ca")!
+    static let apiBaseURL = URL(string: "https://www.fxracing.ca")!
     #endif
 }

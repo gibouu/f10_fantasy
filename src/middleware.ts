@@ -43,7 +43,11 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
     return method === "GET";
   }
 
-  return method === "GET" && /^\/api\/users\/[^/]+$/.test(pathname);
+  return (
+    method === "GET" &&
+    pathname !== "/api/users/me" &&
+    /^\/api\/users\/[^/]+$/.test(pathname)
+  );
 }
 
 export default auth((req: NextAuthRequest) => {
