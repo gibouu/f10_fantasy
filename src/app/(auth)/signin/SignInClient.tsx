@@ -30,6 +30,7 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
     callbackUrlParam && callbackUrlParam.startsWith("/") && !callbackUrlParam.startsWith("//")
       ? callbackUrlParam
       : "/races"
+  const authError = searchParams.get("error")
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-6 relative overflow-hidden">
@@ -56,6 +57,12 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
             The F1 prediction game where 10th place wins
           </p>
         </div>
+
+        {authError && (
+          <div className="w-full rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-center">
+            <p className="text-sm font-semibold text-red-400">Sign-in failed — please try again.</p>
+          </div>
+        )}
 
         {/* Auth buttons */}
         <div className="w-full flex flex-col gap-3">

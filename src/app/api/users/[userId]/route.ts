@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { auth } from '@/auth'
+import { mobileAuth } from '@/lib/auth/mobileAuth'
 import { resolveTeam } from '@/lib/f1/teams'
 import { getPicksForSeason } from '@/lib/services/pick.service'
 import { getActiveSeason, getRaceEntrants } from '@/lib/services/race.service'
@@ -60,7 +61,7 @@ export async function GET(
         favoriteTeamSlug: true,
       },
     }),
-    auth(),
+    auth().then((s) => s ?? mobileAuth(_req)),
   ])
 
   if (!user) {
@@ -91,15 +92,13 @@ export async function GET(
   }
 
   const picks = await getPicksForSeason(userId, season.id)
-  const now = new Date()
-  const visiblePicks = picks.filter((pick) => pick.race.lockCutoffUtc <= now)
-  const raceIds = Array.from(new Set(visiblePicks.map((pick) => pick.raceId)))
+  const raceIds = Array.from(new Set(picks.map((pick) => pick.raceId)))
   const entrantsByRace = new Map(
     await Promise.all(
       raceIds.map(async (raceId) => [raceId, await getRaceEntrants(raceId)] as const),
     ),
   )
-  const resolvedPicks = visiblePicks.map((pick) =>
+  const resolvedPicks = picks.map((pick) =>
     resolvePickAgainstEntrants(pick, entrantsByRace.get(pick.raceId) ?? []),
   )
 
