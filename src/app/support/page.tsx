@@ -6,7 +6,7 @@ export default function SupportPage() {
   return (
     <main className="min-h-screen bg-background px-6 py-16 max-w-2xl mx-auto">
       <h1 className="text-3xl font-black mb-2">FX Racing Support</h1>
-      <p className="text-sm text-muted-foreground mb-10">We're here to help.</p>
+      <p className="text-sm text-muted-foreground mb-10">We are here to help.</p>
 
       <section className="space-y-8 text-sm leading-relaxed">
         <div>
