@@ -3,7 +3,8 @@
  *
  * Scoring rules:
  *   Main race:
- *     - 10th place pick: max(0, 25 - |position - 10| * 3) for CLASSIFIED drivers
+ *     - 10th place pick: F1_POINTS[|position - 10|] for CLASSIFIED drivers
+ *       (25 exact, 18 one off, 15 two off … 1 nine off, 0 ten+ off)
  *     - Winner bonus:    +5 if picked driver finishes P1
  *     - DNF bonus:       +3 if picked driver is DNF
  *   Sprint:
@@ -44,6 +45,13 @@ export type ScoreOutput = {
 // Constants
 // ─────────────────────────────────────────────
 
+/**
+ * F1 points table used for the 10th-place pick.
+ * Index = number of positions away from P10.
+ * 0 off → 25, 1 off → 18, 2 off → 15, …, 9 off → 1, 10+ off → 0.
+ */
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+
 /** Maximum achievable score in a main race (25 + 5 + 3) */
 export const MAX_MAIN_RACE_SCORE = 33
 
@@ -71,7 +79,7 @@ function findResult(
  * Only CLASSIFIED drivers earn points here. Non-classified drivers
  * (DNF / DNS / DSQ) score 0 regardless of position.
  *
- * Main:   max(0, 25 - |position - 10| * 3)
+ * Main:   F1_POINTS[|position - 10|]  (25 / 18 / 15 / 12 / 10 / 8 / 6 / 4 / 2 / 1 / 0)
  * Sprint: max(0, 10 - |position - 10|)
  */
 export function computeTenthPlaceScore(
@@ -86,7 +94,7 @@ export function computeTenthPlaceScore(
   const delta = Math.abs(result.position - 10)
 
   if (ctx.raceType === 'MAIN') {
-    return Math.max(0, 25 - delta * 3)
+    return F1_POINTS[delta] ?? 0
   } else {
     return Math.max(0, 10 - delta)
   }
@@ -177,11 +185,7 @@ export function getScoreExplanation(
   if (score.tenthPlaceScore === maxTenth) {
     lines.push(`Perfect 10th place pick! +${score.tenthPlaceScore} pts`)
   } else if (score.tenthPlaceScore > 0) {
-    lines.push(`10th place pick scored +${score.tenthPlaceScore} pts (off by ${
-      raceType === 'MAIN'
-        ? Math.round((maxTenth - score.tenthPlaceScore) / 3)
-        : maxTenth - score.tenthPlaceScore
-    } position${score.tenthPlaceScore < maxTenth - 3 ? 's' : ''})`)
+    lines.push(`10th place pick scored +${score.tenthPlaceScore} pts`)
   } else {
     lines.push('10th place pick scored 0 pts (too far off or driver did not finish)')
   }
