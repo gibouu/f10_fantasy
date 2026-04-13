@@ -4,6 +4,7 @@ import { TEAMS } from "@/lib/f1/teams"
 import type { TeamSlug } from "@/lib/f1/teams"
 import { UserAvatarMenu } from "./UserAvatarMenu"
 import { TabBarLink } from "./TabBarLink"
+import { LegalModal } from "@/components/legal/LegalModal"
 import { Flag, Trophy } from "lucide-react"
 import Link from "next/link"
 
@@ -56,6 +57,7 @@ export default async function MainLayout({
        */}
       <main className="flex-1 overflow-y-auto pb-24">
         {children}
+        <LegalModal />
       </main>
 
       {/* ── Fixed bottom tab bar ───────────────────────────────────────── */}
