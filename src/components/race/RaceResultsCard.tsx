@@ -11,7 +11,6 @@ interface RaceResultsCardProps {
 
 const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2]
 
-/** Points a P10 pick of this driver earns given their actual finishing position */
 function p10Score(result: RaceResultRecord, raceType: 'MAIN' | 'SPRINT'): number {
   if (result.status !== ResultStatus.CLASSIFIED || result.position === null) return 0
   const delta = Math.abs(result.position - 10)
@@ -30,7 +29,6 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
 
   const entrantMap = new Map(entrants.map((e) => [e.id, e]))
 
-  // Sort: classified by position first, then DNF/DNS/DSQ
   const sorted = [...results].sort((a, b) => {
     if (a.status === ResultStatus.CLASSIFIED && b.status === ResultStatus.CLASSIFIED) {
       return (a.position ?? 99) - (b.position ?? 99)
@@ -40,7 +38,6 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
     return 0
   })
 
-  const maxP10Score = raceType === 'MAIN' ? 25 : 10
   const winnerBonus = raceType === 'MAIN' ? 5 : 2
   const dnfBonus = raceType === 'MAIN' ? 3 : 1
 
@@ -49,21 +46,35 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
       {/* Header */}
       <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
         <p className="text-sm font-semibold text-text-primary">Race Results</p>
-        <div className="flex items-center gap-3 text-[10px] text-text-tertiary font-medium">
-          <span>P10 pts</span>
-          <span>W/DNF</span>
-        </div>
+        <span className="text-[10px] text-text-tertiary font-medium">pts</span>
       </div>
 
       {/* Results rows */}
       <div>
-        {sorted.map((result, idx) => {
+        {sorted.map((result) => {
           const driver = entrantMap.get(result.driverId)
           const isClassified = result.status === ResultStatus.CLASSIFIED
           const isWinner = result.position === 1
           const isDnf = result.status === ResultStatus.DNF
           const isP10 = result.position === 10 && isClassified
           const pts = p10Score(result, raceType)
+
+          // Single column: W bonus, DNF bonus, or P10 pts
+          let ptsLabel: string
+          let ptsColor: string
+          if (isWinner) {
+            ptsLabel = `+${winnerBonus}W`
+            ptsColor = 'text-[#30d158]'
+          } else if (isDnf) {
+            ptsLabel = `+${dnfBonus}D`
+            ptsColor = 'text-accent'
+          } else if (pts > 0) {
+            ptsLabel = `+${pts}`
+            ptsColor = isP10 ? 'text-[#C9A227]' : 'text-[#C9A227]/70'
+          } else {
+            ptsLabel = '—'
+            ptsColor = 'text-text-tertiary/40'
+          }
 
           return (
             <div
@@ -102,42 +113,18 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
                     {driver?.code.slice(0, 2) ?? '??'}
                   </div>
                 )}
-                <div className="min-w-0">
-                  <span className={cn('text-sm font-semibold truncate block', isClassified ? 'text-text-primary' : 'text-text-tertiary')}>
-                    {driver?.code ?? '???'}
-                  </span>
-                </div>
+                <span className={cn('text-sm font-semibold truncate', isClassified ? 'text-text-primary' : 'text-text-tertiary')}>
+                  {driver?.code ?? '???'}
+                </span>
               </div>
 
-              {/* P10 pick score */}
-              <span
-                className={cn(
-                  'text-xs font-bold w-10 text-right shrink-0',
-                  pts === maxP10Score ? 'text-[#C9A227]' : pts > 0 ? 'text-[#C9A227]/70' : 'text-text-tertiary/50',
-                )}
-              >
-                {pts > 0 ? `+${pts}` : '—'}
+              {/* Single pts column */}
+              <span className={cn('text-xs font-bold w-10 text-right shrink-0', ptsColor)}>
+                {ptsLabel}
               </span>
-
-              {/* Winner / DNF bonus */}
-              <div className="w-12 text-right shrink-0">
-                {isWinner && (
-                  <span className="text-[10px] font-bold text-[#30d158]">+{winnerBonus}W</span>
-                )}
-                {isDnf && (
-                  <span className="text-[10px] font-bold text-accent">+{dnfBonus}D</span>
-                )}
-              </div>
             </div>
           )
         })}
-      </div>
-
-      {/* Legend */}
-      <div className="px-4 py-2.5 border-t border-[var(--border)] flex flex-wrap gap-3 text-[10px] text-text-tertiary">
-        <span><span className="font-bold text-[#30d158]">green</span> = P1 (+{winnerBonus}) · <span className="font-bold text-[#C9A227]">gold</span> = P10</span>
-        <span>DNF = +{dnfBonus} bonus</span>
-        <span>Max P10 = +{maxP10Score} pts</span>
       </div>
     </div>
   )
