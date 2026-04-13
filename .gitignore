@@ -37,3 +37,11 @@ yarn-error.log*
 next-env.d.ts
 f10_racing_backup.sql
 *.pem
+
+# Xcode user data & derived files (xcshareddata/xcschemes kept — needed for Xcode Cloud)
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/
+ios/DerivedData/
+
+# Source assets not needed in repo
+favicon2.png
