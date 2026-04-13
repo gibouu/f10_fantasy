@@ -9,7 +9,7 @@ interface RaceResultsCardProps {
   raceType: 'MAIN' | 'SPRINT'
 }
 
-const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2]
 
 /** Points a P10 pick of this driver earns given their actual finishing position */
 function p10Score(result: RaceResultRecord, raceType: 'MAIN' | 'SPRINT'): number {

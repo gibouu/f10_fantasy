@@ -4,7 +4,7 @@
  * Scoring rules:
  *   Main race:
  *     - 10th place pick: F1_POINTS[|position - 10|] for CLASSIFIED drivers
- *       (25 exact, 18 one off, 15 two off … 1 nine off, 0 ten+ off)
+ *       (25 exact, 18 one off, 15 two off … 2 eight off, 0 nine+ off)
  *     - Winner bonus:    +5 if picked driver finishes P1
  *     - DNF bonus:       +3 if picked driver is DNF
  *   Sprint:
@@ -50,7 +50,7 @@ export type ScoreOutput = {
  * Index = number of positions away from P10.
  * 0 off → 25, 1 off → 18, 2 off → 15, …, 9 off → 1, 10+ off → 0.
  */
-const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2]
 
 /** Maximum achievable score in a main race (25 + 5 + 3) */
 export const MAX_MAIN_RACE_SCORE = 33
