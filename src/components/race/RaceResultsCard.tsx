@@ -9,11 +9,13 @@ interface RaceResultsCardProps {
   raceType: 'MAIN' | 'SPRINT'
 }
 
+const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
+
 /** Points a P10 pick of this driver earns given their actual finishing position */
 function p10Score(result: RaceResultRecord, raceType: 'MAIN' | 'SPRINT'): number {
   if (result.status !== ResultStatus.CLASSIFIED || result.position === null) return 0
   const delta = Math.abs(result.position - 10)
-  return raceType === 'MAIN' ? Math.max(0, 25 - delta * 3) : Math.max(0, 10 - delta)
+  return raceType === 'MAIN' ? (F1_POINTS[delta] ?? 0) : Math.max(0, 10 - delta)
 }
 
 export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCardProps) {
