@@ -63,7 +63,7 @@ final class FriendsViewModel {
             )
             searchResults = results
         } catch {
-            // silently ignore search errors
+            errorMessage = "Search failed: \(error.localizedDescription)"
         }
     }
 

@@ -27,6 +27,10 @@ struct FriendSearchView: View {
                                 ProgressView()
                                 Spacer()
                             }
+                        } else if let err = vm.errorMessage {
+                            Text(err)
+                                .foregroundStyle(.red)
+                                .font(.subheadline)
                         } else if vm.searchResults.isEmpty {
                             Text("No users found")
                                 .foregroundStyle(.secondary)
