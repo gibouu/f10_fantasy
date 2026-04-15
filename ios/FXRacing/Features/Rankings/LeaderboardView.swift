@@ -33,7 +33,9 @@ struct LeaderboardView: View {
                 }
             }
         }
-        .sheet(isPresented: $showFriendSearch) {
+        .sheet(isPresented: $showFriendSearch, onDismiss: {
+            Task { await vm.load(token: authManager.accessToken) }
+        }) {
             FriendSearchView()
         }
         .sheet(isPresented: $showSignIn) {
