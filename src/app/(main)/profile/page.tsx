@@ -5,6 +5,7 @@ import { TeamPicker } from './TeamPicker'
 import { UsernameSetForm } from './UsernameSetForm'
 import { UsernameChangeForm } from './UsernameChangeForm'
 import { SignOutButton } from './SignOutButton'
+import { DeleteAccountButton } from './DeleteAccountButton'
 import { TEAM_LIST } from '@/lib/f1/teams'
 
 export default async function ProfilePage() {
@@ -64,6 +65,7 @@ export default async function ProfilePage() {
       </div>
 
       <SignOutButton />
+      <DeleteAccountButton />
     </div>
   )
 }

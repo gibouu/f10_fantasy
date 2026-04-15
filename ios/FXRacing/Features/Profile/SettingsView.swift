@@ -21,6 +21,8 @@ struct SettingsView: View {
     @State private var showSignOutConfirm = false
     @State private var showUsernameChange = false
     @State private var teamError: String? = nil
+    @State private var showDeleteAccountWarn = false
+    @State private var showDeleteAccountConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -80,6 +82,12 @@ struct SettingsView: View {
                         showSignOutConfirm = true
                     }
                 }
+
+                Section {
+                    Button("Delete Account", role: .destructive) {
+                        showDeleteAccountWarn = true
+                    }
+                }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
@@ -100,6 +108,17 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showUsernameChange) {
                 UsernameChangeView()
+            }
+            .alert("Delete Account?", isPresented: $showDeleteAccountWarn) {
+                Button("Continue", role: .destructive) {
+                    showDeleteAccountConfirm = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes your account and all associated data. This action cannot be undone.")
+            }
+            .sheet(isPresented: $showDeleteAccountConfirm) {
+                DeleteAccountConfirmView()
             }
         }
     }

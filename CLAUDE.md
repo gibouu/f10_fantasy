@@ -1,6 +1,208 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Purpose
+This repository uses AI coding agents to produce high-quality software with:
+- maximum correctness
+- minimal complexity
+- minimal surface area of change
+- explicit reasoning and verification
+
+This file defines behavioral constraints to reduce hallucination, overengineering, wasted effort, and unnecessary repo scanning.
+
+## Read Order (CRITICAL)
+Before doing meaningful work, read in this order:
+1. `ai/docs/architecture.md`
+2. `ai/docs/decisions.md`
+3. `ai/docs/worklog.md`
+4. only then open the minimum necessary code files
+
+If `AGENTS.md` contains Codex-specific notes or updates, absorb them too.
+
+## Operating Principles
+
+### 1. Think Before Coding
+Before writing code:
+- state assumptions explicitly
+- identify ambiguities
+- present multiple interpretations if they exist
+- do not silently choose an interpretation
+- if something is unclear, stop and ask unless the task clearly allows a best-effort path
+
+If a simpler approach exists, propose it before implementing.
+
+### 2. Simplicity First
+Write the minimum code required to solve the problem.
+
+Do NOT:
+- add features not requested
+- introduce abstractions for single-use code
+- add configurability unless explicitly required
+- implement speculative future-proofing
+- add defensive logic for impossible scenarios
+
+### 3. Surgical Changes
+When modifying existing code:
+- only change what is necessary for the task
+- do not refactor unrelated code
+- do not reformat unrelated sections
+- match existing style and patterns
+- mention unrelated issues, do not fix them unless asked
+
+Allowed cleanup:
+- remove unused imports caused by your changes
+- remove variables/functions made obsolete by your changes
+
+Constraint:
+> Every changed line must directly map to the task.
+
+### 4. Goal-Driven Execution
+Convert vague instructions into verifiable goals.
+
+Examples:
+- fix bug -> reproduce -> fix -> verify
+- add validation -> create failing case -> make it pass
+- refactor -> preserve behavior and verify before/after
+
+For any non-trivial task, define:
+1. Plan
+2. Implementation
+3. Verification
+
+### 5. Verification Hierarchy
+Never claim something works without verification.
+
+Use, in order:
+1. existing tests
+2. targeted new tests if appropriate
+3. type checking
+4. linting
+5. build
+6. minimal manual verification
+
+If something cannot be verified:
+- explicitly state that it is unverified
+
+### 6. Output Discipline
+Every response involving code changes should include:
+- assumptions
+- what changed
+- why it changed
+- how it was verified
+- what remains uncertain
+
+### 7. Handling Ambiguity
+If multiple interpretations exist:
+- list them
+- do not silently choose one
+
+If confidence is low:
+- ask clarifying questions before coding, unless the user clearly prefers best-effort progress
+
+### 8. Anti-Overengineering Constraints
+Do NOT:
+- create new layers unless already present
+- generalize prematurely
+- optimize for scale unless explicitly required
+- introduce patterns not used elsewhere in the repo
+
+### 9. Code Quality Heuristics
+Prefer:
+- explicit over clever
+- local reasoning over global abstractions
+- small functions with single purpose
+- readability over compactness
+
+Avoid:
+- deep abstraction chains
+- premature modularization
+- unnecessary indirection
+
+### 10. Codebase Scanning Policy (CRITICAL)
+Do NOT scan the entire repository by default.
+
+Always follow this order:
+1. Read `ai/docs/architecture.md`
+2. Use listed entry points and modules
+3. Open only files directly relevant to the task
+
+Only expand search if:
+- required information is missing
+- architecture.md is incomplete
+- ambiguity cannot be resolved otherwise
+
+If you scan beyond defined scope:
+- justify why
+- keep exploration minimal
+
+Constraint:
+> `ai/docs/architecture.md` is the primary source of truth for codebase structure.
+
+### 11. Repository Awareness
+Before making changes:
+- identify entry points
+- identify main modules
+- understand the smallest relevant data flow
+- locate related code paths
+
+### 12. Shared Project Memory (CRITICAL)
+Durable repo knowledge must be stored in shared files so Claude and Codex stay aligned.
+
+Update when appropriate:
+- `ai/docs/architecture.md` -> structure and data flow
+- `ai/docs/decisions.md` -> durable technical decisions
+- `ai/docs/worklog.md` -> concise recent updates and open issues
+
+Do NOT store temporary or speculative information as durable knowledge.
+
+### 13. Cross-Model Consistency
+If work appears to have been done by another model:
+- read shared docs first
+- reconcile differences against current code
+- update shared docs if the current truth differs
+
+Treat repo files as the shared memory layer between Claude and Codex.
+
+### 14. Failure Modes to Avoid
+- writing code before understanding context
+- solving the wrong problem
+- overengineering simple tasks
+- making large unnecessary diffs
+- claiming correctness without verification
+- ignoring ambiguity
+- silent assumptions
+- refactoring unrelated code
+- scanning far more code than necessary
+
+### 15. Execution Standard
+The default workflow is:
+1. Understand
+2. Read shared docs
+3. Clarify
+4. Plan
+5. Implement minimally
+6. Verify
+7. Update shared docs if needed
+8. Report clearly
+
+### 16. No Test Framework — Verification Fallback (Project-Specific)
+This project has no test framework. Verify in this strict order:
+1. `npx tsc --noEmit` — type checking
+2. `npm run lint` — ESLint
+3. `npm run build` — full build
+4. Manual spot-check in dev server if UI was changed
+
+If a step fails, fix it before proceeding. Explicitly state when a change is unverified.
+
+## Final Constraint
+You are not rewarded for writing more code.
+You are rewarded for:
+- correctness
+- simplicity
+- precision
+- verifiability
+- keeping shared repo memory accurate
+
+---
 
 ## Commands
 
@@ -8,212 +210,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev          # Start development server (localhost:3000)
 npm run build        # Production build
 npm run lint         # ESLint
+npx tsc --noEmit     # Type check
 npm run db:push      # Sync Prisma schema to DB (no migrations — direct push)
 npm run db:studio    # Open Prisma Studio GUI
 ```
 
-No test framework is configured.
+## Project-Specific Constraints
 
----
+See `ai/docs/architecture.md` for full architecture, entry points, data flow, and API surface.
 
-## Architecture
-
-**Stack**: Next.js 14 App Router, TypeScript, PostgreSQL + Prisma ORM, Auth.js v5 (JWT), Tailwind CSS + Radix UI, OpenF1 API for F1 data.
-
-### Layered Structure
-
-```
-Client Components / Pages (RSC)
-  → API Routes (Next.js server functions, validation via Zod)
-    → Service Layer (src/lib/services/) — all business logic
-      → Pure Functions (src/lib/scoring/formula.ts) — scoring math, no DB
-      → Prisma ORM (src/lib/db/client.ts) → PostgreSQL
-      → F1 Provider (src/lib/f1/) → OpenF1 API
-```
-
----
-
-## Route Groups
-
-- `src/app/(auth)/` — signin, onboarding/username (separate layout, no nav bar)
-- `src/app/(main)/` — pages; layout adds sticky header + bottom tab nav. Most pages support **guest access** (no auth required for read-only)
-- `src/app/api/cron/` — background jobs; protected by `Authorization: Bearer CRON_SECRET` header (not session)
-
-### Auth / Guest Mode
-Middleware (`src/middleware.ts`) allows unauthenticated access to:
-- `/races`, `/races/*` — race list and detail (read-only)
-- `/leaderboard` — global leaderboard only (Friends tab hidden for guests)
-- `/profile/*` — public user profiles
-- `/api/races`, `/api/users` — public API routes
-
-Auth is required for: `/profile` (own profile editing), `/picks`, POST `/api/picks`, `/api/friends`, `/onboarding/*`
-
-Pages handle `userId = null` gracefully — show sign-in CTA instead of crashing.
-
----
-
-## Key Pages & Their Data Fetching
-
-### `/races` → `src/app/(main)/races/page.tsx`
-- Fetches: `getActiveSeason()`, `getRacesForSeason(season.id)`, `getPickedRaceIds(userId, season.id)` (skipped for guests)
-- Shows upcoming races and completed races as `RaceCard` links
-- Renders `<OnboardingCarousel />` at top (dismisses via `localStorage`)
-
-### `/races/[raceId]` → `src/app/(main)/races/[raceId]/page.tsx`
-- Fetches: `getRaceById`, `getRaceEntrants`, `getPickForRace` (null for guests)
-- If completed: ALSO fetches `getRaceResults` → builds `heroResults` (structured) + `displayResults` (flat)
-- Active race → renders `<PickHero>` or sign-in CTA for guests
-- Completed race → renders `<HeroVisualization>` + `<PicksDisplay>` (or sign-in CTA) + `<RaceResultsCard>`
-- **Both `entrants` and `results` must be passed to HeroVisualization and PicksDisplay**
-
-### `/leaderboard` → `src/app/(main)/leaderboard/page.tsx`
-- Fetches global leaderboard + user rank from `getGlobalLeaderboard` / `getUserSeasonRank`
-- Guests see global leaderboard only (no Friends tab, no FriendSearch)
-
-### `/profile` → `src/app/(main)/profile/page.tsx` (auth-required)
-- Shows `TeamPicker` for selecting favourite team (stored as `favoriteTeamSlug` on User)
-
-### `/profile/[userId]` → `src/app/(main)/profile/[userId]/page.tsx` (public, client component)
-- SWR-fetches `/api/users/[userId]` — shows picks per race + season total score
-- Accessible by guests and linked from leaderboard rows + friend list
-
----
-
-## Pick Flow (Active Race)
-
-```
-races/[raceId]/page.tsx (server)
-  └─ PickHero (src/components/picks/PickHero.tsx) [client]
-       ├─ PickBubble: circular bubble showing headshot photo when picked, "tap to pick" when empty
-       │    → tap opens DriverSheet bottom sheet
-       ├─ DriverSheet: scrollable list of all entrants
-       │    → each row: team logo (on team-color bg) + driver code/name + number
-       │    → selecting a driver closes sheet and updates PickBubble
-       ├─ ResultBubble: smaller bubble below each PickBubble showing actual race result
-       │    → shows driver headshot photo when result is available
-       └─ Save button → POST /api/picks
-```
-
-## Results / Completed Race Flow
-
-```
-races/[raceId]/page.tsx (server)
-  ├─ HeroVisualization (src/components/race/HeroVisualization.tsx) [client]
-  │    └─ SlotColumn × 3 (Winner / P10 / DNF)
-  │         ├─ DriverBubble (top, larger): actual result driver with headshot
-  │         └─ DriverBubble (bottom, smaller): user's pick with headshot
-  │    Props needed: race, pick, results (structured), entrants
-  └─ PicksDisplay (src/components/picks/PicksDisplay.tsx)
-       └─ CategoryRow × 3: shows pick code → actual result → score
-       Props needed: pick, race, results (flat ResultRow[]), entrants
-```
-
----
-
-## Driver Photos & Team Logos (Static Assets)
-
-- **Driver photos**: `public/drivers/{lastName}.png` (22 drivers, 2026 grid)
-- **Team logos**: `public/teamlogos/{slug}.webp` (11 teams, white logos)
-- **Static mapping**: `src/lib/f1/teams.ts`
-  - `DRIVER_PHOTOS: Record<number, string>` — driver number → photo path
-  - `TEAMS: Record<TeamSlug, TeamInfo>` — team registry with slug, name, color, logoUrl, dbMatch[]
-  - `resolveTeam(constructorName)` — matches DB Constructor name to TeamInfo
-- **Where photos/logos are injected**: `getRaceEntrants()` in `src/lib/services/race.service.ts` calls `resolveTeam()` and `DRIVER_PHOTOS` to populate `DriverSummary.photoUrl` and `DriverSummary.constructor.{slug, logoUrl, color}`
-
-### Driver photo format
-Images in `public/drivers/` are pre-cropped circular headshots — use default `object-center` (no objectPosition override needed). Two DB drivers have no photo (DOO #7 Jack Doohan, TSU #22 Yuki Tsunoda) — fall back to team-color background with initials.
-
----
-
-## Service Layer (`src/lib/services/`)
-
-| Service | Owns |
-|---|---|
-| `race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRaceResults`, `getRacesForSeason`, `getActiveSeason`, `getCurrentRace` |
-| `pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick` |
-| `ingestion.service.ts` | `ingestResultsForRace` — fetches OpenF1 final results → upserts `RaceResult`; `findRacesNeedingIngestion` |
-| `scoring.service.ts` | `computeAndStoreScoresForRace` — orchestrates scoring via pure formula (requires results already in DB) |
-| `leaderboard.service.ts` | `getGlobalLeaderboard`, `getFriendsLeaderboard`, `getUserSeasonRank` |
-| `user.service.ts` | `setUsername`, `isUsernameAvailable`, `setFavoriteTeam`, `suggestUsernames` |
-| `friendship.service.ts` | Friend request CRUD |
-| `lock.service.ts` | `isRaceLocked(race)`, `isPickSetLocked(pickSet)` |
-
-### Cron Infrastructure
-Cron jobs are **NOT Vercel crons**. They are AWS Lambda functions configured externally that POST to the Next.js API routes on a schedule. Each route validates the `Authorization: Bearer CRON_SECRET` header.
-
-**To add a new cron:**
-1. Create (or reuse) an API route under `src/app/api/cron/`
-2. Configure a new AWS Lambda scheduled trigger to `POST https://<domain>/api/cron/<route>` with `Authorization: Bearer <CRON_SECRET>`
-
-There is no cron config file in this repo — schedules live entirely in AWS.
-
-### Cron Pipeline
-```
-sync-schedule  (weekly)       → full season sync: upserts Race/Driver/Constructor/RaceEntry from OpenF1
-sync-entries   (hourly)       → lightweight: refreshes RaceEntry only for non-completed races; handles substitutes
-lock-picks     (daily 12:00)  → locks PickSets past cutoff
-ingest-results (daily 20:00)  → ingestResultsForRace → computeAndStoreScoresForRace
-```
-
-- `sync-schedule` fetches all sessions + meetings for the year — run weekly, not daily.
-- `sync-entries` is the pre-race refresh. It only queries races already in the DB (no full year fetch), upserts any new drivers/constructors (for substitutes), and rebuilds RaceEntry rows. Safe to run hourly.
-- `ingest-results` replaces the old `compute-scores` cron. The old `/api/cron/compute-scores` route remains for manual targeted reruns.
-- Completed races are never touched by `sync-schedule` or `sync-entries` — their grids are final.
-
----
-
-## Type System
-
-Three parallel type systems — keep them separate:
-- **Domain types** (`src/types/domain.ts`) — safe for client and server, decoupled from Prisma. `DriverSummary` includes `constructor.{slug, logoUrl, color}`. `LeaderboardRow` includes `teamLogoUrl`, `teamColor`.
-- **Prisma types** — DB layer only, never leak to client
-- **F1 types** (`src/lib/f1/types.ts`) — provider-agnostic, internal to the F1 layer
-
-### Serialization pattern
-`Date` fields cannot cross the RSC/client boundary. All client components receive "Serialized" variants: `SerializedRaceSummary`, `SerializedPickSetData`, `SerializedPickSetWithScore` — same shape but dates as ISO strings.
-
----
-
-## Key DB Constraints
-
-- `PickSet` unique on `[userId, raceId]` — one pick set per user per race
-- `Race` unique on `[seasonId, round, type]` — separates MAIN and SPRINT races
-- Two lock levels: `race.lockCutoffUtc` (race-wide) and `pickSet.lockedAt` (individual override)
-- `User.favoriteTeamSlug` — team slug e.g. `"mercedes"` for leaderboard icon
-
----
-
-## Scoring Formula
-
-| | Main Race | Sprint |
-|---|---|---|
-| 10th place | `max(0, 25 - \|pos-10\| × 3)` | `max(0, 10 - \|pos-10\|)` |
-| Winner bonus | +5 | +2 |
-| DNF bonus | +3 | +1 |
-
-Only CLASSIFIED drivers contribute to position scoring.
-
----
-
-## UI Components (`src/components/ui/`)
-
-- `Avatar` — shows OAuth photo, team logo (on team-color bg), or initials gradient. Props: `src`, `name`, `teamLogoUrl`, `teamColor`, `color` (ring), `size`
-- `Button` — variants: `primary`, `secondary`, `ghost`. Props: `variant`, `size`, `fullWidth`, `loading`
-- `Badge` — variants: `accent`, `warning`, `success`
-- `SegmentedControl` — tab-style selector
-- `Card` — surface card wrapper
-
----
-
-## Environment Variables
-
-```
-DATABASE_URL           # PostgreSQL connection string
-AUTH_SECRET            # NextAuth secret
-GOOGLE_CLIENT_ID       # OAuth (required)
-GOOGLE_CLIENT_SECRET
-APPLE_ID               # OAuth (optional)
-APPLE_SECRET
-CRON_SECRET            # Bearer token for /api/cron/* routes
-OPENF1_BASE_URL        # Defaults to https://api.openf1.org/v1
-```
+Key behavioral constraints not derivable from reading code:
+- **Cron jobs are AWS Lambda, not Vercel Crons** — never add vercel.json cron config; new crons require external AWS trigger setup
+- **No migrations** — `db:push` only; be deliberate about destructive schema changes
+- **Three type systems must stay separate** — Domain types, Prisma types, F1 types — never mix layers
+- **Completed races are immutable** — `sync-schedule` and `sync-entries` must never touch them
+- **Guest access** — all read-only pages must handle `userId = null` gracefully; never crash or throw on missing auth
+- **Serialization** — `Date` fields cannot cross the RSC/client boundary; use `Serialized*` variants

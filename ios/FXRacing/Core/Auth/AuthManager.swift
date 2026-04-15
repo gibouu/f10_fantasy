@@ -102,6 +102,14 @@ final class AuthManager {
         state = .unauthenticated
     }
 
+    // MARK: - Account deletion
+
+    func deleteAccount() async throws {
+        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
+        let _: DeleteAccountResponse = try await api.request(.deleteAccount, token: token)
+        signOut()
+    }
+
 
     // MARK: - Convenience
 
@@ -133,5 +141,9 @@ private struct UsernameSetResponse: Decodable, Sendable {
 }
 
 private struct TeamResponse: Decodable, Sendable {
+    let ok: Bool
+}
+
+private struct DeleteAccountResponse: Decodable, Sendable {
     let ok: Bool
 }

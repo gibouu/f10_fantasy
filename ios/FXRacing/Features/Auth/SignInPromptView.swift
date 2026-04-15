@@ -6,6 +6,7 @@ import AuthenticationServices
 struct SignInPromptView: View {
     let reason: String
     @Environment(AuthManager.self) private var authManager
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var vm = SignInViewModel()
 
@@ -47,7 +48,7 @@ struct SignInPromptView: View {
                             if authManager.isAuthenticated { dismiss() }
                         }
                     }
-                    .signInWithAppleButtonStyle(.white)
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(height: 54)
                     .cornerRadius(FXTheme.Radius.md)
                     .disabled(vm.isLoading)

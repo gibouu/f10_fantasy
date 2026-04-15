@@ -226,6 +226,14 @@ export async function dismissTutorial(userId: string): Promise<Date> {
   return user.tutorialDismissedAt
 }
 
+/**
+ * Permanently delete a user account and all associated data.
+ * Cascade deletes via Prisma schema: Account, Session, PickSet → ScoreBreakdown, FriendRequest.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  await db.user.delete({ where: { id: userId } })
+}
+
 export async function revokeUserSessions(userId: string): Promise<Date> {
   const user = await db.user.update({
     where: { id: userId },

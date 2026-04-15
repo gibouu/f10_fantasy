@@ -29,6 +29,9 @@ extension APIEndpoint {
         return APIEndpoint(method: "POST", path: "/api/auth/mobile/exchange", bodyData: body)
     }
 
+    // Account
+    static let deleteAccount = APIEndpoint(method: "DELETE", path: "/api/account")
+
     // User
     static let me = APIEndpoint(method: "GET", path: "/api/users/me")
 

@@ -3,6 +3,7 @@ import AuthenticationServices
 
 struct SignInView: View {
     @Environment(AuthManager.self) private var authManager
+    @Environment(\.colorScheme) private var colorScheme
     @State private var viewModel = SignInViewModel()
 
     var body: some View {
@@ -46,7 +47,7 @@ struct SignInView: View {
                             await viewModel.handleAppleResult(result, authManager: authManager)
                         }
                     }
-                    .signInWithAppleButtonStyle(.white)
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(height: 54)
                     .cornerRadius(FXTheme.Radius.md)
                     .disabled(viewModel.isLoading)

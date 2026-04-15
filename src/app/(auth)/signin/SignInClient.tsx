@@ -80,8 +80,8 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
             <button
               onClick={() => signIn("apple", { callbackUrl })}
               className="w-full flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl
-                         bg-white text-text-primary font-semibold text-sm border border-black/10
-                         shadow-sm transition-opacity active:opacity-80 hover:opacity-90"
+                         bg-black text-white font-semibold text-sm border border-black
+                         transition-opacity active:opacity-80 hover:opacity-90"
             >
               <AppleIcon />
               Continue with Apple
