@@ -23,10 +23,10 @@ import { resolveTeam } from '@/lib/f1/teams'
 
 export const CreatePickSchema = z
   .object({
-    raceId: z.string().cuid(),
-    tenthPlaceDriverId: z.string().cuid(),
-    winnerDriverId: z.string().cuid(),
-    dnfDriverId: z.string().cuid(),
+    raceId: z.string().min(1),
+    tenthPlaceDriverId: z.string().min(1),
+    winnerDriverId: z.string().min(1),
+    dnfDriverId: z.string().min(1),
   })
   .refine(
     (data) => {

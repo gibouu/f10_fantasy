@@ -61,9 +61,10 @@ final class AuthManager {
         let user: User = try await api.request(.me, token: exchange.accessToken)
         state = .authenticated(user)
 
-        // Migrate any guest picks that were saved locally
+        // Migrate any guest picks in the background — don't block sign-in completion
+        // so the caller can dismiss sheets / transition views before migration finishes.
         if let store = localPickStore {
-            await syncManager.migrateGuestPicks(token: exchange.accessToken, localPickStore: store)
+            Task { await syncManager.migrateGuestPicks(token: exchange.accessToken, localPickStore: store) }
         }
 
         // Offer the guest draft username as a prefill (caller reads guestStore if needed)
