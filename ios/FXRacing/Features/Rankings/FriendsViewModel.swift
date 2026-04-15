@@ -57,11 +57,11 @@ final class FriendsViewModel {
         isSearching = true
         defer { isSearching = false }
         do {
-            let response: SearchResponse = try await client.request(
+            let results: [UserSummary] = try await client.request(
                 .searchUsers(searchQuery),
                 token: token
             )
-            searchResults = response.users
+            searchResults = results
         } catch {
             // silently ignore search errors
         }
@@ -106,10 +106,6 @@ private struct FriendsResponse: Decodable, Sendable {
     let friends: [UserSummary]
     let pendingReceived: [FriendRequest]
     let pendingSent: [FriendRequest]
-}
-
-private struct SearchResponse: Decodable, Sendable {
-    let users: [UserSummary]
 }
 
 private struct EmptyResponse: Decodable, Sendable {}
