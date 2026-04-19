@@ -7,8 +7,7 @@ import { CheckCircle2 } from 'lucide-react'
 function validateUsername(value: string): string | null {
   if (value.length < 3) return 'Must be at least 3 characters'
   if (value.length > 20) return 'Must be 20 characters or fewer'
-  if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Letters, numbers, and underscores only'
-  if (value.startsWith('_') || value.endsWith('_')) return 'Cannot start or end with underscore'
+  if (!/^[a-zA-Z0-9]+$/.test(value)) return 'Only letters and numbers allowed.'
   return null
 }
 
@@ -32,10 +31,11 @@ export function UsernameSetForm() {
         const res = await fetch(`/api/users/username?username=${encodeURIComponent(value)}`)
         const data: { available: boolean } = await res.json()
         setIsAvailable(data.available)
-        if (!data.available) setError('Username is already taken')
+        if (!data.available) setError('Username already taken.')
         else setError(null)
       } catch {
         setIsAvailable(null)
+        setError("Couldn't verify username. Please try again.")
       } finally {
         setIsChecking(false)
       }
@@ -60,7 +60,7 @@ export function UsernameSetForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       })
-      if (res.status === 409) { setError('Username is already taken'); return }
+      if (res.status === 409) { setError('Username already taken.'); return }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setError((data as { error?: string }).error ?? 'Something went wrong')

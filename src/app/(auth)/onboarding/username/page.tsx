@@ -9,8 +9,7 @@ import { useSession } from "next-auth/react"
 function validateUsername(value: string): string | null {
   if (value.length < 3) return "Must be at least 3 characters"
   if (value.length > 20) return "Must be 20 characters or fewer"
-  if (!/^[a-zA-Z0-9_]+$/.test(value)) return "Letters, numbers, and underscores only"
-  if (value.startsWith("_") || value.endsWith("_")) return "Cannot start or end with an underscore"
+  if (!/^[a-zA-Z0-9]+$/.test(value)) return "Only letters and numbers allowed."
   return null
 }
 
@@ -74,13 +73,13 @@ export default function UsernameOnboardingPage() {
         const data: { available: boolean } = await res.json()
         setIsAvailable(data.available)
         if (!data.available) {
-          setError("Username is already taken")
+          setError("Username already taken.")
         } else {
           setError(null)
         }
       } catch {
-        // Network failure — don't block submission; server validates too
         setIsAvailable(null)
+        setError("Couldn't verify username. Please try again.")
       } finally {
         setIsChecking(false)
       }
@@ -125,7 +124,7 @@ export default function UsernameOnboardingPage() {
       })
 
       if (res.status === 409) {
-        setError("Username is already taken")
+        setError("Username already taken.")
         return
       }
 
@@ -199,7 +198,7 @@ export default function UsernameOnboardingPage() {
               <p className="text-[#ff453a] text-xs px-1">{error}</p>
             )}
             {!error && isAvailable === false && !isChecking && (
-              <p className="text-[#ff453a] text-xs px-1">Username is already taken</p>
+              <p className="text-[#ff453a] text-xs px-1">Username already taken.</p>
             )}
             {!error && isAvailable === true && !isChecking && (
               <p className="text-success text-xs px-1">Available!</p>

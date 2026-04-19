@@ -15,6 +15,7 @@ Before doing meaningful work, read in this order:
 2. `ai/docs/decisions.md`
 3. `ai/docs/worklog.md`
 4. only then open the minimum necessary code files
+5. if ios fixes are necessary please read `ios/CLAUDE.md`
 
 If `AGENTS.md` contains Codex-specific notes or updates, absorb them too.
 

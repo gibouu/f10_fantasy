@@ -43,18 +43,8 @@ export function validateUsernameFormat(
     return { valid: false, error: 'Username must be 20 characters or fewer' }
   }
 
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    return {
-      valid: false,
-      error: 'Username may only contain letters, numbers, and underscores',
-    }
-  }
-
-  if (username.startsWith('_') || username.endsWith('_')) {
-    return {
-      valid: false,
-      error: 'Username cannot start or end with an underscore',
-    }
+  if (!/^[a-zA-Z0-9]+$/.test(username)) {
+    return { valid: false, error: 'Only letters and numbers allowed.' }
   }
 
   return { valid: true }
@@ -106,7 +96,7 @@ export async function setUsername(
   await db.user.update({
     where: { id: userId },
     data: {
-      publicUsername: username,
+      publicUsername: username.toLowerCase(),
       usernameSet: true,
     },
   })
@@ -151,7 +141,7 @@ export async function changeUsername(
 
   await db.user.update({
     where: { id: userId },
-    data: { publicUsername: username, usernameChangeUsed: true },
+    data: { publicUsername: username.toLowerCase(), usernameChangeUsed: true },
   })
 }
 

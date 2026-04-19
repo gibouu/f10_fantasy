@@ -112,17 +112,23 @@ struct UsernamePickerView: View {
 
     @ViewBuilder
     private var availabilityCaption: some View {
-        switch viewModel.availability {
-        case .available:
-            Text("Available!")
-                .font(.caption)
-                .foregroundStyle(FXTheme.Colors.accent)
-        case .taken:
-            Text("Already taken.")
+        if let err = viewModel.formatError {
+            Text(err)
                 .font(.caption)
                 .foregroundStyle(FXTheme.Colors.danger)
-        default:
-            EmptyView()
+        } else {
+            switch viewModel.availability {
+            case .available:
+                Text("Available!")
+                    .font(.caption)
+                    .foregroundStyle(FXTheme.Colors.accent)
+            case .taken:
+                Text("Username already taken.")
+                    .font(.caption)
+                    .foregroundStyle(FXTheme.Colors.danger)
+            default:
+                EmptyView()
+            }
         }
     }
 
