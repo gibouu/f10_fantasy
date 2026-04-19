@@ -55,6 +55,7 @@ final class FriendsViewModel {
 
     private func search(token: String?) async {
         isSearching = true
+        errorMessage = nil
         defer { isSearching = false }
         do {
             let results: [UserSummary] = try await client.request(
@@ -63,6 +64,7 @@ final class FriendsViewModel {
             )
             searchResults = results
         } catch {
+            if error is CancellationError { return }
             errorMessage = "Search failed: \(error.localizedDescription)"
         }
     }
