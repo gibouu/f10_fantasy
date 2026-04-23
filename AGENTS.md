@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Follow `CLAUDE.md` in this repository as the primary instruction file.
+Follow `CLAUDE.md` in this repository as the primary instruction file. When working on iOS app fixes, read `ios/CLAUDE.md`.
 
 ## Read Order
 Before doing meaningful work, read in this order:

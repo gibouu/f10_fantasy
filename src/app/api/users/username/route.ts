@@ -10,6 +10,12 @@ import {
 } from "@/lib/services/user.service"
 import { getClientIp, rateLimit } from "@/lib/security/rate-limit"
 
+export const dynamic = "force-dynamic"
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store",
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/users/username — set username during onboarding
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +123,7 @@ export async function GET(req: NextRequest) {
       {
         status: 429,
         headers: {
+          ...NO_STORE_HEADERS,
           "Retry-After": String(limit.retryAfterSeconds),
           "X-RateLimit-Limit": "30",
           "X-RateLimit-Remaining": "0",
@@ -133,6 +140,7 @@ export async function GET(req: NextRequest) {
       {
         status: 400,
         headers: {
+          ...NO_STORE_HEADERS,
           "X-RateLimit-Limit": "30",
           "X-RateLimit-Remaining": String(limit.remaining),
         },
@@ -148,6 +156,7 @@ export async function GET(req: NextRequest) {
       { available: false, reason: formatCheck.error },
       {
         headers: {
+          ...NO_STORE_HEADERS,
           "X-RateLimit-Limit": "30",
           "X-RateLimit-Remaining": String(limit.remaining),
         },
@@ -160,6 +169,7 @@ export async function GET(req: NextRequest) {
     { available },
     {
       headers: {
+        ...NO_STORE_HEADERS,
         "X-RateLimit-Limit": "30",
         "X-RateLimit-Remaining": String(limit.remaining),
       },

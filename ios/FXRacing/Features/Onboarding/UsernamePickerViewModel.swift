@@ -15,10 +15,15 @@ final class UsernamePickerViewModel {
     var errorMessage: String?
     var formatError: String?
 
-    var canSubmit: Bool { availability == .available && !isSubmitting }
+    var canSubmit: Bool {
+        availability == .available
+            && checkedUsername == normalizedUsername
+            && !isSubmitting
+    }
 
     let isChange: Bool
     private var debounceTask: Task<Void, Never>?
+    private var checkedUsername: String?
     private let api = APIClient()
 
     init(isChange: Bool = false) {
@@ -29,7 +34,8 @@ final class UsernamePickerViewModel {
 
     func loadSuggestions() async {
         do {
-            suggestions = try await api.request(.suggestUsernames)
+            let response: SuggestionsResponse = try await api.request(.suggestUsernames)
+            suggestions = response.suggestions
         } catch {
             // Suggestions are non-critical; fail silently.
         }
@@ -41,9 +47,10 @@ final class UsernamePickerViewModel {
         debounceTask?.cancel()
         errorMessage = nil
         formatError = nil
+        checkedUsername = nil
 
-        // Trim leading/trailing whitespace per spec
-        let value = newValue.trimmingCharacters(in: .whitespaces)
+        // Trim pasted whitespace before validating or submitting.
+        let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if value != newValue {
             username = value
         }
@@ -61,14 +68,19 @@ final class UsernamePickerViewModel {
         }
 
         availability = .checking
+        let candidate = value
         debounceTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
 
             do {
-                let response: CheckResponse = try await api.request(.checkUsername(value))
+                let response: CheckResponse = try await api.request(.checkUsername(candidate))
+                guard !Task.isCancelled, username == candidate else { return }
+                errorMessage = nil
+                checkedUsername = candidate
                 availability = response.available ? .available : .taken
             } catch {
+                guard !Task.isCancelled, username == candidate else { return }
                 // Network/server failure — must not display as "already taken"
                 availability = .idle
                 errorMessage = "Couldn't verify username. Please try again."
@@ -80,28 +92,40 @@ final class UsernamePickerViewModel {
 
     func submit(authManager: AuthManager) async {
         guard canSubmit else { return }
+        let submittedUsername = normalizedUsername
+        debounceTask?.cancel()
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
 
         do {
             if isChange {
-                try await authManager.changeUsername(username)
+                try await authManager.changeUsername(submittedUsername)
             } else {
-                try await authManager.setUsername(username)
+                try await authManager.setUsername(submittedUsername)
             }
         } catch {
-            errorMessage = error.localizedDescription
+            if case APIError.serverError(409, let message) = error {
+                guard normalizedUsername == submittedUsername else { return }
+                checkedUsername = submittedUsername
+                availability = .taken
+                errorMessage = message ?? "Username already taken."
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     // MARK: - Private
 
+    private var normalizedUsername: String {
+        username.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func localValidate(_ value: String) -> String? {
         if value.count < 3 { return "Username must be at least 3 characters." }
         if value.count > 20 { return "Username must be 20 characters or fewer." }
-        let allowed = CharacterSet.alphanumerics
-        if value.unicodeScalars.contains(where: { !allowed.contains($0) }) {
+        if value.range(of: "^[A-Za-z0-9]+$", options: .regularExpression) == nil {
             return "Only letters and numbers allowed."
         }
         return nil
@@ -110,4 +134,8 @@ final class UsernamePickerViewModel {
 
 private struct CheckResponse: Decodable, Sendable {
     let available: Bool
+}
+
+private struct SuggestionsResponse: Decodable, Sendable {
+    let suggestions: [String]
 }
