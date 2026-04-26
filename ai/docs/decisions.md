@@ -55,11 +55,11 @@ Do not log temporary debugging notes here.
 - Affected areas: `src/middleware.ts`, all read-only pages.
 - Follow-up: —
 
-### 2026-04-15 — Scoring formula: P10 picks cut off at 9 positions away
+### 2026-04-15 — Scoring formula: P10 picks use explicit distance table
 - Status: accepted
 - Context: P10 scoring used F1 points table initially, then was revised.
-- Decision: `max(0, 25 - |pos-10| × 3)` for main race. Points go to zero at 9 positions away (P1 scores 0). Sprint uses `max(0, 10 - |pos-10|)`.
-- Reason: Creates meaningful scoring gradient without rewarding completely wrong picks.
+- Decision: Main-race P10 scoring uses an explicit table by distance from P10: `25,18,15,12,10,8,6,4,2,0...`. Sprint P10 scoring uses `max(0, 8 - |pos-10|)`.
+- Reason: Creates a single app-defined fantasy scoring law from final classified positions without rewarding completely wrong picks.
 - Tradeoffs: P1 finishing scores 0 for a P10 pick — intentional.
 - Affected areas: `src/lib/scoring/formula.ts`.
 - Follow-up: —

@@ -2,19 +2,12 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import type { DriverSummary, RaceResultRecord } from '@/types/domain'
 import { ResultStatus } from '@/types/domain'
+import { getResultScoreGuide, getScoringCaps } from '@/lib/scoring/formula'
 
 interface RaceResultsCardProps {
   results: RaceResultRecord[]
   entrants: DriverSummary[]
   raceType: 'MAIN' | 'SPRINT'
-}
-
-const F1_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2]
-
-function p10Score(result: RaceResultRecord, raceType: 'MAIN' | 'SPRINT'): number {
-  if (result.status !== ResultStatus.CLASSIFIED || result.position === null) return 0
-  const delta = Math.abs(result.position - 10)
-  return raceType === 'MAIN' ? (F1_POINTS[delta] ?? 0) : Math.max(0, 10 - delta)
 }
 
 export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCardProps) {
@@ -38,8 +31,7 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
     return 0
   })
 
-  const winnerBonus = raceType === 'MAIN' ? 5 : 2
-  const dnfBonus = raceType === 'MAIN' ? 3 : 1
+  const caps = getScoringCaps(raceType)
 
   return (
     <div className="rounded-2xl bg-surface border border-[var(--border)] overflow-hidden">
@@ -54,22 +46,22 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
         {sorted.map((result) => {
           const driver = entrantMap.get(result.driverId)
           const isClassified = result.status === ResultStatus.CLASSIFIED
-          const isWinner = result.position === 1
-          const isDnf = result.status === ResultStatus.DNF
+          const isWinner = isClassified && result.position === 1
+          const isNonClassified = !isClassified
           const isP10 = result.position === 10 && isClassified
-          const pts = p10Score(result, raceType)
+          const guide = result.scoreGuide ?? getResultScoreGuide(result, raceType)
 
           // Single column: W bonus, DNF bonus, or P10 pts
           let ptsLabel: string
           let ptsColor: string
           if (isWinner) {
-            ptsLabel = `+${winnerBonus}W`
+            ptsLabel = `+${caps.winner}W`
             ptsColor = 'text-[#30d158]'
-          } else if (isDnf) {
-            ptsLabel = `+${dnfBonus}D`
+          } else if (isNonClassified) {
+            ptsLabel = `+${guide.dnf}D`
             ptsColor = 'text-accent'
-          } else if (pts > 0) {
-            ptsLabel = `+${pts}`
+          } else if (guide.p10 > 0) {
+            ptsLabel = `+${guide.p10}`
             ptsColor = isP10 ? 'text-[#C9A227]' : 'text-[#C9A227]/70'
           } else {
             ptsLabel = '—'

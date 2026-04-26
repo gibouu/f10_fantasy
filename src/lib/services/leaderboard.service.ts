@@ -11,14 +11,9 @@
 
 import { db } from '@/lib/db/client'
 import type { LeaderboardRow } from '@/types/domain'
-import { MAX_MAIN_RACE_SCORE, MAX_SPRINT_SCORE } from '@/lib/scoring/formula'
+import { getScoringCaps } from '@/lib/scoring/formula'
 import { TEAMS } from '@/lib/f1/teams'
 import type { TeamSlug } from '@/lib/f1/teams'
-
-// Maximum tenth-place scores (used to identify "exact tenth hits")
-// Main: 25, Sprint: 10
-const MAX_TENTH_MAIN = 25
-const MAX_TENTH_SPRINT = 10
 
 // ─────────────────────────────────────────────
 // Internal types
@@ -124,20 +119,17 @@ async function aggregateScores(
     const row = aggregated.get(ps.userId)
     if (!row) continue
 
-    const maxTenth =
-      ps.race.type === 'MAIN' ? MAX_TENTH_MAIN : MAX_TENTH_SPRINT
-    const maxWinner = ps.race.type === 'MAIN' ? 5 : 2
-    const maxDnf = ps.race.type === 'MAIN' ? 3 : 1
+    const caps = getScoringCaps(ps.race.type)
 
     row.totalScore += ps.scoreBreakdown.totalScore
 
-    if (ps.scoreBreakdown.tenthPlaceScore === maxTenth) {
+    if (ps.scoreBreakdown.tenthPlaceScore === caps.p10) {
       row.exactTenthHits += 1
     }
-    if (ps.scoreBreakdown.winnerBonus === maxWinner) {
+    if (ps.scoreBreakdown.winnerBonus === caps.winner) {
       row.winnerHits += 1
     }
-    if (ps.scoreBreakdown.dnfBonus === maxDnf) {
+    if (ps.scoreBreakdown.dnfBonus === caps.dnf) {
       row.dnfHits += 1
     }
   }

@@ -5,8 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import type { ScoreBreakdownData } from '@/types/domain'
 import {
   getScoreExplanation,
-  MAX_MAIN_RACE_SCORE,
-  MAX_SPRINT_SCORE,
+  getScoringCaps,
 } from '@/lib/scoring/formula'
 
 // ─────────────────────────────────────────────
@@ -58,10 +57,7 @@ function LineItem({ label, score, maxScore, explanation }: LineItemProps) {
 // ─────────────────────────────────────────────
 
 export function ScoreBreakdown({ scoreBreakdown, raceType }: ScoreBreakdownProps) {
-  const maxTenth = raceType === 'MAIN' ? 25 : 10
-  const maxWinner = raceType === 'MAIN' ? 5 : 2
-  const maxDnf = raceType === 'MAIN' ? 3 : 1
-  const maxTotal = raceType === 'MAIN' ? MAX_MAIN_RACE_SCORE : MAX_SPRINT_SCORE
+  const caps = getScoringCaps(raceType)
 
   // Use the scoring formula's explanation helper
   const explanations = getScoreExplanation(
@@ -84,19 +80,19 @@ export function ScoreBreakdown({ scoreBreakdown, raceType }: ScoreBreakdownProps
           <LineItem
             label="10th Place Prediction"
             score={scoreBreakdown.tenthPlaceScore}
-            maxScore={maxTenth}
+            maxScore={caps.p10}
             explanation={explanations[0]}
           />
           <LineItem
             label="Race Winner"
             score={scoreBreakdown.winnerBonus}
-            maxScore={maxWinner}
+            maxScore={caps.winner}
             explanation={explanations[1]}
           />
           <LineItem
             label="DNF Pick"
             score={scoreBreakdown.dnfBonus}
-            maxScore={maxDnf}
+            maxScore={caps.dnf}
             explanation={explanations[2]}
           />
 
@@ -112,7 +108,7 @@ export function ScoreBreakdown({ scoreBreakdown, raceType }: ScoreBreakdownProps
               >
                 {scoreBreakdown.totalScore}
               </span>
-              <span className="text-text-tertiary text-sm">/{maxTotal}</span>
+              <span className="text-text-tertiary text-sm">/{caps.total}</span>
             </div>
           </div>
         </div>

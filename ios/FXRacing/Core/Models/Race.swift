@@ -19,7 +19,7 @@ struct Race: Codable, Sendable, Identifiable {
     /// Maximum scores for each slot, used to colour-code score badges.
     var scoreCaps: ScoreCaps {
         isSprint
-            ? ScoreCaps(p10: 10, winner: 2, dnf: 1)
+            ? ScoreCaps(p10: 8, winner: 2, dnf: 1)
             : ScoreCaps(p10: 25, winner: 5, dnf: 3)
     }
 

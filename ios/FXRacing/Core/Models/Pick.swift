@@ -22,6 +22,13 @@ struct RaceResult: Codable, Sendable {
     let position: Int?
     let status: ResultStatus
     let fastestLap: Bool
+    let scoreGuide: ResultScoreGuide?
+}
+
+struct ResultScoreGuide: Codable, Sendable {
+    let p10: Int
+    let winner: Int
+    let dnf: Int
 }
 
 enum ResultStatus: String, Codable, Sendable {

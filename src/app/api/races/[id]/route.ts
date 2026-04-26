@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRaceById, getRaceEntrants } from '@/lib/services/race.service'
 import { db } from '@/lib/db/client'
+import { getResultScoreGuide } from '@/lib/scoring/formula'
 
 // No auth required — race details are public
 export async function GET(
@@ -17,16 +18,21 @@ export async function GET(
   // Include results if race is completed
   const results =
     race.status === 'COMPLETED'
-      ? await db.raceResult.findMany({
-          where: { raceId: params.id },
-          select: {
-            driverId: true,
-            position: true,
-            status: true,
-            fastestLap: true,
-          },
-          orderBy: { position: 'asc' },
-        })
+      ? (
+          await db.raceResult.findMany({
+            where: { raceId: params.id },
+            select: {
+              driverId: true,
+              position: true,
+              status: true,
+              fastestLap: true,
+            },
+            orderBy: { position: 'asc' },
+          })
+        ).map((result) => ({
+          ...result,
+          scoreGuide: getResultScoreGuide(result, race.type),
+        }))
       : []
 
   return NextResponse.json({

@@ -370,7 +370,6 @@ struct RaceDetailView: View {
         let pickedDNFId     = viewModel.serverPick?.dnfDriverId       ?? viewModel.selectedDNF?.id
 
         if !classified.isEmpty || !nonClassified.isEmpty {
-            let isSprint = viewModel.race?.isSprint ?? false
             VStack(alignment: .leading, spacing: 10) {
                 Text("Results")
                     .font(.headline)
@@ -382,7 +381,7 @@ struct RaceDetailView: View {
                             let isP10 = result.position == 10
                             let isWinner = result.position == 1
                             let isUserPick = driver.id == pickedWinnerId || driver.id == pickedP10Id
-                            let pts = potentialScore(result: result, isSprint: isSprint)
+                            let pts = potentialScore(result: result)
                             resultRow(
                                 result: result,
                                 driver: driver,
@@ -409,7 +408,7 @@ struct RaceDetailView: View {
                         ForEach(nonClassified, id: \.driverId) { result in
                             if let driver = driverMap[result.driverId] {
                                 let isUserPick = driver.id == pickedDNFId
-                                let pts = potentialScore(result: result, isSprint: isSprint)
+                                let pts = potentialScore(result: result)
                                 resultRow(
                                     result: result,
                                     driver: driver,
@@ -428,24 +427,18 @@ struct RaceDetailView: View {
     }
 
     /// Points you'd earn for picking this driver in the relevant slot.
-    /// Matches the server formula in formula.ts:
-    ///   - Classified: max(0, p10Cap - |pos-10| * step), P1 earns winnerPts
-    ///   - Any non-classified (DNF/DNS/DSQ): earns dnfPts
-    private func potentialScore(result: RaceResult, isSprint: Bool) -> (pts: Int, color: Color) {
-        let p10Cap    = isSprint ? 10 : 25
-        let winnerPts = isSprint ?  2 :  5
-        let dnfPts    = isSprint ?  1 :  3
-        let step      = isSprint ?  1 :  3
-
+    /// The server owns this score guide so the iOS UI cannot drift from stored scoring.
+    private func potentialScore(result: RaceResult) -> (pts: Int, color: Color) {
         if result.status == .classified {
             guard let pos = result.position else { return (0, Color(uiColor: .tertiaryLabel)) }
-            if pos == 1 { return (winnerPts, Color(red: 0.18, green: 0.78, blue: 0.35)) }
-            let score = max(0, p10Cap - abs(pos - 10) * step)
+            if pos == 1 {
+                return (result.scoreGuide?.winner ?? 0, Color(red: 0.18, green: 0.78, blue: 0.35))
+            }
+            let score = result.scoreGuide?.p10 ?? 0
             let color: Color = pos == 10 ? FXTheme.Colors.gold : score > 0 ? .primary : Color(uiColor: .tertiaryLabel)
             return (score, color)
         }
-        // All non-classified outcomes (DNF, DNS, DSQ) earn the DNF bonus
-        return (dnfPts, FXTheme.Colors.danger)
+        return (result.scoreGuide?.dnf ?? 0, FXTheme.Colors.danger)
     }
 
     @ViewBuilder

@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-04-26 18:10 — Scoring source-of-truth cleanup
+- by: Codex
+- summary: Centralized race scoring constants, changed sprint P10 max to 8, added server score-guide fields for result-row previews, and aligned iOS completed-race result rows with server-provided preview scoring instead of local formula math.
+- files touched: `src/lib/scoring/formula.ts`, `src/app/api/races/[id]/route.ts`, `ios/FXRacing/Features/Races/RaceDetailView.swift`, `ios/FXRacing/Core/Models/Pick.swift`, `ios/FXRacing/Core/Models/Race.swift`
+- verification: `npx tsc --noEmit`; focused `npx tsx` formula check for P1-P20 main/sprint + DNF/DNS/DSQ; `npm run lint`; `npm run build`; iOS `xcodebuild ... -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/FXRacingDerivedData build`
+- open questions: After deploy, call `POST /api/cron/compute-scores` with `{ "raceType": "SPRINT" }` and `Authorization: Bearer CRON_SECRET` to recompute stored sprint scores.
+- should update architecture?: yes
+- should update decisions?: yes
+
 ### 2026-04-23 09:42 — iOS username availability race fix
 - by: Codex
 - summary: Fixed iOS onboarding so stale username availability responses cannot mark the current text available; submit now only enables for the exact checked username and 409 submit failures flip the UI to taken. Username availability/suggestion API GETs are force-dynamic with no-store headers. DB inspection confirmed `testapple` exists in production, so the red submit error was correct and the green availability state was stale.
@@ -49,9 +58,9 @@ Do NOT turn this into a giant diary.
 - should update architecture?: no
 - should update decisions?: no
 
-### 2026-04-15 — P10 scoring fix: cut at 9 positions away
+### 2026-04-15 — P10 scoring fix: superseded
 - by: Claude
-- summary: P10 score formula revised — P1 now scores 0 (was incorrectly scoring positive). Formula: `max(0, 25 - |pos-10| × 3)`. Also updated RaceResultsCard to show correct expected scores.
+- summary: Historical note only; current scoring source of truth is the 2026-04-26 entry and `ai/docs/decisions.md`.
 - files touched: `src/lib/scoring/formula.ts`, `src/components/race/RaceResultsCard.tsx`
 - verification: Unit-checked formula manually against grid positions.
 - open questions: None.

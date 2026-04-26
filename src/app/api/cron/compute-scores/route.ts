@@ -1,11 +1,6 @@
 /**
  * Cron: compute and store scores for completed races.
  *
- * Add to vercel.json:
- * {
- *   "crons": [{ "path": "/api/cron/compute-scores", "schedule": "0 * * * *" }]
- * }
- *
  * Protected by the CRON_SECRET environment variable.
  */
 
@@ -30,8 +25,10 @@ function validateCronSecret(req: NextRequest): boolean {
 //
 // Body (all optional):
 //   { raceId?: string }
+//   { raceType?: "MAIN" | "SPRINT" }
 //
 // If raceId is omitted, computes scores for the most recently completed race.
+// If raceType is provided, recomputes all completed races of that type.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -40,6 +37,7 @@ export async function POST(req: NextRequest) {
   }
 
   let raceId: string | undefined
+  let raceType: "MAIN" | "SPRINT" | undefined
 
   // Body is optional — the cron job can call with an empty body
   try {
@@ -47,8 +45,40 @@ export async function POST(req: NextRequest) {
     if (typeof body?.raceId === "string") {
       raceId = body.raceId
     }
+    if (body?.raceType === "MAIN" || body?.raceType === "SPRINT") {
+      raceType = body.raceType
+    }
   } catch {
     // No body or invalid JSON — fall through to auto-resolve
+  }
+
+  if (raceType) {
+    const races = await db.race.findMany({
+      where: {
+        type: raceType,
+        status: "COMPLETED",
+        results: { some: {} },
+      },
+      orderBy: { scheduledStartUtc: "asc" },
+      select: { id: true },
+    })
+
+    const results: Array<{ raceId: string; computed: number; error?: string }> = []
+
+    for (const race of races) {
+      try {
+        const computed = await computeAndStoreScoresForRace(race.id)
+        results.push({ raceId: race.id, computed })
+      } catch (err) {
+        results.push({
+          raceId: race.id,
+          computed: 0,
+          error: err instanceof Error ? err.message : "Unknown error",
+        })
+      }
+    }
+
+    return NextResponse.json({ raceType, processed: results })
   }
 
   // If no raceId provided, find the most recently completed race

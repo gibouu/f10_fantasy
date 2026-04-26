@@ -127,7 +127,7 @@ Client Components / RSC Pages
 
 | Pick | Main Race | Sprint |
 |---|---|---|
-| P10 | `max(0, 25 - |pos-10| × 3)` | `max(0, 10 - |pos-10|)` |
+| P10 | table by distance from P10: `25,18,15,12,10,8,6,4,2,0...` | `max(0, 8 - |pos-10|)` |
 | Winner bonus | +5 | +2 |
 | DNF bonus | +3 | +1 |
 

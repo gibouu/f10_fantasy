@@ -3,6 +3,7 @@ import SwiftUI
 struct UsernamePickerView: View {
     @Environment(AuthManager.self) private var authManager
     @State private var viewModel: UsernamePickerViewModel
+    @State private var showConfirmAlert = false
 
     init(isChange: Bool = false) {
         _viewModel = State(initialValue: UsernamePickerViewModel(isChange: isChange))
@@ -16,12 +17,22 @@ struct UsernamePickerView: View {
 
                     // Header
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Pick your username")
+                        Text(viewModel.isChange ? "Change your username" : "Pick your username")
                             .font(.system(size: 28, weight: .black))
 
                         Text("This is how other players will see you on the leaderboard.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+
+                        if viewModel.isChange {
+                            Text("This is a one-time change — choose carefully.")
+                                .font(.footnote).fontWeight(.semibold)
+                                .foregroundStyle(FXTheme.Colors.danger)
+                        } else {
+                            Text("You may only change your username once after this.")
+                                .font(.footnote).fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     // Input
@@ -90,6 +101,21 @@ struct UsernamePickerView: View {
                 .background(.ultraThinMaterial)
         }
         .task { await viewModel.loadSuggestions() }
+        .alert(
+            viewModel.isChange ? "Change your username?" : "Confirm your username",
+            isPresented: $showConfirmAlert
+        ) {
+            Button(viewModel.isChange ? "Change" : "Confirm") {
+                Task { await viewModel.submit(authManager: authManager) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if viewModel.isChange {
+                Text("Your username will be changed to @\(viewModel.username.trimmingCharacters(in: .whitespacesAndNewlines)). This cannot be undone.")
+            } else {
+                Text("Your username will be @\(viewModel.username.trimmingCharacters(in: .whitespacesAndNewlines)). You can only change it once after this.")
+            }
+        }
     }
 
     // MARK: - Sub-views
@@ -134,7 +160,7 @@ struct UsernamePickerView: View {
 
     private var confirmButton: some View {
         Button {
-            Task { await viewModel.submit(authManager: authManager) }
+            showConfirmAlert = true
         } label: {
             Group {
                 if viewModel.isSubmitting {

@@ -83,6 +83,11 @@ export type RaceResultRecord = {
   position: number | null
   status: ResultStatus
   fastestLap: boolean
+  scoreGuide?: {
+    p10: number
+    winner: number
+    dnf: number
+  }
 }
 
 // ─────────────────────────────────────────────

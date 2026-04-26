@@ -6,6 +6,7 @@ import { resolveTeam } from '@/lib/f1/teams'
 import { getPicksForSeason } from '@/lib/services/pick.service'
 import { getActiveSeason, getRaceEntrants } from '@/lib/services/race.service'
 import { resolvePickAgainstEntrants } from '@/lib/services/pick-resolution'
+import { getScoringCaps } from '@/lib/scoring/formula'
 
 type SlotDriver = {
   id: string
@@ -16,12 +17,6 @@ type SlotDriver = {
   teamName: string
   teamColor: string
   logoUrl: string | null
-}
-
-function getScoreCaps(raceType: string) {
-  return raceType === 'SPRINT'
-    ? { p10: 10, winner: 2, dnf: 1 }
-    : { p10: 25, winner: 5, dnf: 3 }
 }
 
 async function areFriends(viewerId: string, profileUserId: string): Promise<boolean> {
@@ -170,7 +165,7 @@ export async function GET(
   // Serialize — dates to ISO strings so Next.js can send as JSON
   const serializedPicks = resolvedPicks.map((ps) => ({
     ...(() => {
-      const caps = getScoreCaps(ps.race.type)
+      const caps = getScoringCaps(ps.race.type)
       const p10Score = ps.scoreBreakdown?.tenthPlaceScore ?? 0
       const winnerScore = ps.scoreBreakdown?.winnerBonus ?? 0
       const dnfScore = ps.scoreBreakdown?.dnfBonus ?? 0
