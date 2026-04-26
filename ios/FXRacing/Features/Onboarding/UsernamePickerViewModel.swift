@@ -105,12 +105,20 @@ final class UsernamePickerViewModel {
                 try await authManager.setUsername(submittedUsername)
             }
         } catch {
-            if case APIError.serverError(409, let message) = error {
+            let isTaken: Bool = {
+                if case APIError.serverError(409, _) = error { return true }
+                if case APIError.serverError(400, let msg) = error,
+                   let m = msg, m.lowercased().contains("unique constraint") { return true }
+                return false
+            }()
+
+            if isTaken {
                 guard normalizedUsername == submittedUsername else { return }
                 checkedUsername = submittedUsername
                 availability = .taken
-                errorMessage = message ?? "Username already taken."
+                errorMessage = "Username already taken."
             } else {
+                availability = .idle
                 errorMessage = error.localizedDescription
             }
         }

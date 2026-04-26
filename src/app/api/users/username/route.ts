@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { Prisma } from "@prisma/client"
 import { auth } from "@/auth"
 import { mobileAuth } from "@/lib/auth/mobileAuth"
 import {
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
     // setUsername internally re-validates format + checks availability atomically
     await setUsername(session.user.id, username)
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json({ error: "Username is already taken" }, { status: 409 })
+    }
+
     const message = err instanceof Error ? err.message : "Unknown error"
 
     if (message.includes("already taken")) {
@@ -95,6 +100,10 @@ export async function PATCH(req: NextRequest) {
   try {
     await changeUsername(session.user.id, username)
   } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json({ error: "Username is already taken" }, { status: 409 })
+    }
+
     const message = err instanceof Error ? err.message : "Unknown error"
     if (message.includes("already taken")) {
       return NextResponse.json({ error: message }, { status: 409 })

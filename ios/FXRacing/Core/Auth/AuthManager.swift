@@ -77,16 +77,26 @@ final class AuthManager {
     func setUsername(_ username: String) async throws {
         guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
         let _: UsernameSetResponse = try await api.request(.setUsername(username), token: token)
-        let user: User = try await api.request(.me, token: token)
-        state = .authenticated(user)
+        // Username is now set on server. GET /me failure must not block progress —
+        // otherwise the user is permanently stuck (retrying returns "already taken").
+        do {
+            let user: User = try await api.request(.me, token: token)
+            state = .authenticated(user)
+        } catch {
+            await restoreSession()
+        }
         guestStore?.clearUsername()
     }
 
     func changeUsername(_ username: String) async throws {
         guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
         let _: UsernameSetResponse = try await api.request(.changeUsername(username), token: token)
-        let user: User = try await api.request(.me, token: token)
-        state = .authenticated(user)
+        do {
+            let user: User = try await api.request(.me, token: token)
+            state = .authenticated(user)
+        } catch {
+            await restoreSession()
+        }
     }
 
     func setFavoriteTeam(_ slug: String?) async throws {

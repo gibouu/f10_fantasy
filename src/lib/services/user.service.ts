@@ -56,14 +56,19 @@ export function validateUsernameFormat(
 
 /**
  * Check if a username is available (case-insensitive lookup).
+ * Pass `excludeUserId` to ignore the caller's own record (e.g. during re-set after a partial failure).
  */
-export async function isUsernameAvailable(username: string): Promise<boolean> {
+export async function isUsernameAvailable(
+  username: string,
+  excludeUserId?: string,
+): Promise<boolean> {
   const existing = await db.user.findFirst({
     where: {
       publicUsername: {
         equals: username,
         mode: 'insensitive',
       },
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
     },
     select: { id: true },
   })
@@ -88,17 +93,25 @@ export async function setUsername(
     throw new Error(formatCheck.error ?? 'Invalid username format')
   }
 
-  const available = await isUsernameAvailable(username)
-  if (!available) {
-    throw new Error(`Username "${username}" is already taken`)
-  }
+  await db.$transaction(async (tx) => {
+    const existing = await tx.user.findFirst({
+      where: {
+        publicUsername: { equals: username, mode: 'insensitive' },
+        id: { not: userId },
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      throw new Error(`Username "${username}" is already taken`)
+    }
 
-  await db.user.update({
-    where: { id: userId },
-    data: {
-      publicUsername: username.toLowerCase(),
-      usernameSet: true,
-    },
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        publicUsername: username.toLowerCase(),
+        usernameSet: true,
+      },
+    })
   })
 }
 
@@ -134,14 +147,22 @@ export async function changeUsername(
     throw new Error('That is already your username')
   }
 
-  const available = await isUsernameAvailable(username)
-  if (!available) {
-    throw new Error(`Username "${username}" is already taken`)
-  }
+  await db.$transaction(async (tx) => {
+    const existing = await tx.user.findFirst({
+      where: {
+        publicUsername: { equals: username, mode: 'insensitive' },
+        id: { not: userId },
+      },
+      select: { id: true },
+    })
+    if (existing) {
+      throw new Error(`Username "${username}" is already taken`)
+    }
 
-  await db.user.update({
-    where: { id: userId },
-    data: { publicUsername: username.toLowerCase(), usernameChangeUsed: true },
+    await tx.user.update({
+      where: { id: userId },
+      data: { publicUsername: username.toLowerCase(), usernameChangeUsed: true },
+    })
   })
 }
 
