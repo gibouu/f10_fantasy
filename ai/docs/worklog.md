@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-04-30 09:30 — Fix Apple review hang on username Confirm
+- by: Claude
+- summary: App Review reported the username picker became unresponsive after tapping Confirm. Three changes: (1) removed the confirmation alert added in 9e737d0 — the helper text under the title already warns about the one-time change, and the alert+`Task` pattern was the only thing that changed between Apple's prior approval and the recent rejections; (2) optimistic local state update in `AuthManager.setUsername`/`changeUsername` — the second `GET /me` roundtrip is gone, RootView swaps to MainTabView as soon as the POST returns; (3) confirm button keeps the red accent background and white spinner during submit so it's clearly visibly working (was gray-on-gray, looked frozen). Bumped MARKETING_VERSION to 1.4.
+- files touched: `ios/FXRacing/Features/Onboarding/UsernamePickerView.swift`, `ios/FXRacing/Core/Auth/AuthManager.swift`, `ios/FXRacing/Core/Models/User.swift`, `ios/FXRacing.xcodeproj/project.pbxproj`, `ios/project.yml`
+- verification: `xcodebuild -project FXRacing.xcodeproj -scheme FXRacing -destination 'generic/platform=iOS Simulator' build` → BUILD SUCCEEDED. Production endpoints curl-tested: `POST /api/users/username` 401 in ~200ms, `GET /api/users/me` 401 in ~170ms — backend is fast, the slowness was always the double-roundtrip.
+- open questions: User must bump `CURRENT_PROJECT_VERSION` (build number) before the next App Store upload — Apple rejects duplicate build numbers.
+- should update architecture?: no
+- should update decisions?: no
+
 ### 2026-04-26 18:10 — Scoring source-of-truth cleanup
 - by: Codex
 - summary: Centralized race scoring constants, changed sprint P10 max to 8, added server score-guide fields for result-row previews, and aligned iOS completed-race result rows with server-provided preview scoring instead of local formula math.

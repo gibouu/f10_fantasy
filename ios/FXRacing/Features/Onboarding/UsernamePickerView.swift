@@ -3,7 +3,6 @@ import SwiftUI
 struct UsernamePickerView: View {
     @Environment(AuthManager.self) private var authManager
     @State private var viewModel: UsernamePickerViewModel
-    @State private var showConfirmAlert = false
 
     init(isChange: Bool = false) {
         _viewModel = State(initialValue: UsernamePickerViewModel(isChange: isChange))
@@ -101,21 +100,6 @@ struct UsernamePickerView: View {
                 .background(.ultraThinMaterial)
         }
         .task { await viewModel.loadSuggestions() }
-        .alert(
-            viewModel.isChange ? "Change your username?" : "Confirm your username",
-            isPresented: $showConfirmAlert
-        ) {
-            Button(viewModel.isChange ? "Change" : "Confirm") {
-                Task { await viewModel.submit(authManager: authManager) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            if viewModel.isChange {
-                Text("Your username will be changed to @\(viewModel.username.trimmingCharacters(in: .whitespacesAndNewlines)). This cannot be undone.")
-            } else {
-                Text("Your username will be @\(viewModel.username.trimmingCharacters(in: .whitespacesAndNewlines)). You can only change it once after this.")
-            }
-        }
     }
 
     // MARK: - Sub-views
@@ -159,8 +143,13 @@ struct UsernamePickerView: View {
     }
 
     private var confirmButton: some View {
-        Button {
-            showConfirmAlert = true
+        // Keep the accent background while submitting so the white spinner is
+        // clearly visible — App Review reported the previous gray-on-gray state
+        // looked unresponsive.
+        let isActive = viewModel.canSubmit || viewModel.isSubmitting
+
+        return Button {
+            Task { await viewModel.submit(authManager: authManager) }
         } label: {
             Group {
                 if viewModel.isSubmitting {
@@ -171,14 +160,10 @@ struct UsernamePickerView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(
-                viewModel.canSubmit
-                    ? FXTheme.Colors.accent
-                    : Color.secondary.opacity(0.25)
-            )
-            .foregroundStyle(viewModel.canSubmit ? FXTheme.Colors.onAccent : .secondary)
+            .background(isActive ? FXTheme.Colors.accent : Color.secondary.opacity(0.25))
+            .foregroundStyle(isActive ? FXTheme.Colors.onAccent : .secondary)
             .cornerRadius(FXTheme.Radius.md)
         }
-        .disabled(!viewModel.canSubmit)
+        .disabled(!viewModel.canSubmit || viewModel.isSubmitting)
     }
 }

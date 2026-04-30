@@ -76,26 +76,22 @@ final class AuthManager {
 
     func setUsername(_ username: String) async throws {
         guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let _: UsernameSetResponse = try await api.request(.setUsername(username), token: token)
-        // Username is now set on server. GET /me failure must not block progress —
-        // otherwise the user is permanently stuck (retrying returns "already taken").
-        do {
-            let user: User = try await api.request(.me, token: token)
-            state = .authenticated(user)
-        } catch {
-            await restoreSession()
+        let response: UsernameSetResponse = try await api.request(.setUsername(username), token: token)
+        // Optimistic local update — server has accepted the username, so flip
+        // RootView immediately without waiting for a second GET /me roundtrip.
+        // The previous double-roundtrip kept the spinner visible long enough
+        // that App Review reported it as "unresponsive".
+        if case .authenticated(let user) = state {
+            state = .authenticated(user.withUsernameSet(response.username))
         }
         guestStore?.clearUsername()
     }
 
     func changeUsername(_ username: String) async throws {
         guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let _: UsernameSetResponse = try await api.request(.changeUsername(username), token: token)
-        do {
-            let user: User = try await api.request(.me, token: token)
-            state = .authenticated(user)
-        } catch {
-            await restoreSession()
+        let response: UsernameSetResponse = try await api.request(.changeUsername(username), token: token)
+        if case .authenticated(let user) = state {
+            state = .authenticated(user.withUsernameChanged(response.username))
         }
     }
 
