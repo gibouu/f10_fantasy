@@ -40,11 +40,14 @@ export async function POST(req: NextRequest) {
   const now = new Date()
 
   // Find all races that:
-  //   - Are not yet completed (UPCOMING or LIVE)
+  //   - Are still in play (UPCOMING or LIVE — explicitly allowlisted to avoid
+  //     touching COMPLETED or CANCELLED races; `not: "COMPLETED"` historically
+  //     matched CANCELLED races whose start time had passed and incorrectly
+  //     flipped them to LIVE).
   //   - Have passed their lock cutoff
   const racesToLock = await db.race.findMany({
     where: {
-      status: { not: "COMPLETED" },
+      status: { in: ["UPCOMING", "LIVE"] },
       lockCutoffUtc: { lte: now },
     },
     select: {
