@@ -15,6 +15,10 @@
 
 # production
 /build
+/ios/build/
+
+# claude code session state
+/.claude/
 
 # misc
 .DS_Store

@@ -107,6 +107,8 @@ Client Components / RSC Pages
 - `POST /api/cron/sync-entries` — hourly race entry refresh
 - `POST /api/cron/lock-picks` — daily pick lock
 - `POST /api/cron/ingest-results` — daily result ingestion + scoring
+- `GET  /api/diag/health` — Bearer CRON_SECRET; race-weekend snapshot (next 3 upcoming + last 3 completed, with pipeline issues flagged)
+- `GET  /api/diag/race/[id]` — Bearer CRON_SECRET; per-race pipeline diagnostic (entry/result/pick/score counts + auto-detected issues)
 
 ---
 
@@ -166,6 +168,11 @@ npm run db:studio    # Prisma Studio GUI
 ---
 
 ## Update Log
+
+### 2026-05-01
+- Added `/api/diag/health` and `/api/diag/race/[id]` (Bearer CRON_SECRET) for race-weekend pipeline troubleshooting
+- iOS gained `Core/Logger.swift` (os.Logger + 500-entry ring buffer) + `Features/Profile/DiagnosticsView.swift`, exposed via "View logs" rows in Settings and Guest profile
+- reason: Miami Sprint is the first scored race; cron pipeline (lock-picks → ingest-results → compute-scores) needs external observability since the user can't always debug live
 
 ### 2026-04-15
 - Created from existing CLAUDE.md as part of ai-system integration

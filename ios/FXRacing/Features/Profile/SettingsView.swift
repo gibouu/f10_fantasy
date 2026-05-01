@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var teamError: String? = nil
     @State private var showDeleteAccountWarn = false
     @State private var showDeleteAccountConfirm = false
+    @State private var showDiagnostics = false
 
     var body: some View {
         NavigationStack {
@@ -61,6 +62,23 @@ struct SettingsView: View {
                         Text(err)
                             .font(.caption)
                             .foregroundStyle(.red)
+                    }
+                }
+
+                Section("Diagnostics") {
+                    Button {
+                        showDiagnostics = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .foregroundStyle(FXTheme.Colors.accent)
+                            Text("View logs")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Text("\(FXLogStore.shared.entries.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -119,6 +137,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showDeleteAccountConfirm) {
                 DeleteAccountConfirmView()
+            }
+            .sheet(isPresented: $showDiagnostics) {
+                DiagnosticsView()
             }
         }
     }

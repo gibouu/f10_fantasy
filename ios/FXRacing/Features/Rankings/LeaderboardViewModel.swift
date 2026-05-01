@@ -20,6 +20,7 @@ final class LeaderboardViewModel {
     func load(token: String?) async {
         isLoading = true
         errorMessage = nil
+        fxLog(.score, "leaderboard load scope=\(scope.rawValue)")
         do {
             let response: LeaderboardResponse = try await client.request(
                 .leaderboard(scope: scope.rawValue, sort: "season"),
@@ -28,8 +29,10 @@ final class LeaderboardViewModel {
             rows = response.rows
             userRank = response.userRank
             userRow = response.userRow
+            fxLog(.score, "leaderboard rows=\(response.rows.count) userRank=\(response.userRank.map(String.init) ?? "nil")")
         } catch {
             errorMessage = error.localizedDescription
+            fxError(.score, "leaderboard load failed scope=\(scope.rawValue): \(error.localizedDescription)")
         }
         isLoading = false
     }

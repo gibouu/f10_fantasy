@@ -21,7 +21,7 @@ import { createF1Provider } from '@/lib/f1/adapter'
 export async function ingestResultsForRace(raceId: string): Promise<number> {
   const race = await db.race.findUnique({
     where: { id: raceId },
-    select: { id: true, openf1SessionKey: true, status: true },
+    select: { id: true, openf1SessionKey: true, status: true, name: true, type: true },
   })
 
   if (!race) throw new Error(`Race not found: ${raceId}`)
@@ -29,8 +29,16 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
     throw new Error(`Race ${raceId} has no OpenF1 session key — cannot fetch results`)
   }
 
+  console.log(
+    `[f10:ingest] raceId=${raceId} (${race.name} ${race.type}) sessionKey=${race.openf1SessionKey} status=${race.status}`,
+  )
+
   const provider = createF1Provider()
   const finalResults = await provider.getFinalResults(race.openf1SessionKey)
+
+  console.log(
+    `[f10:ingest] OpenF1 returned ${finalResults.length} rows for session ${race.openf1SessionKey}`,
+  )
 
   if (finalResults.length === 0) {
     throw new Error(
@@ -49,7 +57,17 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
     dbDrivers.map((d) => [d.openf1DriverNumber, d.id]),
   )
 
+  const unmapped = finalResults
+    .filter((r) => !driverMap.has(r.driverNumber))
+    .map((r) => r.driverNumber)
+  if (unmapped.length > 0) {
+    console.warn(
+      `[f10:ingest] raceId=${raceId} unmapped OpenF1 driver numbers (no DB row, e.g. substitute): ${unmapped.join(',')}`,
+    )
+  }
+
   let ingested = 0
+  const statusCounts: Record<string, number> = {}
 
   for (const result of finalResults) {
     const driverId = driverMap.get(result.driverNumber)
@@ -69,6 +87,7 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
       },
     })
 
+    statusCounts[result.status] = (statusCounts[result.status] ?? 0) + 1
     ingested++
   }
 
@@ -78,7 +97,12 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
       where: { id: raceId },
       data: { status: 'COMPLETED' },
     })
+    console.log(`[f10:ingest] raceId=${raceId} flipped status ${race.status} → COMPLETED`)
   }
+
+  console.log(
+    `[f10:ingest] raceId=${raceId} ingested=${ingested} statusBreakdown=${JSON.stringify(statusCounts)}`,
+  )
 
   return ingested
 }

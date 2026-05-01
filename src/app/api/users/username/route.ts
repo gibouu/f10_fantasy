@@ -49,9 +49,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: formatCheck.error }, { status: 400 })
   }
 
+  let stored: string
   try {
     // setUsername internally re-validates format + checks availability atomically
-    await setUsername(session.user.id, username)
+    stored = await setUsername(session.user.id, username)
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return NextResponse.json({ error: "Username is already taken" }, { status: 409 })
@@ -66,9 +67,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
-  // The client calls next-auth's update() after this to refresh the JWT token.
-  // We return the username so the client can pass it directly to update().
-  return NextResponse.json({ ok: true, username })
+  // Return the stored (lowercased) username so the iOS client's optimistic
+  // update matches what the next /api/users/me call will return — avoids the
+  // displayed username flicker between input case and stored case after relaunch.
+  return NextResponse.json({ ok: true, username: stored })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,8 +99,9 @@ export async function PATCH(req: NextRequest) {
     )
   }
 
+  let stored: string
   try {
-    await changeUsername(session.user.id, username)
+    stored = await changeUsername(session.user.id, username)
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return NextResponse.json({ error: "Username is already taken" }, { status: 409 })
@@ -111,7 +114,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, username })
+  return NextResponse.json({ ok: true, username: stored })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

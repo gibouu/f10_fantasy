@@ -19,26 +19,35 @@ final class SyncManager {
         races: [Race] = []
     ) async {
         let unsynced = localPickStore.unsyncedPicks()
-        guard !unsynced.isEmpty else { return }
+        guard !unsynced.isEmpty else {
+            fxLog(.sync, "migrateGuestPicks: nothing to migrate")
+            return
+        }
+        fxLog(.sync, "migrateGuestPicks: \(unsynced.count) unsynced picks")
 
         let raceMap = Dictionary(uniqueKeysWithValues: races.map { ($0.id, $0) })
 
         for localPick in unsynced {
             // Client-side lock check — skip if we know the race is locked
             if let race = raceMap[localPick.raceId], race.isLocked {
+                fxLog(.sync, "skip raceId=\(localPick.raceId) (locked)")
                 localPickStore.markSynced(raceId: localPick.raceId)
                 continue
             }
 
             // Check if server already has a pick (server wins on conflict)
             if await checkServerPick(raceId: localPick.raceId, token: token) {
+                fxLog(.sync, "skip raceId=\(localPick.raceId) (server already has pick)")
                 localPickStore.markSynced(raceId: localPick.raceId)
                 continue
             }
 
             // Upload
             if await uploadPick(localPick, token: token) {
+                fxLog(.sync, "uploaded raceId=\(localPick.raceId)")
                 localPickStore.markSynced(raceId: localPick.raceId)
+            } else {
+                fxWarn(.sync, "upload failed raceId=\(localPick.raceId) — will retry on next sign-in")
             }
             // On network error → leave unsynced; will retry on next sign-in
         }

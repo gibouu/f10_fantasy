@@ -33,21 +33,18 @@ function validateCronSecret(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
+    console.warn("[f10:cron:scores] unauthorized")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const startedAt = Date.now()
   let raceId: string | undefined
   let raceType: "MAIN" | "SPRINT" | undefined
 
-  // Body is optional — the cron job can call with an empty body
   try {
     const body = await req.json()
-    if (typeof body?.raceId === "string") {
-      raceId = body.raceId
-    }
-    if (body?.raceType === "MAIN" || body?.raceType === "SPRINT") {
-      raceType = body.raceType
-    }
+    if (typeof body?.raceId === "string") raceId = body.raceId
+    if (body?.raceType === "MAIN" || body?.raceType === "SPRINT") raceType = body.raceType
   } catch {
     // No body or invalid JSON — fall through to auto-resolve
   }
@@ -63,25 +60,26 @@ export async function POST(req: NextRequest) {
       select: { id: true },
     })
 
+    console.log(`[f10:cron:scores] mode=byType type=${raceType} count=${races.length}`)
+
     const results: Array<{ raceId: string; computed: number; error?: string }> = []
 
     for (const race of races) {
       try {
         const computed = await computeAndStoreScoresForRace(race.id)
         results.push({ raceId: race.id, computed })
+        console.log(`[f10:cron:scores] OK raceId=${race.id} computed=${computed}`)
       } catch (err) {
-        results.push({
-          raceId: race.id,
-          computed: 0,
-          error: err instanceof Error ? err.message : "Unknown error",
-        })
+        const message = err instanceof Error ? err.message : "Unknown error"
+        results.push({ raceId: race.id, computed: 0, error: message })
+        console.error(`[f10:cron:scores] FAIL raceId=${race.id}: ${message}`)
       }
     }
 
+    console.log(`[f10:cron:scores] done in ${Date.now() - startedAt}ms`)
     return NextResponse.json({ raceType, processed: results })
   }
 
-  // If no raceId provided, find the most recently completed race
   if (!raceId) {
     const lastCompleted = await db.race.findFirst({
       where: { status: "COMPLETED" },
@@ -90,6 +88,7 @@ export async function POST(req: NextRequest) {
     })
 
     if (!lastCompleted) {
+      console.warn("[f10:cron:scores] no completed races to score")
       return NextResponse.json(
         { error: "No completed races found to score" },
         { status: 404 },
@@ -97,6 +96,9 @@ export async function POST(req: NextRequest) {
     }
 
     raceId = lastCompleted.id
+    console.log(`[f10:cron:scores] auto-resolved raceId=${raceId} (${lastCompleted.name})`)
+  } else {
+    console.log(`[f10:cron:scores] targeted raceId=${raceId}`)
   }
 
   let computed: number
@@ -104,8 +106,12 @@ export async function POST(req: NextRequest) {
     computed = await computeAndStoreScoresForRace(raceId)
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
+    console.error(`[f10:cron:scores] FAIL raceId=${raceId}: ${message}`)
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
+  console.log(
+    `[f10:cron:scores] OK raceId=${raceId} computed=${computed} (${Date.now() - startedAt}ms)`,
+  )
   return NextResponse.json({ computed, raceId })
 }

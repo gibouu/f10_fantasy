@@ -35,17 +35,20 @@ final class AuthManager {
 
     func restoreSession() async {
         guard let token = KeychainService.loadToken() else {
+            fxLog(.auth, "restoreSession: no keychain token → guest")
             state = .unauthenticated
             return
         }
         do {
             let user: User = try await api.request(.me, token: token)
+            fxLog(.auth, "restoreSession: authenticated user=\(user.id) usernameSet=\(user.usernameSet)")
             state = .authenticated(user)
         } catch APIError.unauthorized {
+            fxWarn(.auth, "restoreSession: token rejected (401) → clearing keychain")
             KeychainService.deleteToken()
             state = .unauthenticated
         } catch {
-            // Network unavailable on launch — fall through to guest mode.
+            fxWarn(.auth, "restoreSession: \(error.localizedDescription) → falling back to guest")
             state = .unauthenticated
         }
     }
@@ -53,13 +56,16 @@ final class AuthManager {
     // MARK: - Sign in
 
     func signInWithApple(idToken: String) async throws {
+        fxLog(.auth, "signInWithApple: exchanging Apple id_token")
         let exchange: ExchangeResponse = try await api.request(
             .mobileExchange(provider: "apple", idToken: idToken)
         )
         try KeychainService.saveToken(exchange.accessToken)
+        fxLog(.auth, "signInWithApple: token issued, userId=\(exchange.userId) usernameSet=\(exchange.usernameSet)")
 
         let user: User = try await api.request(.me, token: exchange.accessToken)
         state = .authenticated(user)
+        fxLog(.auth, "signInWithApple: state=authenticated user=\(user.id)")
 
         // Migrate any guest picks in the background — don't block sign-in completion
         // so the caller can dismiss sheets / transition views before migration finishes.

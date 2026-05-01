@@ -114,6 +114,10 @@ export async function computeAndStoreScoresForRace(
     )
   }
 
+  console.log(
+    `[f10:score] raceId=${raceId} type=${race.type} entries=${race.entries.length} results=${race.results.length}`,
+  )
+
   // 2. Load all pick sets for the race
   const pickSets = await db.pickSet.findMany({
     where: { raceId },
@@ -135,6 +139,8 @@ export async function computeAndStoreScoresForRace(
       },
     },
   })
+
+  console.log(`[f10:score] raceId=${raceId} pickSets=${pickSets.length}`)
 
   if (pickSets.length === 0) return 0
 
@@ -252,6 +258,7 @@ export async function computeAndStoreScoresForRace(
     count++
   }
 
+  console.log(`[f10:score] raceId=${raceId} computed=${count} pickSets`)
   return count
 }
 

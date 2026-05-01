@@ -27,19 +27,18 @@ function validateCronSecret(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
+    console.warn('[f10:cron:ingest] unauthorized')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
   let targetRaceIds: string[]
+  let mode: 'force' | 'targeted' | 'auto' | 'fallback-latest' = 'auto'
 
-  // Body options:
-  //   { force: true }          — re-ingest ALL completed races (fixes wrong DNF data)
-  //   { raceId: "..." }        — targeted re-ingest for one race
-  //   (no body)                — normal: ingest races with no results yet
   try {
     const body = await req.json()
     if (body?.force === true) {
-      // Force mode: re-ingest every completed race so DNF statuses are corrected
+      mode = 'force'
       const all = await db.race.findMany({
         where: { status: 'COMPLETED', openf1SessionKey: { not: null } },
         orderBy: { scheduledStartUtc: 'asc' },
@@ -47,6 +46,7 @@ export async function POST(req: NextRequest) {
       })
       targetRaceIds = all.map((r) => r.id)
     } else if (typeof body?.raceId === 'string') {
+      mode = 'targeted'
       targetRaceIds = [body.raceId]
     } else {
       targetRaceIds = await findRacesNeedingIngestion()
@@ -55,18 +55,24 @@ export async function POST(req: NextRequest) {
     targetRaceIds = await findRacesNeedingIngestion()
   }
 
-  // If no backlog found, also check the most recently COMPLETED race
-  // (it may already have results — ingestResultsForRace is idempotent)
   if (targetRaceIds.length === 0) {
     const latest = await db.race.findFirst({
       where: { status: 'COMPLETED', openf1SessionKey: { not: null } },
       orderBy: { scheduledStartUtc: 'desc' },
       select: { id: true },
     })
-    if (latest) targetRaceIds = [latest.id]
+    if (latest) {
+      mode = 'fallback-latest'
+      targetRaceIds = [latest.id]
+    }
   }
 
+  console.log(
+    `[f10:cron:ingest] mode=${mode} targetCount=${targetRaceIds.length} ids=${JSON.stringify(targetRaceIds)}`,
+  )
+
   if (targetRaceIds.length === 0) {
+    console.log('[f10:cron:ingest] nothing to process')
     return NextResponse.json({ message: 'No races to process', processed: [] })
   }
 
@@ -78,19 +84,26 @@ export async function POST(req: NextRequest) {
   }> = []
 
   for (const raceId of targetRaceIds) {
+    const raceStartedAt = Date.now()
     try {
       const ingested = await ingestResultsForRace(raceId)
       const scored = await computeAndStoreScoresForRace(raceId)
       results.push({ raceId, ingested, scored })
+      console.log(
+        `[f10:cron:ingest] OK raceId=${raceId} ingested=${ingested} scored=${scored} (${Date.now() - raceStartedAt}ms)`,
+      )
     } catch (err) {
-      results.push({
-        raceId,
-        ingested: 0,
-        scored: 0,
-        error: err instanceof Error ? err.message : String(err),
-      })
+      const message = err instanceof Error ? err.message : String(err)
+      results.push({ raceId, ingested: 0, scored: 0, error: message })
+      console.error(
+        `[f10:cron:ingest] FAIL raceId=${raceId} (${Date.now() - raceStartedAt}ms): ${message}`,
+      )
     }
   }
+
+  console.log(
+    `[f10:cron:ingest] done in ${Date.now() - startedAt}ms processed=${results.length} errors=${results.filter((r) => r.error).length}`,
+  )
 
   return NextResponse.json({ processed: results })
 }

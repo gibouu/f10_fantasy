@@ -7,6 +7,7 @@ struct GuestProfileView: View {
     @AppStorage("colorSchemePreference") private var colorSchemePreference: String = "system"
     @State private var showSignIn = false
     @State private var showTeamPicker = false
+    @State private var showDiagnostics = false
     @State private var usernameInput = ""
     @FocusState private var usernameFocused: Bool
 
@@ -85,6 +86,25 @@ struct GuestProfileView: View {
                 .pickerStyle(.segmented)
             }
 
+            // Diagnostics — exposed to guests too so external testers can grab
+            // logs before completing sign-in.
+            Section("Diagnostics") {
+                Button {
+                    showDiagnostics = true
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .foregroundStyle(FXTheme.Colors.accent)
+                        Text("View logs")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Text("\(FXLogStore.shared.entries.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             // Legal
             Section {
                 Link(destination: URL(string: "https://fxracing.ca/privacy")!) {
@@ -126,6 +146,9 @@ struct GuestProfileView: View {
         }
         .sheet(isPresented: $showSignIn) {
             SignInPromptView(reason: "Sign in to save your profile, track your picks, and compete with friends.")
+        }
+        .sheet(isPresented: $showDiagnostics) {
+            DiagnosticsView()
         }
     }
 

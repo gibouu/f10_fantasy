@@ -82,16 +82,22 @@ export async function isUsernameAvailable(
  * Atomically validates format, checks availability, and updates the record.
  * Sets usernameSet = true on the user row.
  *
+ * Returns the stored (lowercased) username so callers can display the same
+ * value the DB persisted — preventing the iOS optimistic-update from showing
+ * one case before relaunch and another after `/api/users/me` reloads it.
+ *
  * @throws If the username format is invalid or the username is already taken
  */
 export async function setUsername(
   userId: string,
   username: string,
-): Promise<void> {
+): Promise<string> {
   const formatCheck = validateUsernameFormat(username)
   if (!formatCheck.valid) {
     throw new Error(formatCheck.error ?? 'Invalid username format')
   }
+
+  const stored = username.toLowerCase()
 
   await db.$transaction(async (tx) => {
     const existing = await tx.user.findFirst({
@@ -108,11 +114,13 @@ export async function setUsername(
     await tx.user.update({
       where: { id: userId },
       data: {
-        publicUsername: username.toLowerCase(),
+        publicUsername: stored,
         usernameSet: true,
       },
     })
   })
+
+  return stored
 }
 
 /**
@@ -124,7 +132,7 @@ export async function setUsername(
 export async function changeUsername(
   userId: string,
   username: string,
-): Promise<void> {
+): Promise<string> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { usernameSet: true, usernameChangeUsed: true, publicUsername: true },
@@ -147,6 +155,8 @@ export async function changeUsername(
     throw new Error('That is already your username')
   }
 
+  const stored = username.toLowerCase()
+
   await db.$transaction(async (tx) => {
     const existing = await tx.user.findFirst({
       where: {
@@ -161,9 +171,11 @@ export async function changeUsername(
 
     await tx.user.update({
       where: { id: userId },
-      data: { publicUsername: username.toLowerCase(), usernameChangeUsed: true },
+      data: { publicUsername: stored, usernameChangeUsed: true },
     })
   })
+
+  return stored
 }
 
 /**

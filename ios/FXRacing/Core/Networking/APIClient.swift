@@ -16,35 +16,48 @@ struct APIClient: Sendable {
         token: String? = nil
     ) async throws -> T {
         let urlRequest = try buildRequest(for: endpoint, token: token)
+        let started = Date()
+        let pathTag = "\(endpoint.method) \(endpoint.path)"
 
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await session.data(for: urlRequest)
         } catch {
+            fxError(.network, "\(pathTag) — network failure: \(error.localizedDescription)")
             throw APIError.networkFailed(error)
         }
 
         guard let http = response as? HTTPURLResponse else {
+            fxError(.network, "\(pathTag) — non-HTTP response")
             throw APIError.networkFailed(URLError(.badServerResponse))
         }
 
+        let ms = Int(Date().timeIntervalSince(started) * 1000)
+        let auth = token != nil ? "auth" : "anon"
+
         switch http.statusCode {
         case 200...299:
+            fxLog(.network, "\(pathTag) → \(http.statusCode) (\(ms)ms, \(data.count)B, \(auth))")
             do {
                 return try JSONDecoder.api.decode(T.self, from: data)
             } catch {
+                let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
+                fxError(.network, "\(pathTag) — decode \(T.self) failed: \(error.localizedDescription); body[0..200]=\(preview)")
                 throw APIError.decodingFailed(error)
             }
         case 401:
             let message = (try? JSONDecoder.api.decode(APIErrorBody.self, from: data))?.error
+            fxWarn(.network, "\(pathTag) → 401 (\(ms)ms, \(auth)) \(message ?? "")")
             if let message {
                 throw APIError.serverError(401, message)
             }
             throw APIError.unauthorized
         case 404:
+            fxWarn(.network, "\(pathTag) → 404 (\(ms)ms, \(auth))")
             throw APIError.notFound
         default:
             let message = (try? JSONDecoder.api.decode(APIErrorBody.self, from: data))?.error
+            fxWarn(.network, "\(pathTag) → \(http.statusCode) (\(ms)ms, \(auth)) \(message ?? "")")
             throw APIError.serverError(http.statusCode, message)
         }
     }

@@ -32,9 +32,11 @@ function validateCronSecret(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
+    console.warn("[f10:cron:lock] unauthorized")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const startedAt = Date.now()
   const now = new Date()
 
   // Find all races that:
@@ -53,6 +55,10 @@ export async function POST(req: NextRequest) {
     },
   })
 
+  console.log(
+    `[f10:cron:lock] candidates=${racesToLock.length} now=${now.toISOString()}`,
+  )
+
   let lockedRaces = 0
   let totalPicksLocked = 0
 
@@ -61,15 +67,11 @@ export async function POST(req: NextRequest) {
     const picksLocked = await lockPicksForRace(race.id)
     totalPicksLocked += picksLocked
 
-    // Determine the new race status:
-    //   - LIVE  if the race has started (scheduledStartUtc <= now)
-    //   - Keep existing status otherwise (e.g. UPCOMING with lock passed but not yet started)
     const newStatus =
       race.scheduledStartUtc <= now && race.status !== "LIVE"
         ? "LIVE"
         : undefined
 
-    // Only write if something actually changed
     if (newStatus) {
       await db.race.update({
         where: { id: race.id },
@@ -77,8 +79,16 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    console.log(
+      `[f10:cron:lock] race=${race.id} (${race.name}) oldStatus=${race.status} newStatus=${newStatus ?? race.status} picksLocked=${picksLocked}`,
+    )
+
     lockedRaces++
   }
+
+  console.log(
+    `[f10:cron:lock] done in ${Date.now() - startedAt}ms lockedRaces=${lockedRaces} totalPicksLocked=${totalPicksLocked}`,
+  )
 
   return NextResponse.json({ lockedRaces, totalPicksLocked })
 }

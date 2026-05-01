@@ -79,6 +79,13 @@ final class UsernamePickerViewModel {
                 errorMessage = nil
                 checkedUsername = candidate
                 availability = response.available ? .available : .taken
+                // Refresh suggestions when the typed name is taken so the user
+                // always has a fresh available alternative within reach. Apple
+                // reviewers tend to retype the same patterns; static
+                // suggestions stale out across reviews.
+                if !response.available {
+                    Task { await self.loadSuggestions() }
+                }
             } catch {
                 guard !Task.isCancelled, username == candidate else { return }
                 // Network/server failure — must not display as "already taken"
@@ -117,8 +124,14 @@ final class UsernamePickerViewModel {
                 checkedUsername = submittedUsername
                 availability = .taken
                 errorMessage = "Username already taken."
+                // Apple reviewers retype the same names across reviews — pull
+                // fresh suggestions so a working alternative is one tap away.
+                Task { await loadSuggestions() }
             } else {
-                availability = .idle
+                // Transient failure (network, 5xx, decoding). Leave availability
+                // as-is so the Confirm button stays enabled for retry — resetting
+                // to .idle would dead-end the user (canSubmit requires .available
+                // and they'd have to retype to re-trigger the check).
                 errorMessage = error.localizedDescription
             }
         }

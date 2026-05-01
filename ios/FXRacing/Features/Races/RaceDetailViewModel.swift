@@ -41,13 +41,19 @@ final class RaceDetailViewModel {
         isLoading = true
         defer { isLoading = false }
 
+        fxLog(.race, "load raceId=\(raceId) token=\(token != nil)")
         do {
             let detail: DetailResponse = try await api.request(.raceDetail(id: raceId))
             race    = detail.race
             entrants = detail.entrants
             results  = detail.results
+            fxLog(.race, "load OK status=\(detail.race.status.rawValue) entrants=\(detail.entrants.count) results=\(detail.results.count) lockCutoff=\(detail.race.lockCutoffUtc.timeIntervalSinceNow)s")
+            if detail.race.status == .completed && detail.results.isEmpty {
+                fxWarn(.race, "load: race COMPLETED but results empty — ingestion may not have run")
+            }
         } catch {
             errorMessage = error.localizedDescription
+            fxError(.race, "load failed raceId=\(raceId): \(error.localizedDescription)")
             return
         }
 
@@ -60,12 +66,19 @@ final class RaceDetailViewModel {
                 selectedWinner = entrants.first { $0.id == response.pick.winnerDriverId }
                 selectedP10    = entrants.first { $0.id == response.pick.tenthPlaceDriverId }
                 selectedDNF    = entrants.first { $0.id == response.pick.dnfDriverId }
+                if selectedWinner == nil || selectedP10 == nil || selectedDNF == nil {
+                    fxWarn(.pick, "server pick driver id not in entrants — winner=\(selectedWinner == nil ? "missing" : "ok") p10=\(selectedP10 == nil ? "missing" : "ok") dnf=\(selectedDNF == nil ? "missing" : "ok")")
+                } else {
+                    fxLog(.pick, "server pick loaded raceId=\(raceId)")
+                }
                 // Mark local pick synced if server has it
                 localPickStore.markSynced(raceId: raceId)
                 return
             } catch APIError.notFound {
+                fxLog(.pick, "no server pick for raceId=\(raceId) — falling back to local")
                 serverPick = nil
             } catch {
+                fxWarn(.pick, "server pick fetch failed raceId=\(raceId): \(error.localizedDescription) — falling back to local")
                 serverPick = nil
             }
         }
@@ -151,15 +164,18 @@ final class RaceDetailViewModel {
             isLocalOnly = false
             localPickStore.markSynced(raceId: raceId)
             submitSuccess = true
+            fxLog(.pick, "submit OK raceId=\(raceId) winner=\(winner.code) p10=\(p10.code) dnf=\(dnf.code)")
             Haptics.success()
         } catch APIError.serverError(let code, let msg) where code == 423 {
             // Server says locked — local pick was saved but can't be uploaded
             errorMessage = msg ?? "This race is now locked."
+            fxWarn(.pick, "submit locked (423) raceId=\(raceId) — local pick retained")
             Haptics.locked()
         } catch {
             // Network error: local save succeeded, server upload failed
             // Show success because the pick IS saved locally
             submitSuccess = true
+            fxWarn(.pick, "submit network failure raceId=\(raceId): \(error.localizedDescription) — local pick retained for retry")
             Haptics.success()
         }
     }

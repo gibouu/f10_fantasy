@@ -19,10 +19,15 @@ final class FriendProfileViewModel {
     func load(token: String?) async {
         isLoading = true
         errorMessage = nil
+        fxLog(.race, "profile load userId=\(userId)")
         do {
-            profile = try await client.request(.userProfile(userId: userId), token: token)
+            let loaded: FriendProfile = try await client.request(.userProfile(userId: userId), token: token)
+            profile = loaded
+            let scored = loaded.picks.filter { $0.scoreBreakdown != nil }.count
+            fxLog(.race, "profile loaded userId=\(userId) picks=\(loaded.picks.count) scored=\(scored)")
         } catch {
             errorMessage = error.localizedDescription
+            fxError(.race, "profile load failed userId=\(userId): \(error.localizedDescription)")
         }
         isLoading = false
     }
