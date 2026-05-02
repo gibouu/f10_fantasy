@@ -53,6 +53,7 @@ export async function GET(
       lockCutoffUtc: true,
       openf1SessionKey: true,
       openf1MeetingKey: true,
+      openf1QualifyingSessionKey: true,
     },
   })
 
@@ -60,7 +61,7 @@ export async function GET(
     return NextResponse.json({ error: "Race not found", raceId }, { status: 404 })
   }
 
-  const [entryCount, resultRows, pickSetCount, scoreCount, latestScore] =
+  const [entryCount, resultRows, pickSetCount, scoreCount, latestScore, qualifyingCount] =
     await Promise.all([
       db.raceEntry.count({ where: { raceId } }),
       db.raceResult.findMany({
@@ -76,6 +77,7 @@ export async function GET(
         orderBy: { computedAt: "desc" },
         select: { computedAt: true, totalScore: true },
       }),
+      db.qualifyingResult.count({ where: { raceId } }),
     ])
 
   const resultStatusBreakdown = resultRows.reduce<Record<string, number>>(
@@ -170,6 +172,7 @@ export async function GET(
       total: resultRows.length,
       byStatus: resultStatusBreakdown,
     },
+    qualifying: { total: qualifyingCount, sessionKey: race.openf1QualifyingSessionKey },
     picks: { total: pickSetCount, scored: scoreCount },
     latestScore: latestScore
       ? {
