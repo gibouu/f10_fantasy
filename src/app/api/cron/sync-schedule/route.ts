@@ -182,14 +182,36 @@ export async function POST(req: NextRequest) {
       status: initialStatus,
     }
 
+    // OpenF1 occasionally re-issues session keys mid-season (the same race
+    // weekend can come back with a different `session_key`). The stable
+    // identifier is `[seasonId, openf1MeetingKey, type]` — meeting+type
+    // uniquely picks the Race row regardless of key churn. We try that
+    // lookup first; if no row exists, fall through to a plain insert.
     try {
-      const race = await db.race.upsert({
-        where: { openf1SessionKey: session.sessionKey },
-        create: createPayload,
-        update: updatePayload,
+      const existing = await db.race.findFirst({
+        where: {
+          seasonId: season.id,
+          openf1MeetingKey: session.meetingKey,
+          type: raceType as "MAIN" | "SPRINT",
+        },
         select: { id: true },
       })
-      raceIdBySessionKey.set(session.sessionKey, race.id)
+
+      let raceId: string
+      if (existing) {
+        await db.race.update({
+          where: { id: existing.id },
+          data: { ...updatePayload, openf1SessionKey: session.sessionKey },
+        })
+        raceId = existing.id
+      } else {
+        const created = await db.race.create({
+          data: createPayload,
+          select: { id: true },
+        })
+        raceId = created.id
+      }
+      raceIdBySessionKey.set(session.sessionKey, raceId)
       synced++
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
