@@ -161,11 +161,25 @@ export async function POST(req: NextRequest) {
     // [seasonId, round, type] when another race already occupies the new
     // slot. We set round only on insert. Existing rows keep whatever round
     // was assigned when first synced — manual fix-ups can adjust if needed.
+
+    // OpenF1 ships a single meeting_name per weekend (e.g. "Miami Grand Prix")
+    // shared by both the Sprint and the Race sessions. We derive the sprint
+    // row's display name by swapping the "Grand Prix" suffix for "Sprint" so
+    // the races list shows e.g. "Miami Sprint" and "Miami Grand Prix" as
+    // distinct entries instead of two identical names disambiguated only by
+    // the SPRINT badge.
+    const displayName =
+      raceType === "SPRINT"
+        ? meeting.name.endsWith(" Grand Prix")
+          ? `${meeting.name.slice(0, -" Grand Prix".length)} Sprint`
+          : `${meeting.name} Sprint`
+        : meeting.name
+
     const updatePayload = {
       // intentionally NO `round` here — see comment above
       // intentionally NO `status` here — owned by lock-picks + ingest-results
       seasonId: season.id,
-      name: meeting.name,
+      name: displayName,
       circuitName: meeting.circuitName,
       country: meeting.country,
       type: raceType as "MAIN" | "SPRINT",
