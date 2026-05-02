@@ -182,13 +182,16 @@ export async function POST(req: NextRequest) {
       status: initialStatus,
     }
 
-    // OpenF1 occasionally re-issues session keys mid-season (the same race
-    // weekend can come back with a different `session_key`). The stable
-    // identifier is `[seasonId, openf1MeetingKey, type]` — meeting+type
-    // uniquely picks the Race row regardless of key churn. We try that
-    // lookup first; if no row exists, fall through to a plain insert.
+    // OpenF1 occasionally re-issues session AND meeting keys mid-season
+    // (republishes), and occasionally adjusts scheduled start times. We try
+    // a chain of progressively looser identifiers to pick the existing DB
+    // row before falling back to insert:
+    //   1. [seasonId, openf1MeetingKey, type] — exact meeting match
+    //   2. [seasonId, type, scheduledStartUtc within ±36h] — same weekend
+    //      slot even if both meeting key and exact time drifted
+    //   3. insert new
     try {
-      const existing = await db.race.findFirst({
+      let existing = await db.race.findFirst({
         where: {
           seasonId: season.id,
           openf1MeetingKey: session.meetingKey,
@@ -196,6 +199,22 @@ export async function POST(req: NextRequest) {
         },
         select: { id: true },
       })
+
+      if (!existing) {
+        const start = session.scheduledStartUtc.getTime()
+        const windowMs = 36 * 60 * 60 * 1000
+        existing = await db.race.findFirst({
+          where: {
+            seasonId: season.id,
+            type: raceType as "MAIN" | "SPRINT",
+            scheduledStartUtc: {
+              gte: new Date(start - windowMs),
+              lte: new Date(start + windowMs),
+            },
+          },
+          select: { id: true },
+        })
+      }
 
       let raceId: string
       if (existing) {
