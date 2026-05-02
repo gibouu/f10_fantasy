@@ -49,10 +49,27 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2. Fetch sessions + meetings in parallel ───────────────────────────────
-  const [sessions, meetings] = await Promise.all([
-    provider.getSessions(year),
-    provider.getMeetings(year),
-  ])
+  // OpenF1 restricts the public API during live sessions (returns 401 with a
+  // "Live F1 session in progress" message). Treat any provider error as a soft
+  // skip so AWS scheduler doesn't retry-storm the route — the next scheduled
+  // tick will pick up where we left off.
+  let sessions: Awaited<ReturnType<typeof provider.getSessions>>
+  let meetings: Awaited<ReturnType<typeof provider.getMeetings>>
+  try {
+    ;[sessions, meetings] = await Promise.all([
+      provider.getSessions(year),
+      provider.getMeetings(year),
+    ])
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[f10:cron:sync-schedule] provider unavailable: ${message}`)
+    return NextResponse.json({
+      synced: 0,
+      year,
+      skipped: true,
+      reason: message,
+    })
+  }
 
   const relevantSessions = sessions.filter(
     (s) => s.type === "Race" || s.type === "Sprint",
