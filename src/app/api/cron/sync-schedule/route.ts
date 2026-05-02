@@ -155,9 +155,16 @@ export async function POST(req: NextRequest) {
           ? ("LIVE" as const)
           : ("UPCOMING" as const)
 
-    const baseData = {
+    // Round is computed from the position of this meeting in sortedMeetings.
+    // That's not stable across re-syncs (e.g. cancelled races, OpenF1 data
+    // shifts), and writing a changed round on update can collide with
+    // [seasonId, round, type] when another race already occupies the new
+    // slot. We set round only on insert. Existing rows keep whatever round
+    // was assigned when first synced — manual fix-ups can adjust if needed.
+    const updatePayload = {
+      // intentionally NO `round` here — see comment above
+      // intentionally NO `status` here — owned by lock-picks + ingest-results
       seasonId: season.id,
-      round,
       name: meeting.name,
       circuitName: meeting.circuitName,
       country: meeting.country,
@@ -168,14 +175,29 @@ export async function POST(req: NextRequest) {
       openf1QualifyingSessionKey: qualifyingSessionKey,
     }
 
-    const race = await db.race.upsert({
-      where: { openf1SessionKey: session.sessionKey },
-      create: { ...baseData, openf1SessionKey: session.sessionKey, status: initialStatus },
-      update: baseData,
-      select: { id: true },
-    })
-    raceIdBySessionKey.set(session.sessionKey, race.id)
-    synced++
+    const createPayload = {
+      ...updatePayload,
+      round,
+      openf1SessionKey: session.sessionKey,
+      status: initialStatus,
+    }
+
+    try {
+      const race = await db.race.upsert({
+        where: { openf1SessionKey: session.sessionKey },
+        create: createPayload,
+        update: updatePayload,
+        select: { id: true },
+      })
+      raceIdBySessionKey.set(session.sessionKey, race.id)
+      synced++
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn(
+        `[f10:cron:sync-schedule] upsert FAIL sessionKey=${session.sessionKey} (${meeting.name} ${raceType}): ${message}`,
+      )
+      // Continue — don't let one bad row kill the whole sync.
+    }
   }
 
   // Skip the remaining steps if no driver data was fetched
