@@ -82,7 +82,7 @@ model Race {
   lockCutoffUtc              DateTime
   status                     RaceStatus         @default(UPCOMING)
   openf1SessionKey           Int?               @unique
-  openf1QualifyingSessionKey Int?               @unique
+  openf1QualifyingSessionKey Int?
   openf1MeetingKey           Int?
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
