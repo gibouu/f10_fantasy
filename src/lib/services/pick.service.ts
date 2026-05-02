@@ -9,6 +9,7 @@
  *   - One pick set per user per race (DB unique constraint as backstop)
  */
 
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import { isRaceLocked, isPickSetLocked } from './lock.service'
 import { z } from 'zod'
@@ -16,6 +17,20 @@ import type { PickSetData, PickSetWithScore, RaceSummary } from '@/types/domain'
 import { RaceStatus, RaceType } from '@/types/domain'
 import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
 import { resolveTeam } from '@/lib/f1/teams'
+
+/**
+ * Thrown when a pick cannot be created/updated because either the race-level
+ * lock cutoff has passed or the pick set has been individually locked.
+ *
+ * The /api/picks route maps any error whose message contains "locked" to
+ * HTTP 423 — keep the message verbiage consistent.
+ */
+export class PickLockedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'PickLockedError'
+  }
+}
 
 // ─────────────────────────────────────────────
 // Validation schema
@@ -166,99 +181,130 @@ export async function createOrUpdatePick(
   // 1. Validate input
   const validated = CreatePickSchema.parse(input)
 
-  // 2. Load race
-  const race = await db.race.findUnique({
-    where: { id: validated.raceId },
-    select: {
-      id: true,
-      lockCutoffUtc: true,
-      status: true,
-    },
-  })
+  return db.$transaction(async (tx) => {
+    // 2. Load race
+    const race = await tx.race.findUnique({
+      where: { id: validated.raceId },
+      select: { id: true, lockCutoffUtc: true, status: true },
+    })
 
-  if (!race) {
-    throw new Error(`Race not found: ${validated.raceId}`)
-  }
+    if (!race) {
+      throw new Error(`Race not found: ${validated.raceId}`)
+    }
 
-  // 3. Race-level lock check
-  if (isRaceLocked(race)) {
-    throw new Error(
-      `Race ${validated.raceId} is locked — picks can no longer be submitted`,
-    )
-  }
+    // 3. Race-level lock check (best-effort — DB guard below is authoritative)
+    if (isRaceLocked(race)) {
+      throw new PickLockedError(
+        `Race ${validated.raceId} is locked — picks can no longer be submitted`,
+      )
+    }
 
-  // 4. Validate that all picked drivers are registered entrants for this race
-  const pickedIds = [
-    validated.tenthPlaceDriverId,
-    validated.winnerDriverId,
-    validated.dnfDriverId,
-  ]
+    // 4. Validate that all picked drivers are registered entrants for this race
+    const pickedIds = [
+      validated.tenthPlaceDriverId,
+      validated.winnerDriverId,
+      validated.dnfDriverId,
+    ]
 
-  const entries = await db.raceEntry.findMany({
-    where: { raceId: validated.raceId },
-    include: {
-      driver: {
-        include: {
-          constructor: true,
-        },
+    const entries = await tx.raceEntry.findMany({
+      where: { raceId: validated.raceId },
+      include: { driver: { include: { constructor: true } } },
+    })
+
+    const seatAwareEntrants = entries.map((entry) => toSeatAwareDriver(entry.driver))
+    const entrantIds = new Set(seatAwareEntrants.map((driver) => driver.id))
+    const invalidPicks = pickedIds.filter((id) => !entrantIds.has(id))
+
+    if (invalidPicks.length > 0) {
+      throw new Error(
+        `The following driver IDs are not registered entrants for this race: ${invalidPicks.join(', ')}`,
+      )
+    }
+
+    const seatLookup = buildSeatLookup(seatAwareEntrants)
+
+    const data = {
+      tenthPlaceDriverId: validated.tenthPlaceDriverId,
+      tenthPlaceSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.tenthPlaceDriverId) ?? null,
+      winnerDriverId: validated.winnerDriverId,
+      winnerSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.winnerDriverId) ?? null,
+      dnfDriverId: validated.dnfDriverId,
+      dnfSeatKey:
+        seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
+    }
+
+    // 5. Atomic guarded update — re-asserts both invariants at the DB level.
+    // Two concurrent submits at lockCutoff − Δ both pass the JS check above,
+    // but only the request whose write commits while lockCutoffUtc > now()
+    // and lockedAt IS NULL succeeds.
+    const updated = await tx.pickSet.updateMany({
+      where: {
+        userId,
+        raceId: validated.raceId,
+        lockedAt: null,
+        race: { lockCutoffUtc: { gt: new Date() } },
       },
-    },
+      data,
+    })
+
+    if (updated.count === 0) {
+      // Either no row exists yet, or row exists but failed the guard (locked).
+      const existing = await tx.pickSet.findUnique({
+        where: { userId_raceId: { userId, raceId: validated.raceId } },
+        select: { lockedAt: true },
+      })
+
+      if (existing) {
+        if (isPickSetLocked(existing.lockedAt)) {
+          throw new PickLockedError(
+            'This pick set has been locked and can no longer be edited',
+          )
+        }
+        // Row exists but the relation guard didn't match — race must be locked.
+        throw new PickLockedError(
+          `Race ${validated.raceId} is locked — picks can no longer be submitted`,
+        )
+      }
+
+      // No existing row — create one. Re-check race lock first inside the tx
+      // so we don't insert a fresh pick after the cutoff.
+      const fresh = await tx.race.findUnique({
+        where: { id: validated.raceId },
+        select: { lockCutoffUtc: true },
+      })
+      if (!fresh || isRaceLocked(fresh)) {
+        throw new PickLockedError(
+          `Race ${validated.raceId} is locked — picks can no longer be submitted`,
+        )
+      }
+
+      try {
+        const created = await tx.pickSet.create({
+          data: { userId, raceId: validated.raceId, ...data },
+        })
+        return mapPickSetToData(created)
+      } catch (err) {
+        // [userId, raceId] unique constraint catches concurrent double-create.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new Error('A pick set already exists for this race — please refresh')
+        }
+        throw err
+      }
+    }
+
+    const pickSet = await tx.pickSet.findUnique({
+      where: { userId_raceId: { userId, raceId: validated.raceId } },
+    })
+    if (!pickSet) {
+      throw new Error('Pick set vanished after update — this should never happen')
+    }
+    return mapPickSetToData(pickSet)
   })
-
-  const seatAwareEntrants = entries.map((entry) => toSeatAwareDriver(entry.driver))
-  const entrantIds = new Set(seatAwareEntrants.map((driver) => driver.id))
-  const invalidPicks = pickedIds.filter((id) => !entrantIds.has(id))
-
-  if (invalidPicks.length > 0) {
-    throw new Error(
-      `The following driver IDs are not registered entrants for this race: ${invalidPicks.join(', ')}`,
-    )
-  }
-
-  const seatLookup = buildSeatLookup(seatAwareEntrants)
-
-  // 5. If an existing pick set exists, ensure it hasn't been individually locked
-  const existing = await db.pickSet.findUnique({
-    where: { userId_raceId: { userId, raceId: validated.raceId } },
-    select: { lockedAt: true },
-  })
-
-  if (existing && isPickSetLocked(existing.lockedAt)) {
-    throw new Error('This pick set has been locked and can no longer be edited')
-  }
-
-  // Upsert the pick set
-  const pickSet = await db.pickSet.upsert({
-    where: {
-      userId_raceId: { userId, raceId: validated.raceId },
-    },
-    create: {
-      userId,
-      raceId: validated.raceId,
-      tenthPlaceDriverId: validated.tenthPlaceDriverId,
-      tenthPlaceSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.tenthPlaceDriverId) ?? null,
-      winnerDriverId: validated.winnerDriverId,
-      winnerSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.winnerDriverId) ?? null,
-      dnfDriverId: validated.dnfDriverId,
-      dnfSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
-    },
-    update: {
-      tenthPlaceDriverId: validated.tenthPlaceDriverId,
-      tenthPlaceSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.tenthPlaceDriverId) ?? null,
-      winnerDriverId: validated.winnerDriverId,
-      winnerSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.winnerDriverId) ?? null,
-      dnfDriverId: validated.dnfDriverId,
-      dnfSeatKey:
-        seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
-    },
-  })
-
-  return mapPickSetToData(pickSet)
 }
 
 /**

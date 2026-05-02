@@ -104,36 +104,45 @@ export async function sendFriendRequest(
     throw new Error('You cannot send a friend request to yourself')
   }
 
-  // Check for any existing relationship in either direction
-  const existing = await db.friendRequest.findFirst({
-    where: {
-      OR: [
-        { requesterId, addresseeId },
-        { requesterId: addresseeId, addresseeId: requesterId },
-      ],
-    },
-    select: { id: true, status: true },
-  })
+  // Serialize concurrent A→B and B→A submissions on the *unordered* user-pair
+  // via a Postgres advisory lock. Without this, both pass the existence check
+  // and both inserts succeed (the unique index is on the directional pair).
+  const [a, b] = [requesterId, addresseeId].sort()
+  const pairKey = `friend-pair:${a}:${b}`
 
-  if (existing) {
-    if (existing.status === 'ACCEPTED') {
-      throw new Error('You are already friends with this user')
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${pairKey}))`
+
+    const existing = await tx.friendRequest.findFirst({
+      where: {
+        OR: [
+          { requesterId, addresseeId },
+          { requesterId: addresseeId, addresseeId: requesterId },
+        ],
+      },
+      select: { id: true, status: true },
+    })
+
+    if (existing) {
+      if (existing.status === 'ACCEPTED') {
+        throw new Error('You are already friends with this user')
+      }
+      throw new Error('A friend request already exists between these users')
     }
-    throw new Error('A friend request already exists between these users')
-  }
 
-  const fr = await db.friendRequest.create({
-    data: {
-      requesterId,
-      addresseeId,
-      status: 'PENDING',
-    },
-    include: {
-      requester: { select: { publicUsername: true, image: true } },
-    },
+    const fr = await tx.friendRequest.create({
+      data: {
+        requesterId,
+        addresseeId,
+        status: 'PENDING',
+      },
+      include: {
+        requester: { select: { publicUsername: true, image: true } },
+      },
+    })
+
+    return mapFriendRequest(fr)
   })
-
-  return mapFriendRequest(fr)
 }
 
 /**

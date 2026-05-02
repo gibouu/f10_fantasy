@@ -6,6 +6,7 @@
  * the formula, and persists the output via upsert so repeated calls are safe.
  */
 
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import {
   computeRaceScore,
@@ -15,6 +16,12 @@ import type { ScoreBreakdownData } from '@/types/domain'
 import type { NormalizedFinalResult } from '@/lib/f1/types'
 import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
 import { resolveTeam } from '@/lib/f1/teams'
+
+/**
+ * A Prisma client capable of running our queries — either the global `db`
+ * singleton or a transaction-scoped `tx` client.
+ */
+type DbOrTx = Prisma.TransactionClient | typeof db
 
 function toSeatAwareDriver(driver: {
   id: string
@@ -86,9 +93,10 @@ function resolveEffectiveDriverId(
  */
 export async function computeAndStoreScoresForRace(
   raceId: string,
+  client: DbOrTx = db,
 ): Promise<number> {
   // 1. Load the race with its type (MAIN | SPRINT) and stored results
-  const race = await db.race.findUnique({
+  const race = await client.race.findUnique({
     where: { id: raceId },
     include: {
       entries: {
@@ -119,7 +127,7 @@ export async function computeAndStoreScoresForRace(
   )
 
   // 2. Load all pick sets for the race
-  const pickSets = await db.pickSet.findMany({
+  const pickSets = await client.pickSet.findMany({
     where: { raceId },
     include: {
       tenthPlaceDriver: {
@@ -184,7 +192,7 @@ export async function computeAndStoreScoresForRace(
 
   // Query driver numbers via the results table to avoid Prisma's Driver select
   // type conflict caused by the `constructor` relation key shadowing Object.constructor
-  const driverNumbers = await db.$queryRaw<
+  const driverNumbers = await client.$queryRaw<
     Array<{ id: string; openf1DriverNumber: number | null }>
   >`SELECT id, "openf1DriverNumber" FROM "Driver" WHERE id = ANY(${driverIds}::text[])`
 
@@ -236,7 +244,7 @@ export async function computeAndStoreScoresForRace(
       scoringCtx,
     )
 
-    await db.scoreBreakdown.upsert({
+    await client.scoreBreakdown.upsert({
       where: { pickSetId: ps.id },
       create: {
         pickSetId: ps.id,

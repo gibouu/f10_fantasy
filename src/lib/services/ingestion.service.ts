@@ -8,18 +8,32 @@
  * to already exist in the DB.
  */
 
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import { createF1Provider } from '@/lib/f1/adapter'
 
 /**
+ * A Prisma client capable of running our queries — either the global `db`
+ * singleton or a transaction-scoped `tx` client. Used to thread an outer
+ * advisory-lock transaction through service-layer code.
+ */
+type DbOrTx = Prisma.TransactionClient | typeof db
+
+/**
  * Ingest final race results from the F1 provider and store in RaceResult.
  *
+ * @param raceId  The race to ingest.
+ * @param client  Optional Prisma client/tx — pass `tx` to run inside an outer
+ *                transaction (e.g. for cron-level advisory locking).
  * @returns Number of driver results written (upserted).
  * @throws  If the race is not found, has no session key, or the provider
  *          returns no results.
  */
-export async function ingestResultsForRace(raceId: string): Promise<number> {
-  const race = await db.race.findUnique({
+export async function ingestResultsForRace(
+  raceId: string,
+  client: DbOrTx = db,
+): Promise<number> {
+  const race = await client.race.findUnique({
     where: { id: raceId },
     select: { id: true, openf1SessionKey: true, status: true, name: true, type: true },
   })
@@ -49,7 +63,7 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
   // Build openf1DriverNumber → DB driver id map
   const driverNumbers = finalResults.map((r) => r.driverNumber)
 
-  const dbDrivers = await db.$queryRaw<
+  const dbDrivers = await client.$queryRaw<
     Array<{ id: string; openf1DriverNumber: number }>
   >`SELECT id, "openf1DriverNumber" FROM "Driver" WHERE "openf1DriverNumber" = ANY(${driverNumbers}::int[])`
 
@@ -73,7 +87,7 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
     const driverId = driverMap.get(result.driverNumber)
     if (!driverId) continue // driver not in DB (substitute, etc.)
 
-    await db.raceResult.upsert({
+    await client.raceResult.upsert({
       where: { raceId_driverId: { raceId, driverId } },
       create: {
         raceId,
@@ -93,7 +107,7 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
 
   // Ensure race status reflects completion
   if (race.status !== 'COMPLETED') {
-    await db.race.update({
+    await client.race.update({
       where: { id: raceId },
       data: { status: 'COMPLETED' },
     })
@@ -108,18 +122,26 @@ export async function ingestResultsForRace(raceId: string): Promise<number> {
 }
 
 /**
- * Find all races that are marked COMPLETED but have no stored results,
- * or races where re-ingestion is explicitly requested.
+ * Find races that need result ingestion:
+ *   - Status COMPLETED with no RaceResult rows (backfill), OR
+ *   - Status LIVE whose scheduled start was over 3 hours ago and no results yet
+ *     (race must be over by now — this is the post-race transition path).
+ *
+ * sync-schedule no longer flips status to COMPLETED, so the LIVE-with-stale-
+ * start branch is the primary trigger that moves a finished race forward.
  *
  * @returns Array of race IDs needing ingestion.
  */
 export async function findRacesNeedingIngestion(): Promise<string[]> {
-  // Completed races with no RaceResult rows
+  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
   const races = await db.race.findMany({
     where: {
-      status: 'COMPLETED',
-      results: { none: {} },
       openf1SessionKey: { not: null },
+      results: { none: {} },
+      OR: [
+        { status: 'COMPLETED' },
+        { status: 'LIVE', scheduledStartUtc: { lt: threeHoursAgo } },
+      ],
     },
     select: { id: true },
     orderBy: { scheduledStartUtc: 'desc' },

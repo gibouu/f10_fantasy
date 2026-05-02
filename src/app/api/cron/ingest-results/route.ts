@@ -1,12 +1,15 @@
 /**
- * Cron: ingest race results from OpenF1 and compute scores.
+ * Cron: ingest race + qualifying results from OpenF1 and compute scores.
  *
- * Pipeline per race:
- *   1. Fetch final results from OpenF1 → write to RaceResult
- *   2. Compute scores for all pick sets → write to ScoreBreakdown
+ * Pipeline per race (inside a per-race advisory lock):
+ *   1. Ingest qualifying results if the race has a paired qualifying session
+ *      and we don't have those results yet. Runs even when the race is
+ *      still UPCOMING — the qualifying session finishes hours/days before
+ *      lights-out and the result feeds the race detail page leaderboard.
+ *   2. If the race is COMPLETED (or the caller forced/targeted it), fetch
+ *      final race results → write RaceResult, then compute pick scores.
  *
- * Runs after each race completes. Also backfills completed races that have
- * no stored results (up to 10 per invocation).
+ * Backfills up to 10 races per invocation.
  *
  * Protected by the CRON_SECRET environment variable.
  */
@@ -16,6 +19,10 @@ import type { NextRequest } from 'next/server'
 import { db } from '@/lib/db/client'
 import { ingestResultsForRace, findRacesNeedingIngestion } from '@/lib/services/ingestion.service'
 import { computeAndStoreScoresForRace } from '@/lib/services/scoring.service'
+import {
+  ingestQualifyingForRace,
+  findRacesNeedingQualifyingIngestion,
+} from '@/lib/services/qualifying.service'
 
 function validateCronSecret(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -49,10 +56,18 @@ export async function POST(req: NextRequest) {
       mode = 'targeted'
       targetRaceIds = [body.raceId]
     } else {
-      targetRaceIds = await findRacesNeedingIngestion()
+      const [needResults, needQuali] = await Promise.all([
+        findRacesNeedingIngestion(),
+        findRacesNeedingQualifyingIngestion(),
+      ])
+      targetRaceIds = Array.from(new Set([...needResults, ...needQuali]))
     }
   } catch {
-    targetRaceIds = await findRacesNeedingIngestion()
+    const [needResults, needQuali] = await Promise.all([
+      findRacesNeedingIngestion(),
+      findRacesNeedingQualifyingIngestion(),
+    ])
+    targetRaceIds = Array.from(new Set([...needResults, ...needQuali]))
   }
 
   if (targetRaceIds.length === 0) {
@@ -80,21 +95,103 @@ export async function POST(req: NextRequest) {
     raceId: string
     ingested: number
     scored: number
+    qualified: number
     error?: string
   }> = []
 
   for (const raceId of targetRaceIds) {
     const raceStartedAt = Date.now()
     try {
-      const ingested = await ingestResultsForRace(raceId)
-      const scored = await computeAndStoreScoresForRace(raceId)
-      results.push({ raceId, ingested, scored })
+      // Per-race advisory lock so two overlapping cron invocations (EventBridge
+      // retry on timeout, manual force=true while a scheduled run is mid-flight)
+      // can't interleave ingestion + scoring writes for the same race.
+      const outcome = await db.$transaction(
+        async (tx) => {
+          const lockRows = await tx.$queryRaw<Array<{ locked: boolean }>>`
+            SELECT pg_try_advisory_xact_lock(hashtext(${raceId})) AS locked
+          `
+          if (!lockRows[0]?.locked) {
+            return { locked: false as const }
+          }
+
+          const race = await tx.race.findUnique({
+            where: { id: raceId },
+            select: {
+              id: true,
+              status: true,
+              openf1SessionKey: true,
+              openf1QualifyingSessionKey: true,
+            },
+          })
+          if (!race) {
+            return { locked: true as const, ingested: 0, scored: 0, qualified: 0 }
+          }
+
+          let qualified = 0
+          let ingested = 0
+          let scored = 0
+
+          // Qualifying ingestion — runs whether the race is UPCOMING/LIVE/COMPLETED.
+          // Provider returning 0 rows is treated as "session not finished yet"
+          // and surfaces as qualified=0; not an error.
+          if (race.openf1QualifyingSessionKey !== null) {
+            try {
+              qualified = await ingestQualifyingForRace(raceId, tx)
+            } catch (e) {
+              const m = e instanceof Error ? e.message : String(e)
+              console.warn(
+                `[f10:cron:ingest] quali soft-fail raceId=${raceId}: ${m}`,
+              )
+            }
+          }
+
+          // Race results + scoring when the race itself is over (COMPLETED, or
+          // LIVE with start time well in the past), or when the caller
+          // explicitly forced/targeted this race. ingestResultsForRace flips
+          // status from LIVE → COMPLETED once results land in the DB.
+          const allowRaceResults =
+            race.openf1SessionKey !== null &&
+            (race.status === 'COMPLETED' ||
+              race.status === 'LIVE' ||
+              mode === 'force' ||
+              mode === 'targeted')
+
+          if (allowRaceResults) {
+            ingested = await ingestResultsForRace(raceId, tx)
+            scored = await computeAndStoreScoresForRace(raceId, tx)
+          }
+
+          return { locked: true as const, ingested, scored, qualified }
+        },
+        { timeout: 120_000 },
+      )
+
+      if (!outcome.locked) {
+        console.log(
+          `[f10:cron:ingest] SKIP raceId=${raceId} — concurrent invocation holds lock (${Date.now() - raceStartedAt}ms)`,
+        )
+        results.push({
+          raceId,
+          ingested: 0,
+          scored: 0,
+          qualified: 0,
+          error: 'locked-by-concurrent-invocation',
+        })
+        continue
+      }
+
+      results.push({
+        raceId,
+        ingested: outcome.ingested,
+        scored: outcome.scored,
+        qualified: outcome.qualified,
+      })
       console.log(
-        `[f10:cron:ingest] OK raceId=${raceId} ingested=${ingested} scored=${scored} (${Date.now() - raceStartedAt}ms)`,
+        `[f10:cron:ingest] OK raceId=${raceId} ingested=${outcome.ingested} scored=${outcome.scored} qualified=${outcome.qualified} (${Date.now() - raceStartedAt}ms)`,
       )
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      results.push({ raceId, ingested: 0, scored: 0, error: message })
+      results.push({ raceId, ingested: 0, scored: 0, qualified: 0, error: message })
       console.error(
         `[f10:cron:ingest] FAIL raceId=${raceId} (${Date.now() - raceStartedAt}ms): ${message}`,
       )

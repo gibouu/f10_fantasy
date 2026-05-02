@@ -4,6 +4,12 @@ struct RacesListView: View {
     @State private var viewModel = RacesListViewModel()
     @Environment(TutorialStore.self) private var tutorialStore
     @Environment(AuthManager.self) private var authManager
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// Polling cadence when at least one race is LIVE. Cheap server hit;
+    /// keeps the upcoming → past transition feeling near real-time without
+    /// requiring the user to pull-to-refresh.
+    private let livePollSeconds: UInt64 = 60
 
     var body: some View {
         Group {
@@ -30,6 +36,19 @@ struct RacesListView: View {
         .navigationTitle("Races")
         .navigationBarTitleDisplayMode(.large)
         .task { await viewModel.load() }
+        .task(id: viewModel.hasLiveRace) {
+            // Poll silently while at least one race is LIVE. The task is
+            // automatically restarted whenever hasLiveRace flips, and is
+            // cancelled when the view leaves the screen — no manual cleanup.
+            guard viewModel.hasLiveRace else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: livePollSeconds * 1_000_000_000)
+                if Task.isCancelled { return }
+                if scenePhase == .active {
+                    await viewModel.silentRefresh()
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if !tutorialStore.hasSeenWelcome && !authManager.isAuthenticated {
                 TutorialCard(

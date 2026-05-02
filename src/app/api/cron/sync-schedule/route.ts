@@ -108,6 +108,14 @@ export async function POST(req: NextRequest) {
   )
 
   // ── 6. Upsert Race records (Race + Sprint sessions only) ───────────────────
+  // For each Race row we also pair the qualifying session that precedes it
+  // (latest Qualifying in the same meeting whose start < race start). This
+  // works for both sprint and non-sprint weekends:
+  //   - Non-sprint: the only Qualifying pairs with the Main race.
+  //   - Sprint: Sprint Shootout (Friday) pairs with the Sprint race; main
+  //     Qualifying (Saturday) pairs with the Sunday Main race.
+  const allQualifyingSessions = sessions.filter((s) => s.type === "Qualifying")
+
   const raceIdBySessionKey = new Map<number, string>()
   let synced = 0
 
@@ -122,7 +130,32 @@ export async function POST(req: NextRequest) {
       session.scheduledStartUtc.getTime() - 30 * 60 * 1000,
     )
 
-    const raceData = {
+    const qualifyingSessionKey =
+      allQualifyingSessions
+        .filter(
+          (q) =>
+            q.meetingKey === session.meetingKey &&
+            q.scheduledStartUtc.getTime() < session.scheduledStartUtc.getTime(),
+        )
+        .sort(
+          (a, b) =>
+            b.scheduledStartUtc.getTime() - a.scheduledStartUtc.getTime(),
+        )[0]?.sessionKey ?? null
+
+    // Status is owned by lock-picks (UPCOMING → LIVE) and ingest-results
+    // (LIVE → COMPLETED, after results are actually written). sync-schedule
+    // sets the initial status only on insert. On update it is intentionally
+    // omitted so we don't race with the other crons or create a COMPLETED-
+    // without-results window when OpenF1's session.status flips to "finished"
+    // before final results are published.
+    const initialStatus =
+      session.status === "finished"
+        ? ("LIVE" as const) // ingest-results will flip to COMPLETED once data is in
+        : session.status === "active"
+          ? ("LIVE" as const)
+          : ("UPCOMING" as const)
+
+    const baseData = {
       seasonId: season.id,
       round,
       name: meeting.name,
@@ -132,18 +165,13 @@ export async function POST(req: NextRequest) {
       scheduledStartUtc: session.scheduledStartUtc,
       lockCutoffUtc,
       openf1MeetingKey: session.meetingKey,
-      status:
-        session.status === "finished"
-          ? ("COMPLETED" as const)
-          : session.status === "active"
-            ? ("LIVE" as const)
-            : ("UPCOMING" as const),
+      openf1QualifyingSessionKey: qualifyingSessionKey,
     }
 
     const race = await db.race.upsert({
       where: { openf1SessionKey: session.sessionKey },
-      create: { ...raceData, openf1SessionKey: session.sessionKey },
-      update: raceData,
+      create: { ...baseData, openf1SessionKey: session.sessionKey, status: initialStatus },
+      update: baseData,
       select: { id: true },
     })
     raceIdBySessionKey.set(session.sessionKey, race.id)

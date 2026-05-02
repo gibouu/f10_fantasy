@@ -71,24 +71,26 @@ model Season {
 }
 
 model Race {
-  id                String       @id @default(cuid())
-  seasonId          String
-  round             Int
-  name              String
-  circuitName       String
-  country           String
-  type              RaceType     @default(MAIN)
-  scheduledStartUtc DateTime
-  lockCutoffUtc     DateTime
-  status            RaceStatus   @default(UPCOMING)
-  openf1SessionKey  Int?         @unique
-  openf1MeetingKey  Int?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  pickSets          PickSet[]
-  season            Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  entries           RaceEntry[]
-  results           RaceResult[]
+  id                         String             @id @default(cuid())
+  seasonId                   String
+  round                      Int
+  name                       String
+  circuitName                String
+  country                    String
+  type                       RaceType           @default(MAIN)
+  scheduledStartUtc          DateTime
+  lockCutoffUtc              DateTime
+  status                     RaceStatus         @default(UPCOMING)
+  openf1SessionKey           Int?               @unique
+  openf1QualifyingSessionKey Int?               @unique
+  openf1MeetingKey           Int?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+  pickSets                   PickSet[]
+  season                     Season             @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  entries                    RaceEntry[]
+  results                    RaceResult[]
+  qualifyingResults          QualifyingResult[]
 
   @@unique([seasonId, round, type])
 }
@@ -103,20 +105,21 @@ model Constructor {
 }
 
 model Driver {
-  id                 String       @id @default(cuid())
+  id                 String             @id @default(cuid())
   code               String
   firstName          String
   lastName           String
   number             Int
   photoUrl           String?
   constructorId      String
-  openf1DriverNumber Int?         @unique
-  constructor        Constructor  @relation(fields: [constructorId], references: [id])
-  dnfPicks           PickSet[]    @relation("DnfPicks")
-  tenthPicks         PickSet[]    @relation("TenthPlacePicks")
-  winnerPicks        PickSet[]    @relation("WinnerPicks")
+  openf1DriverNumber Int?               @unique
+  constructor        Constructor        @relation(fields: [constructorId], references: [id])
+  dnfPicks           PickSet[]          @relation("DnfPicks")
+  tenthPicks         PickSet[]          @relation("TenthPlacePicks")
+  winnerPicks        PickSet[]          @relation("WinnerPicks")
   entries            RaceEntry[]
   results            RaceResult[]
+  qualifyingResults  QualifyingResult[]
 }
 
 model RaceEntry {
@@ -143,6 +146,20 @@ model RaceResult {
   race       Race         @relation(fields: [raceId], references: [id], onDelete: Cascade)
 
   @@unique([raceId, driverId])
+}
+
+model QualifyingResult {
+  id        String   @id @default(cuid())
+  raceId    String
+  driverId  String
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  race      Race     @relation(fields: [raceId], references: [id], onDelete: Cascade)
+
+  @@unique([raceId, driverId])
+  @@index([raceId, position])
 }
 
 model PickSet {

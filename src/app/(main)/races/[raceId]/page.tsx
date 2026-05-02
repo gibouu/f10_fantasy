@@ -1,12 +1,14 @@
 import { auth } from "@/auth"
 import { getRaceById, getRaceEntrants, getRaceResults } from "@/lib/services/race.service"
 import { getPickForRace } from "@/lib/services/pick.service"
+import { getQualifyingResults } from "@/lib/services/qualifying.service"
 import { resolvePickAgainstEntrants } from "@/lib/services/pick-resolution"
 import { isRaceLocked } from "@/lib/services/lock.service"
 import { PickHero } from "@/components/picks/PickHero"
 import { HeroVisualization } from "@/components/race/HeroVisualization"
 import { PicksDisplay } from "@/components/picks/PicksDisplay"
 import { RaceResultsCard } from "@/components/race/RaceResultsCard"
+import { QualifyingResultsCard } from "@/components/race/QualifyingResultsCard"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
@@ -29,9 +31,10 @@ export default async function RacePickPage({
   const race = await getRaceById(params.raceId)
   if (!race) notFound()
 
-  const [entrants, existingPick] = await Promise.all([
+  const [entrants, existingPick, qualifyingResults] = await Promise.all([
     getRaceEntrants(race.id),
     userId ? getPickForRace(userId, race.id) : Promise.resolve(null),
+    getQualifyingResults(race.id),
   ])
   const resolvedPick =
     existingPick ? resolvePickAgainstEntrants(existingPick, entrants) : null
@@ -149,15 +152,31 @@ export default async function RacePickPage({
             entrants={entrants}
             raceType={race.type}
           />
+          {qualifyingResults.length > 0 && (
+            <QualifyingResultsCard
+              results={qualifyingResults}
+              entrants={entrants}
+              raceType={race.type}
+            />
+          )}
         </>
       ) : (
-        <PickHero
-          race={raceSerialized}
-          entrants={entrants}
-          existingPick={pickDataSerialized}
-          isLocked={locked}
-          requiresSignIn={!userId}
-        />
+        <>
+          <PickHero
+            race={raceSerialized}
+            entrants={entrants}
+            existingPick={pickDataSerialized}
+            isLocked={locked}
+            requiresSignIn={!userId}
+          />
+          {qualifyingResults.length > 0 && (
+            <QualifyingResultsCard
+              results={qualifyingResults}
+              entrants={entrants}
+              raceType={race.type}
+            />
+          )}
+        </>
       )}
     </div>
   )
