@@ -28,6 +28,7 @@ struct RaceDetailView: View {
                     if race.status == .completed {
                         resultsCard
                     }
+                    qualifyingCard(race)
                 }
             }
             .padding(FXTheme.Spacing.md)
@@ -350,6 +351,60 @@ struct RaceDetailView: View {
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
             .shadow(color: color.opacity(0.5), radius: 3, x: 0, y: 1)
+    }
+
+    // MARK: - Qualifying card
+
+    @ViewBuilder
+    private func qualifyingCard(_ race: Race) -> some View {
+        if !viewModel.qualifyingResults.isEmpty {
+            let driverMap = Dictionary(uniqueKeysWithValues: viewModel.entrants.map { ($0.id, $0) })
+            let sorted = viewModel.qualifyingResults.sorted { $0.position < $1.position }
+            let header = race.isSprint ? "Sprint Qualifying Results" : "Qualifying Results"
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(header)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, FXTheme.Spacing.md)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.2))
+                    .frame(height: 0.5)
+
+                ForEach(sorted, id: \.driverId) { row in
+                    qualifyingRow(row: row, driver: driverMap[row.driverId])
+                }
+            }
+            .fxCardSurface()
+        }
+    }
+
+    @ViewBuilder
+    private func qualifyingRow(row: QualifyingResultRow, driver: Driver?) -> some View {
+        let isPole = row.position == 1
+        HStack(spacing: 10) {
+            Text("P\(row.position)")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(isPole ? FXTheme.Colors.gold : Color(uiColor: .tertiaryLabel))
+                .frame(width: 32, alignment: .leading)
+
+            DriverBubbleView(driver: driver, size: 28)
+
+            Text(driver?.code ?? "???")
+                .font(.subheadline.weight(.semibold))
+
+            Text(driver.map { "\($0.firstName) \($0.lastName)" } ?? "")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+        }
+        .padding(.horizontal, FXTheme.Spacing.md)
+        .padding(.vertical, 8)
+        .background(isPole ? FXTheme.Colors.gold.opacity(0.08) : Color.clear)
     }
 
     // MARK: - Results card

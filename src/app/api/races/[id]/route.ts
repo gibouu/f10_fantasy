@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getRaceById, getRaceEntrants } from '@/lib/services/race.service'
+import { getQualifyingResults } from '@/lib/services/qualifying.service'
 import { db } from '@/lib/db/client'
 import { getResultScoreGuide } from '@/lib/scoring/formula'
 
@@ -35,6 +36,10 @@ export async function GET(
         }))
       : []
 
+  // Defensive: qualifying ingestion may not have run, or the table may be
+  // missing in older deploys. Empty array → iOS hides the section.
+  const qualifyingResults = await getQualifyingResults(params.id).catch(() => [])
+
   return NextResponse.json({
     race: {
       ...race,
@@ -43,5 +48,6 @@ export async function GET(
     },
     entrants,
     results,
+    qualifyingResults,
   })
 }

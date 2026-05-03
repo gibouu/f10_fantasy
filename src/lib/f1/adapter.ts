@@ -49,6 +49,17 @@ export interface F1ProviderAdapter {
    * Each driver entry includes a classified position or a non-classified status.
    */
   getFinalResults(sessionKey: number): Promise<NormalizedFinalResult[]>
+
+  /**
+   * Return the qualifying classification grid for a qualifying session.
+   * Unlike `getFinalResults`, this does NOT use stint heuristics for DNF
+   * detection — qualifying eliminations leave drivers with sparse stint data.
+   * Drivers eliminated in Q1/Q2 are returned with their final qualifying
+   * position. DNS / DSQ drivers are omitted (position would be misleading).
+   */
+  getQualifyingClassification(
+    sessionKey: number,
+  ): Promise<Array<{ driverNumber: number; position: number }>>
 }
 
 // ─────────────────────────────────────────────

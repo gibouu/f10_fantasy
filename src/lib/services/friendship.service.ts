@@ -111,7 +111,9 @@ export async function sendFriendRequest(
   const pairKey = `friend-pair:${a}:${b}`
 
   return db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${pairKey}))`
+    // pg_advisory_xact_lock returns void; cast to text so Prisma's $queryRaw
+    // can deserialize the result row.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${pairKey}))::text`
 
     const existing = await tx.friendRequest.findFirst({
       where: {

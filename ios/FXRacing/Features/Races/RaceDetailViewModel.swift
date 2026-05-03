@@ -6,6 +6,7 @@ final class RaceDetailViewModel {
     var race: Race?
     var entrants: [Driver] = []
     var results: [RaceResult] = []
+    var qualifyingResults: [QualifyingResultRow] = []
 
     /// Server-synced pick (nil for guests or before server responds)
     var serverPick: Pick?
@@ -47,7 +48,8 @@ final class RaceDetailViewModel {
             race    = detail.race
             entrants = detail.entrants
             results  = detail.results
-            fxLog(.race, "load OK status=\(detail.race.status.rawValue) entrants=\(detail.entrants.count) results=\(detail.results.count) lockCutoff=\(detail.race.lockCutoffUtc.timeIntervalSinceNow)s")
+            qualifyingResults = detail.qualifyingResults ?? []
+            fxLog(.race, "load OK status=\(detail.race.status.rawValue) entrants=\(detail.entrants.count) results=\(detail.results.count) qualifying=\(qualifyingResults.count) lockCutoff=\(detail.race.lockCutoffUtc.timeIntervalSinceNow)s")
             if detail.race.status == .completed && detail.results.isEmpty {
                 fxWarn(.race, "load: race COMPLETED but results empty — ingestion may not have run")
             }
@@ -187,6 +189,7 @@ private struct DetailResponse: Decodable, Sendable {
     let race: Race
     let entrants: [Driver]
     let results: [RaceResult]
+    let qualifyingResults: [QualifyingResultRow]?
 }
 
 private struct PickWrapper: Decodable, Sendable {

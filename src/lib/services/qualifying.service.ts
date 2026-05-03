@@ -74,7 +74,9 @@ export async function ingestQualifyingForRace(
   )
 
   const provider = createF1Provider()
-  const results = await provider.getFinalResults(race.openf1QualifyingSessionKey)
+  const results = await provider.getQualifyingClassification(
+    race.openf1QualifyingSessionKey,
+  )
 
   console.log(
     `[f10:quali] OpenF1 returned ${results.length} rows for qualifying session ${race.openf1QualifyingSessionKey}`,
@@ -108,7 +110,6 @@ export async function ingestQualifyingForRace(
   for (const r of results) {
     const driverId = driverMap.get(r.driverNumber)
     if (!driverId) continue
-    if (r.position === null) continue // qualifying has no DNF concept; skip unpositioned
 
     await client.qualifyingResult.upsert({
       where: { raceId_driverId: { raceId, driverId } },
@@ -123,21 +124,36 @@ export async function ingestQualifyingForRace(
 }
 
 /**
- * Find races that have a paired qualifying session key but no qualifying
- * results stored yet, scheduled within the last 14 days (forward window
- * included since qualifying happens before race start).
+ * Find races that have a paired qualifying session key and either no
+ * qualifying rows yet, or a partial set (< 18 rows). The 18-row floor catches
+ * the prior bug where `getFinalResults` mis-classified eliminated drivers as
+ * DNF and wrote only 7-8 rows.
+ *
+ * A 15-minute throttle on partial races prevents the 5-minute cron from
+ * churning OpenF1 for sessions that legitimately have a small grid (testing,
+ * sprint formats, etc.) — once a re-ingest attempt completes (success or
+ * provider returning 0 rows), we don't retry until the throttle clears.
  */
 export async function findRacesNeedingQualifyingIngestion(): Promise<string[]> {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-  const races = await db.race.findMany({
-    where: {
-      openf1QualifyingSessionKey: { not: null },
-      qualifyingResults: { none: {} },
-      scheduledStartUtc: { gt: fourteenDaysAgo },
-    },
-    select: { id: true },
-    orderBy: { scheduledStartUtc: 'asc' },
-    take: 10,
-  })
+  const races = await db.$queryRaw<Array<{ id: string }>>`
+    SELECT r.id
+    FROM "Race" r
+    LEFT JOIN (
+      SELECT "raceId",
+             COUNT(*)::int AS cnt,
+             MAX("updatedAt") AS last_updated
+      FROM "QualifyingResult"
+      GROUP BY "raceId"
+    ) q ON q."raceId" = r.id
+    WHERE r."openf1QualifyingSessionKey" IS NOT NULL
+      AND r."scheduledStartUtc" > ${fourteenDaysAgo}
+      AND (
+        q.cnt IS NULL
+        OR (q.cnt < 18 AND q.last_updated < NOW() - INTERVAL '15 minutes')
+      )
+    ORDER BY r."scheduledStartUtc" ASC
+    LIMIT 10
+  `
   return races.map((r) => r.id)
 }

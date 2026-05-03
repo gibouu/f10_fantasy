@@ -28,7 +28,10 @@ import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose'
 import { db } from '@/lib/db/client'
 import { mobileSigningKey } from '@/lib/auth/mobileAuth'
 
-const MOBILE_TOKEN_MAX_AGE = 60 * 60 * 8 // 8 hours — same as web session
+// 60 days. Native iOS users expect to stay signed in across launches; the 8h
+// expiry forced re-sign-in every day. Server-side revocation is still
+// available via `User.sessionValidAfter` (POST /api/auth/revoke-session).
+const MOBILE_TOKEN_MAX_AGE = 60 * 60 * 24 * 60
 
 // ── Provider JWKS (cached by jose internally) ─────────────────────────────
 

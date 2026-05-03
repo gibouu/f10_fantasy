@@ -25,6 +25,11 @@ struct RaceResult: Codable, Sendable {
     let scoreGuide: ResultScoreGuide?
 }
 
+struct QualifyingResultRow: Codable, Sendable {
+    let driverId: String
+    let position: Int
+}
+
 struct ResultScoreGuide: Codable, Sendable {
     let p10: Int
     let winner: Int

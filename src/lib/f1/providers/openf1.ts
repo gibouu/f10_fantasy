@@ -321,4 +321,27 @@ export class OpenF1Provider implements F1ProviderAdapter {
 
     return results
   }
+
+  async getQualifyingClassification(
+    sessionKey: number,
+  ): Promise<Array<{ driverNumber: number; position: number }>> {
+    const rows = await openF1Fetch<OpenF1SessionResult>(
+      `/session_result?session_key=${sessionKey}`,
+    )
+
+    return rows
+      .filter((r) => !r.dns && !r.dsq && typeof r.position === 'number')
+      .map((r) => ({ driverNumber: r.driver_number, position: r.position }))
+      .sort((a, b) => a.position - b.position)
+  }
+}
+
+interface OpenF1SessionResult {
+  session_key: number
+  driver_number: number
+  position: number
+  dnf: boolean
+  dns: boolean
+  dsq: boolean
+  [key: string]: unknown
 }
