@@ -62,9 +62,17 @@ final class FriendsViewModel {
                 .searchUsers(searchQuery),
                 token: token
             )
+            // The Task may have been cancelled between dispatch and response —
+            // discard a stale result instead of overwriting fresher state.
+            if Task.isCancelled { return }
             searchResults = results
         } catch {
+            // URLSession surfaces cancellation as URLError(.cancelled), not
+            // CancellationError; both are expected when the user keeps typing
+            // and must not flash a red "Search failed" row in the UI.
+            if Task.isCancelled { return }
             if error is CancellationError { return }
+            if let urlError = error as? URLError, urlError.code == .cancelled { return }
             errorMessage = "Search failed: \(error.localizedDescription)"
         }
     }

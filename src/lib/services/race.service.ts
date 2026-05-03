@@ -150,45 +150,59 @@ export async function getRaceById(
 }
 
 /**
- * Return all drivers eligible for picking in a race.
+ * Return all drivers who participated (or are registered to participate) in a race.
  *
- * Pulls from RaceEntry (drivers registered for this specific race).
- * DNS entrants are included in the entry list but callers may wish to
- * filter them — the `isEligibleDnf` flag on RaceEntry can be used for
- * DNF-slot filtering in the UI.
+ * The entrant set is the UNION of:
+ *   - RaceEntry rows (drivers registered for this race; populated by sync-entries
+ *     and sync-schedule)
+ *   - RaceResult driverIds (drivers who actually drove — covers in-session
+ *     substitutes whose RaceEntry was never updated, e.g. a reserve called up
+ *     after lock)
+ *   - QualifyingResult driverIds (drivers who showed up for qualifying but were
+ *     not in the registered entry list)
+ *
+ * Pre-race the union is just RaceEntry. Post-qualifying / post-race it grows
+ * to include any substitute who appeared, so the results card and pick display
+ * never render "???" for a real driver.
  */
 export async function getRaceEntrants(
   raceId: string,
 ): Promise<DriverSummary[]> {
-  const entries = await db.raceEntry.findMany({
-    where: { raceId },
-    include: {
-      driver: {
-        include: {
-          constructor: true,
-        },
-      },
-    },
-    orderBy: {
-      driver: { number: 'asc' },
-    },
+  const [entries, resultRows, qualifyingRows] = await Promise.all([
+    db.raceEntry.findMany({ where: { raceId }, select: { driverId: true } }),
+    db.raceResult.findMany({ where: { raceId }, select: { driverId: true } }),
+    db.qualifyingResult.findMany({ where: { raceId }, select: { driverId: true } }),
+  ])
+
+  const driverIds = new Set<string>([
+    ...entries.map((e) => e.driverId),
+    ...resultRows.map((r) => r.driverId),
+    ...qualifyingRows.map((q) => q.driverId),
+  ])
+
+  if (driverIds.size === 0) return []
+
+  const drivers = await db.driver.findMany({
+    where: { id: { in: Array.from(driverIds) } },
+    include: { constructor: true },
+    orderBy: { number: 'asc' },
   })
 
-  const entrants = entries.map((entry) => {
-    const team = resolveTeam(entry.driver.constructor.name)
+  const entrants = drivers.map((driver) => {
+    const team = resolveTeam(driver.constructor.name)
     return {
-      id: entry.driver.id,
-      code: entry.driver.code,
-      firstName: entry.driver.firstName,
-      lastName: entry.driver.lastName,
-      number: entry.driver.number,
-      photoUrl: DRIVER_PHOTOS[entry.driver.number] ?? entry.driver.photoUrl,
+      id: driver.id,
+      code: driver.code,
+      firstName: driver.firstName,
+      lastName: driver.lastName,
+      number: driver.number,
+      photoUrl: DRIVER_PHOTOS[driver.number] ?? driver.photoUrl,
       seatKey: null,
       constructor: {
-        id: entry.driver.constructor.id,
-        name: entry.driver.constructor.name,
-        shortName: entry.driver.constructor.shortName,
-        color: team?.color ?? entry.driver.constructor.color,
+        id: driver.constructor.id,
+        name: driver.constructor.name,
+        shortName: driver.constructor.shortName,
+        color: team?.color ?? driver.constructor.color,
         slug: team?.slug ?? null,
         logoUrl: team?.logoUrl ?? null,
       },
