@@ -4,94 +4,70 @@ import Foundation
 @MainActor
 final class UsernamePickerViewModel {
 
-    enum AvailabilityState {
-        case idle, checking, available, taken
-    }
-
     var username     = ""
-    var suggestions: [String] = []
-    var availability: AvailabilityState = .idle
     var isSubmitting = false
     var errorMessage: String?
-    var formatError: String?
-
-    var canSubmit: Bool {
-        availability == .available
-            && checkedUsername == normalizedUsername
-            && !isSubmitting
-    }
 
     let isChange: Bool
-    private var debounceTask: Task<Void, Never>?
-    private var checkedUsername: String?
+
+    /// Tracks the most recent system-generated default. Used to determine if
+    /// a 409 should silently retry with a fresh suggestion (the user kept the
+    /// pre-filled name) vs. surface an error (the user typed their own choice).
+    private var generatedDefault: String?
     private let api = APIClient()
 
     init(isChange: Bool = false) {
         self.isChange = isChange
     }
 
-    // MARK: - Load
+    var canSubmit: Bool {
+        !isSubmitting && localValidate(normalizedUsername) == nil
+    }
 
-    func loadSuggestions() async {
-        do {
-            let response: SuggestionsResponse = try await api.request(.suggestUsernames)
-            suggestions = response.suggestions
-        } catch {
-            // Suggestions are non-critical; fail silently.
+    /// Inline format error shown under the input — `nil` when input is empty
+    /// or valid. Kept separate from `errorMessage` (server-side errors).
+    var formatError: String? {
+        guard !normalizedUsername.isEmpty else { return nil }
+        return localValidate(normalizedUsername)
+    }
+
+    // MARK: - Prefill
+
+    /// Pre-populates the text field with a single ready-to-submit username.
+    /// Order: existing guest username → server suggestion → client fallback.
+    func prefillIfNeeded(guestStore: GuestStore?) async {
+        guard username.isEmpty else { return }
+
+        // Prefer an existing guest-mode username (user picked it themselves)
+        if !isChange,
+           let guest = guestStore?.localUsername?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !guest.isEmpty,
+           localValidate(guest) == nil {
+            username = guest
+            // Don't mark as auto-generated — the user typed this; on 409 we
+            // surface the error rather than silently swap their choice.
+            return
         }
+
+        let suggestion = await fetchSuggestion() ?? Self.clientGenerated()
+        guard username.isEmpty else { return }
+        username = suggestion
+        generatedDefault = suggestion
     }
 
     // MARK: - Typing
 
     func onUsernameChanged(_ newValue: String) {
-        debounceTask?.cancel()
+        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != newValue {
+            username = trimmed
+        }
         errorMessage = nil
-        formatError = nil
-        checkedUsername = nil
 
-        // Trim pasted whitespace before validating or submitting.
-        let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value != newValue {
-            username = value
-        }
-
-        guard !value.isEmpty else {
-            availability = .idle
-            return
-        }
-
-        // Local format validation — must pass before any API call
-        if let err = localValidate(value) {
-            formatError = err
-            availability = .idle
-            return
-        }
-
-        availability = .checking
-        let candidate = value
-        debounceTask = Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled else { return }
-
-            do {
-                let response: CheckResponse = try await api.request(.checkUsername(candidate))
-                guard !Task.isCancelled, username == candidate else { return }
-                errorMessage = nil
-                checkedUsername = candidate
-                availability = response.available ? .available : .taken
-                // Refresh suggestions when the typed name is taken so the user
-                // always has a fresh available alternative within reach. Apple
-                // reviewers tend to retype the same patterns; static
-                // suggestions stale out across reviews.
-                if !response.available {
-                    Task { await self.loadSuggestions() }
-                }
-            } catch {
-                guard !Task.isCancelled, username == candidate else { return }
-                // Network/server failure — must not display as "already taken"
-                availability = .idle
-                errorMessage = "Couldn't verify username. Please try again."
-            }
+        // If the user diverged from the pre-filled default, treat as user-typed
+        // so a future 409 surfaces an error instead of swapping their text.
+        if let def = generatedDefault, trimmed != def {
+            generatedDefault = nil
         }
     }
 
@@ -99,17 +75,21 @@ final class UsernamePickerViewModel {
 
     func submit(authManager: AuthManager) async {
         guard canSubmit else { return }
-        let submittedUsername = normalizedUsername
-        debounceTask?.cancel()
+        await performSubmit(authManager: authManager, autoRetriesRemaining: 2)
+    }
+
+    private func performSubmit(authManager: AuthManager, autoRetriesRemaining: Int) async {
+        let candidate = normalizedUsername
+        let isAutoGenerated = (candidate == generatedDefault)
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
 
         do {
             if isChange {
-                try await authManager.changeUsername(submittedUsername)
+                try await authManager.changeUsername(candidate)
             } else {
-                try await authManager.setUsername(submittedUsername)
+                try await authManager.setUsername(candidate)
             }
         } catch {
             let isTaken: Bool = {
@@ -120,21 +100,52 @@ final class UsernamePickerViewModel {
             }()
 
             if isTaken {
-                guard normalizedUsername == submittedUsername else { return }
-                checkedUsername = submittedUsername
-                availability = .taken
-                errorMessage = "Username already taken."
-                // Apple reviewers retype the same names across reviews — pull
-                // fresh suggestions so a working alternative is one tap away.
-                Task { await loadSuggestions() }
+                if isAutoGenerated && autoRetriesRemaining > 0 {
+                    // The user hasn't customized the prefill — silently swap
+                    // to a fresh available suggestion and retry. Apple reviewers
+                    // get a one-tap path to a working account.
+                    let fresh = await fetchSuggestion() ?? Self.clientGenerated()
+                    username = fresh
+                    generatedDefault = fresh
+                    await performSubmit(authManager: authManager, autoRetriesRemaining: autoRetriesRemaining - 1)
+                    return
+                }
+                errorMessage = "Username already taken — please choose another."
+            } else if case APIError.serverError(400, let msg) = error, let m = msg {
+                errorMessage = m
             } else {
-                // Transient failure (network, 5xx, decoding). Leave availability
-                // as-is so the Confirm button stays enabled for retry — resetting
-                // to .idle would dead-end the user (canSubmit requires .available
-                // and they'd have to retype to re-trigger the check).
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Suggestion fetch
+
+    private func fetchSuggestion() async -> String? {
+        do {
+            let response: SuggestionsResponse = try await api.request(.suggestUsernames)
+            return response.suggestions.first
+        } catch {
+            return nil
+        }
+    }
+
+    private static let adjectives = [
+        "Red", "Blue", "Silver", "Golden", "Swift",
+        "Iron", "Midnight", "Rapid", "Turbo", "Carbon",
+        "Neon", "Apex", "Delta", "Storm", "Phantom",
+    ]
+    private static let nouns = [
+        "Falcon", "Wolf", "Viper", "Hawk", "Tiger",
+        "Fox", "Eagle", "Shark", "Racer", "Pilot",
+        "Driver", "Apex", "Vector", "Turbo", "Nitro",
+    ]
+
+    private static func clientGenerated() -> String {
+        let adj  = adjectives.randomElement() ?? "Apex"
+        let noun = nouns.randomElement() ?? "Racer"
+        let num  = Int.random(in: 10...99)
+        return "\(adj)\(noun)\(num)"
     }
 
     // MARK: - Private
@@ -151,10 +162,6 @@ final class UsernamePickerViewModel {
         }
         return nil
     }
-}
-
-private struct CheckResponse: Decodable, Sendable {
-    let available: Bool
 }
 
 private struct SuggestionsResponse: Decodable, Sendable {

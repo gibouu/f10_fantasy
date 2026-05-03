@@ -5,6 +5,7 @@ struct RaceDetailView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(LocalPickStore.self) private var localPickStore
     @Environment(TutorialStore.self) private var tutorialStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: RaceDetailViewModel
     @State private var activeSlot: PickSlot?
     @State private var showSignIn = false
@@ -36,6 +37,13 @@ struct RaceDetailView: View {
         .navigationTitle(viewModel.race?.name ?? "Race")
         .navigationBarTitleDisplayMode(.large)
         .task { await viewModel.load(token: authManager.accessToken, localPickStore: localPickStore) }
+        .onChange(of: scenePhase) { _, phase in
+            // Reload when returning to foreground — catches the case where
+            // the user backgrounded the app before lock cutoff and resumed
+            // after; ensures the lock banner + race status reflect reality.
+            guard phase == .active else { return }
+            Task { await viewModel.load(token: authManager.accessToken, localPickStore: localPickStore) }
+        }
         .onChange(of: viewModel.serverPick?.scoreBreakdown?.totalScore) { _, score in
             if score != nil, viewModel.race?.status == .completed {
                 Haptics.scoreReveal()
@@ -156,7 +164,17 @@ struct RaceDetailView: View {
 
     @ViewBuilder
     private func picksCard(_ race: Race) -> some View {
-        let isLocked = race.isLocked || viewModel.serverPick?.lockedAt != nil
+        // TimelineView ticks every 30s while visible so the lock banner +
+        // bubble-disabled state flip the instant `Date() >= lockCutoffUtc`,
+        // even if the user is sitting on this screen when lock crosses.
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            picksCardContent(race, now: context.date)
+        }
+    }
+
+    @ViewBuilder
+    private func picksCardContent(_ race: Race, now: Date) -> some View {
+        let isLocked = now >= race.lockCutoffUtc || viewModel.serverPick?.lockedAt != nil
         let isCompleted = race.status == .completed
         let hasAnyPick = viewModel.serverPick != nil || localPickStore.pick(for: raceId) != nil
 
@@ -177,6 +195,11 @@ struct RaceDetailView: View {
                     Label("Saved locally", systemImage: "internaldrive")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+            }
+
+            // Visible lock-cutoff banner — pre-lock countdown or post-lock notice
+            if !isCompleted {
+                cutoffBanner(race: race, isLocked: isLocked, now: now)
             }
 
             // Three pick bubbles
@@ -229,10 +252,73 @@ struct RaceDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            } else if isLocked && !isCompleted {
+                // Race is locked but not yet completed — picks are frozen until
+                // results land. Hard-stop messaging in case any tap path falls
+                // through (defense in depth alongside .disabled bubbles).
+                if let err = viewModel.errorMessage {
+                    Text(err)
+                        .font(.footnote)
+                        .foregroundStyle(FXTheme.Colors.danger)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
         .padding(FXTheme.Spacing.md)
         .fxCardSurface()
+    }
+
+    @ViewBuilder
+    private func cutoffBanner(race: Race, isLocked: Bool, now: Date) -> some View {
+        if isLocked {
+            HStack(spacing: 10) {
+                Image(systemName: "lock.fill")
+                    .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Picks closed")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Race starts \(race.scheduledStartUtc.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(FXTheme.Colors.danger.opacity(0.10))
+            .foregroundStyle(FXTheme.Colors.danger)
+            .cornerRadius(FXTheme.Radius.sm)
+        } else {
+            HStack(spacing: 10) {
+                Image(systemName: "clock")
+                    .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Picks lock \(race.lockCutoffUtc.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text(timeUntilString(target: race.lockCutoffUtc, now: now))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(FXTheme.Colors.gold.opacity(0.14))
+            .foregroundStyle(FXTheme.Colors.gold)
+            .cornerRadius(FXTheme.Radius.sm)
+        }
+    }
+
+    private func timeUntilString(target: Date, now: Date) -> String {
+        let interval = target.timeIntervalSince(now)
+        if interval <= 60 { return "Locking now…" }
+        if interval < 3600 { return "Locks in \(Int(interval / 60)) min" }
+        let hours = Int(interval / 3600)
+        let mins  = Int(interval.truncatingRemainder(dividingBy: 3600) / 60)
+        if hours < 24 { return "Locks in \(hours)h \(mins)m" }
+        let days = hours / 24
+        return "Locks in \(days)d \(hours % 24)h"
     }
 
     @ViewBuilder

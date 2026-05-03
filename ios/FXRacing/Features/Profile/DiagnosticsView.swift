@@ -1,8 +1,11 @@
+#if DEBUG
 import SwiftUI
 import UIKit
 
-/// Surfaces the in-memory FXLogStore so external testers can copy logs
-/// without needing a USB-tethered Console.app session.
+/// Surfaces the in-memory FXLogStore so developers can copy logs without a
+/// USB-tethered Console.app session. **DEBUG builds only** — never shipped to
+/// the App Store. App Review historically flags developer/diagnostic surfaces
+/// in production binaries (Guideline 4.2 / 2.3.1).
 struct DiagnosticsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = FXLogStore.shared
@@ -143,3 +146,4 @@ struct DiagnosticsView: View {
         return f.string(from: d)
     }
 }
+#endif

@@ -99,6 +99,15 @@ final class RaceDetailViewModel {
     func select(driver: Driver, for slot: PickSlot) {
         submitSuccess = false
         errorMessage  = nil
+        // Defensive: if the lock cutoff crossed while the picker sheet was open
+        // (race-condition between bubble tap + driver selection), refuse the
+        // selection rather than letting a "phantom pick" appear in the UI.
+        if let race, race.isLocked {
+            errorMessage = "This race is now locked — picks can no longer be changed."
+            Haptics.locked()
+            fxWarn(.pick, "select blocked: race \(race.id) became locked during sheet")
+            return
+        }
         switch slot {
         case .winner: selectedWinner = driver
         case .p10:    selectedP10    = driver

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct UsernamePickerView: View {
     @Environment(AuthManager.self) private var authManager
+    @Environment(GuestStore.self)  private var guestStore
     @State private var viewModel: UsernamePickerViewModel
 
     init(isChange: Bool = false) {
@@ -28,66 +29,37 @@ struct UsernamePickerView: View {
                                 .font(.footnote).fontWeight(.semibold)
                                 .foregroundStyle(FXTheme.Colors.danger)
                         } else {
-                            Text("You may only change your username once after this.")
-                                .font(.footnote).fontWeight(.semibold)
+                            Text("We've picked one for you — tap Confirm to keep it, or edit to choose your own.")
+                                .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     }
 
                     // Input
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            TextField("username", text: $viewModel.username)
-                                .autocorrectionDisabled()
-                                .textInputAutocapitalization(.never)
-                                .focused($fieldFocused)
-                                .onChange(of: viewModel.username) { _, new in
-                                    viewModel.onUsernameChanged(new)
-                                }
-
-                            availabilityIcon
-                        }
-                        .padding(.horizontal, FXTheme.Spacing.md)
-                        .padding(.vertical, 14)
-                        .background(FXTheme.Colors.surface)
-                        .cornerRadius(FXTheme.Radius.md)
-
-                        availabilityCaption
-                    }
-
-                    // Suggestions
-                    if !viewModel.suggestions.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Suggestions")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                                .tracking(1)
-
-                            HStack(spacing: 8) {
-                                ForEach(viewModel.suggestions, id: \.self) { suggestion in
-                                    Button(suggestion) {
-                                        viewModel.username = suggestion
-                                        viewModel.onUsernameChanged(suggestion)
-                                        fieldFocused = false
-                                    }
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .background(FXTheme.Colors.surface)
-                                    .cornerRadius(FXTheme.Radius.sm)
-                                    .foregroundStyle(.primary)
-                                }
+                        TextField("username", text: $viewModel.username)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .focused($fieldFocused)
+                            .onChange(of: viewModel.username) { _, new in
+                                viewModel.onUsernameChanged(new)
                             }
-                        }
-                    }
+                            .padding(.horizontal, FXTheme.Spacing.md)
+                            .padding(.vertical, 14)
+                            .background(FXTheme.Colors.surface)
+                            .cornerRadius(FXTheme.Radius.md)
 
-                    if let error = viewModel.errorMessage {
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundStyle(FXTheme.Colors.danger)
+                        if let format = viewModel.formatError {
+                            Text(format)
+                                .font(.caption)
+                                .foregroundStyle(FXTheme.Colors.danger)
+                        }
+
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(FXTheme.Colors.danger)
+                        }
                     }
                 }
                 .padding(FXTheme.Spacing.lg)
@@ -99,56 +71,19 @@ struct UsernamePickerView: View {
                 .padding(.bottom, 32)
                 .background(.ultraThinMaterial)
         }
-        .task { await viewModel.loadSuggestions() }
+        .task { await viewModel.prefillIfNeeded(guestStore: guestStore) }
     }
 
     // MARK: - Sub-views
 
-    @ViewBuilder
-    private var availabilityIcon: some View {
-        switch viewModel.availability {
-        case .idle:
-            EmptyView()
-        case .checking:
-            ProgressView().scaleEffect(0.85)
-        case .available:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(FXTheme.Colors.accent)
-        case .taken:
-            Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(FXTheme.Colors.danger)
-        }
-    }
-
-    @ViewBuilder
-    private var availabilityCaption: some View {
-        if let err = viewModel.formatError {
-            Text(err)
-                .font(.caption)
-                .foregroundStyle(FXTheme.Colors.danger)
-        } else {
-            switch viewModel.availability {
-            case .available:
-                Text("Available!")
-                    .font(.caption)
-                    .foregroundStyle(FXTheme.Colors.accent)
-            case .taken:
-                Text("Username already taken.")
-                    .font(.caption)
-                    .foregroundStyle(FXTheme.Colors.danger)
-            default:
-                EmptyView()
-            }
-        }
-    }
-
     private var confirmButton: some View {
         // Keep the accent background while submitting so the white spinner is
-        // clearly visible — App Review reported the previous gray-on-gray state
-        // looked unresponsive.
+        // clearly visible — App Review previously reported gray-on-gray as
+        // looking unresponsive.
         let isActive = viewModel.canSubmit || viewModel.isSubmitting
 
         return Button {
+            fieldFocused = false
             Task { await viewModel.submit(authManager: authManager) }
         } label: {
             Group {

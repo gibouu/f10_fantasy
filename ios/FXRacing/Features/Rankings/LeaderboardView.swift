@@ -82,10 +82,12 @@ struct LeaderboardView: View {
         Picker("Scope", selection: Binding(
             get: { vm.scope },
             set: { newScope in
-                Task {
-                    guard authManager.isAuthenticated else { vm.scope = newScope; return }
-                    await vm.switchScope(to: newScope, token: authManager.accessToken)
-                }
+                // Update synchronously so the segmented picker reflects the
+                // tap immediately — avoids a visible bounce-back while the
+                // async load runs.
+                vm.scope = newScope
+                guard authManager.isAuthenticated else { return }
+                Task { await vm.load(token: authManager.accessToken) }
             }
         )) {
             ForEach(LeaderboardViewModel.Scope.allCases, id: \.self) {
