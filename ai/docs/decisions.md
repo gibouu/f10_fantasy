@@ -64,6 +64,18 @@ Do not log temporary debugging notes here.
 - Affected areas: `src/lib/scoring/formula.ts`.
 - Follow-up: —
 
+### 2026-05-04 — Three-layer post-lock pick protection (snapshot + trigger)
+- Status: accepted
+- Context: Picks must be immutable after `lockCutoffUtc`. The pre-existing app-layer atomic guard in `pick.service.ts` (`updateMany` WHERE re-asserts `lockedAt IS NULL AND lockCutoffUtc > now()`) was the only defense. A misfire (wrong `lockCutoffUtc`, lock-cron lag, direct DB write) could let a post-lock edit land and silently change the score.
+- Decision: Three independent defense layers:
+  - **L1 (app):** `pick.service.ts` atomic guard — unchanged.
+  - **L2 (data):** Snapshot-at-lock. `PickSet` has 6 nullable `locked*` cols (3 driver IDs + 3 seat keys). `lockPicksForRace` writes them column-to-column from live fields atomically with the `lockedAt` write. Scoring (`scoring.service.ts`) prefers `locked*` over live, so even if a post-lock write lands, the score uses the pre-lock snapshot.
+  - **L3 (DB):** Postgres `pickset_post_lock_guard` trigger refuses any UPDATE mutating driver/seat fields on a row with `lockedAt IS NOT NULL`. Lives in `prisma/triggers/pickset_post_lock_guard.sql`; installed by `scripts/install-pickset-triggers.ts` using `DIRECT_URL`.
+- Reason: Defense-in-depth so a single failure (cron, code bug, admin script) cannot affect scoring. Snapshot makes scoring correct under any state; trigger prevents the state from drifting in the first place.
+- Tradeoffs: (1) Trigger lives outside Prisma schema — must be re-installed after DB resets/restores or schema teardown. Documented in worklog and the install script header. (2) Admin "force unlock" requires a two-step dance: clear `lockedAt`, edit drivers, re-lock. (3) Snapshot pre-dates per-row history — if a row was tampered before the snapshot existed, original state is unrecoverable.
+- Affected areas: `prisma/schema.prisma` (PickSet snapshot cols), `src/lib/services/lock.service.ts`, `src/lib/services/scoring.service.ts`, `prisma/triggers/`, `scripts/install-pickset-triggers.ts`, `scripts/backfill-locked-snapshots.ts`, `scripts/find-cheated-picks.ts`, `scripts/test-pickset-trigger.ts`.
+- Follow-up: After any prod schema reset, re-run `install-pickset-triggers.ts`. The diagnostic flags both updatedAt drift and snapshot drift — run periodically or wire into `/api/diag/health` if monitoring becomes important.
+
 ### 2026-04-15 — resolveTeam() injection at service layer, not component level
 - Status: accepted
 - Context: Driver photos and team logos need to be available in UI components.

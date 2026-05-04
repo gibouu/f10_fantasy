@@ -119,6 +119,7 @@ Client Components / RSC Pages
 - **PickSet** unique on `[userId, raceId]` — one pick set per user per race
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT
 - **Two lock levels** — `race.lockCutoffUtc` (race-wide) + `pickSet.lockedAt` (individual)
+- **Three-layer post-lock pick protection** — (1) `pick.service.ts` atomic write guard rejects post-lock writes; (2) `lockPicksForRace` snapshots driver/seat into `PickSet.locked*` cols and `scoring.service.ts` reads from those, so scoring uses the pre-lock state regardless of any later live-field drift; (3) Postgres trigger `pickset_post_lock_guard` refuses any UPDATE mutating driver/seat fields on a locked row. Trigger lives in `prisma/triggers/` and must be re-installed via `scripts/install-pickset-triggers.ts` after DB resets.
 - **Cron jobs are NOT Vercel crons** — they are AWS Lambda functions; no cron config lives in this repo
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` never touch them
 - **No test framework** — verify via type checking, linting, and build

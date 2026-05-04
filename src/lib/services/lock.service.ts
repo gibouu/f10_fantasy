@@ -44,28 +44,35 @@ export function msUntilLock(race: Pick<Race, 'lockCutoffUtc'>): number {
 // ─────────────────────────────────────────────
 
 /**
- * Lock all unlocked pick sets for a given race by setting lockedAt = now.
+ * Lock all unlocked pick sets for a given race by setting lockedAt = now AND
+ * snapshotting the live driver/seat fields into the locked* columns. The
+ * column-to-column copy and the lockedAt write happen in a single SQL
+ * statement so the snapshot is always consistent with the lock timestamp.
  *
- * This is called by a scheduled job (or a webhook) once the race's lock
- * cutoff time has been reached. Idempotent — already-locked sets are skipped
- * by the WHERE clause.
+ * Idempotent — already-locked sets are skipped by the WHERE clause.
  *
  * Returns the count of pick sets that were locked in this invocation.
  */
 export async function lockPicksForRace(raceId: string): Promise<number> {
   const now = new Date()
 
-  const result = await db.pickSet.updateMany({
-    where: {
-      raceId,
-      lockedAt: null, // only lock sets that haven't been locked yet
-    },
-    data: {
-      lockedAt: now,
-    },
-  })
+  // Single SQL statement: copy live driver/seat into locked* fields and set
+  // lockedAt atomically. Postgres ensures the snapshot reflects the row state
+  // at this exact moment.
+  const count = await db.$executeRaw`
+    UPDATE "PickSet"
+    SET "lockedAt"                 = ${now},
+        "lockedTenthPlaceDriverId" = "tenthPlaceDriverId",
+        "lockedTenthPlaceSeatKey"  = "tenthPlaceSeatKey",
+        "lockedWinnerDriverId"     = "winnerDriverId",
+        "lockedWinnerSeatKey"      = "winnerSeatKey",
+        "lockedDnfDriverId"        = "dnfDriverId",
+        "lockedDnfSeatKey"         = "dnfSeatKey"
+    WHERE "raceId"   = ${raceId}
+      AND "lockedAt" IS NULL
+  `
 
-  return result.count
+  return Number(count)
 }
 
 /**

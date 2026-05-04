@@ -159,27 +159,52 @@ export async function computeAndStoreScoresForRace(
   )
   const entrantIds = new Set(race.entries.map((entry) => entry.driver.id))
 
-  const resolvedPickSets = pickSets.map((pickSet) => ({
-    id: pickSet.id,
-    tenthPlaceDriverId: resolveEffectiveDriverId(
-      entrantLookup.seatKeyToDriverId,
-      entrantIds,
-      resolveSeatKey(pickSet.tenthPlaceSeatKey, pickSet.tenthPlaceDriver),
-      pickSet.tenthPlaceDriverId,
-    ),
-    winnerDriverId: resolveEffectiveDriverId(
-      entrantLookup.seatKeyToDriverId,
-      entrantIds,
-      resolveSeatKey(pickSet.winnerSeatKey, pickSet.winnerDriver),
-      pickSet.winnerDriverId,
-    ),
-    dnfDriverId: resolveEffectiveDriverId(
-      entrantLookup.seatKeyToDriverId,
-      entrantIds,
-      resolveSeatKey(pickSet.dnfSeatKey, pickSet.dnfDriver),
-      pickSet.dnfDriverId,
-    ),
-  }))
+  // Snapshot-at-lock: prefer the locked* fields when present (set by
+  // lockPicksForRace at the moment of lock). Live fields are only used as a
+  // fallback for un-locked rows or rows that pre-date the snapshot columns.
+  // This guarantees scoring uses the pre-lock state even if a post-lock write
+  // somehow lands on the live fields.
+  const pickFields = (ps: (typeof pickSets)[number]) => ({
+    tenthPlaceDriverId:
+      ps.lockedTenthPlaceDriverId ?? ps.tenthPlaceDriverId,
+    tenthPlaceSeatKey:
+      ps.lockedTenthPlaceDriverId !== null
+        ? ps.lockedTenthPlaceSeatKey
+        : ps.tenthPlaceSeatKey,
+    winnerDriverId: ps.lockedWinnerDriverId ?? ps.winnerDriverId,
+    winnerSeatKey:
+      ps.lockedWinnerDriverId !== null
+        ? ps.lockedWinnerSeatKey
+        : ps.winnerSeatKey,
+    dnfDriverId: ps.lockedDnfDriverId ?? ps.dnfDriverId,
+    dnfSeatKey:
+      ps.lockedDnfDriverId !== null ? ps.lockedDnfSeatKey : ps.dnfSeatKey,
+  })
+
+  const resolvedPickSets = pickSets.map((pickSet) => {
+    const f = pickFields(pickSet)
+    return {
+      id: pickSet.id,
+      tenthPlaceDriverId: resolveEffectiveDriverId(
+        entrantLookup.seatKeyToDriverId,
+        entrantIds,
+        resolveSeatKey(f.tenthPlaceSeatKey, pickSet.tenthPlaceDriver),
+        f.tenthPlaceDriverId,
+      ),
+      winnerDriverId: resolveEffectiveDriverId(
+        entrantLookup.seatKeyToDriverId,
+        entrantIds,
+        resolveSeatKey(f.winnerSeatKey, pickSet.winnerDriver),
+        f.winnerDriverId,
+      ),
+      dnfDriverId: resolveEffectiveDriverId(
+        entrantLookup.seatKeyToDriverId,
+        entrantIds,
+        resolveSeatKey(f.dnfSeatKey, pickSet.dnfDriver),
+        f.dnfDriverId,
+      ),
+    }
+  })
 
   const driverIds = Array.from(
     new Set([
@@ -322,6 +347,22 @@ export async function recomputeScoreForPickSet(
     )
   }
 
+  // Snapshot-at-lock: prefer locked* fields if present. See
+  // computeAndStoreScoresForRace for rationale.
+  const tenthDriverId = ps.lockedTenthPlaceDriverId ?? ps.tenthPlaceDriverId
+  const tenthSeatKey =
+    ps.lockedTenthPlaceDriverId !== null
+      ? ps.lockedTenthPlaceSeatKey
+      : ps.tenthPlaceSeatKey
+  const winnerDriverId = ps.lockedWinnerDriverId ?? ps.winnerDriverId
+  const winnerSeatKey =
+    ps.lockedWinnerDriverId !== null
+      ? ps.lockedWinnerSeatKey
+      : ps.winnerSeatKey
+  const dnfDriverId = ps.lockedDnfDriverId ?? ps.dnfDriverId
+  const dnfSeatKey =
+    ps.lockedDnfDriverId !== null ? ps.lockedDnfSeatKey : ps.dnfSeatKey
+
   // Resolve driver numbers for the three picks
   const entrantLookup = buildSeatLookup(
     ps.race.entries.map((entry) => toSeatAwareDriver(entry.driver)),
@@ -331,20 +372,20 @@ export async function recomputeScoreForPickSet(
     tenthPlaceDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(ps.tenthPlaceSeatKey, ps.tenthPlaceDriver),
-      ps.tenthPlaceDriverId,
+      resolveSeatKey(tenthSeatKey, ps.tenthPlaceDriver),
+      tenthDriverId,
     ),
     winnerDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(ps.winnerSeatKey, ps.winnerDriver),
-      ps.winnerDriverId,
+      resolveSeatKey(winnerSeatKey, ps.winnerDriver),
+      winnerDriverId,
     ),
     dnfDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(ps.dnfSeatKey, ps.dnfDriver),
-      ps.dnfDriverId,
+      resolveSeatKey(dnfSeatKey, ps.dnfDriver),
+      dnfDriverId,
     ),
   }
   const driverIds = [

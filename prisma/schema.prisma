@@ -163,24 +163,35 @@ model QualifyingResult {
 }
 
 model PickSet {
-  id                 String          @id @default(cuid())
-  userId             String
-  raceId             String
-  tenthPlaceDriverId String
-  winnerDriverId     String
-  dnfDriverId        String
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  lockedAt           DateTime?
-  dnfSeatKey         String?
-  tenthPlaceSeatKey  String?
-  winnerSeatKey      String?
-  dnfDriver          Driver          @relation("DnfPicks", fields: [dnfDriverId], references: [id])
-  race               Race            @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  tenthPlaceDriver   Driver          @relation("TenthPlacePicks", fields: [tenthPlaceDriverId], references: [id])
-  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  winnerDriver       Driver          @relation("WinnerPicks", fields: [winnerDriverId], references: [id])
-  scoreBreakdown     ScoreBreakdown?
+  id                       String          @id @default(cuid())
+  userId                   String
+  raceId                   String
+  tenthPlaceDriverId       String
+  winnerDriverId           String
+  dnfDriverId              String
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  lockedAt                 DateTime?
+  dnfSeatKey               String?
+  tenthPlaceSeatKey        String?
+  winnerSeatKey            String?
+  // Snapshot-at-lock fields. lockPicksForRace copies the live driver/seat
+  // values into these columns at the moment of lock; scoring reads from
+  // these if non-null. Live fields can drift (in theory only — the app
+  // guard and DB trigger should both block it), but scoring always uses the
+  // frozen pre-lock state.
+  lockedTenthPlaceDriverId String?
+  lockedTenthPlaceSeatKey  String?
+  lockedWinnerDriverId     String?
+  lockedWinnerSeatKey      String?
+  lockedDnfDriverId        String?
+  lockedDnfSeatKey         String?
+  dnfDriver                Driver          @relation("DnfPicks", fields: [dnfDriverId], references: [id])
+  race                     Race            @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  tenthPlaceDriver         Driver          @relation("TenthPlacePicks", fields: [tenthPlaceDriverId], references: [id])
+  user                     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  winnerDriver             Driver          @relation("WinnerPicks", fields: [winnerDriverId], references: [id])
+  scoreBreakdown           ScoreBreakdown?
 
   @@unique([userId, raceId])
 }
