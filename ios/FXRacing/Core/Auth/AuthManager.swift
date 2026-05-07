@@ -63,7 +63,31 @@ final class AuthManager {
         try KeychainService.saveToken(exchange.accessToken)
         fxLog(.auth, "signInWithApple: token issued, userId=\(exchange.userId) usernameSet=\(exchange.usernameSet)")
 
-        let user: User = try await api.request(.me, token: exchange.accessToken)
+        // Sign-in succeeds the moment the exchange returns — the token is
+        // valid and saved. Try to enrich with /me, but if that call fails
+        // (e.g. transient 401 from a stale revocation snapshot, brief
+        // network blip), fall back to a User constructed from the exchange
+        // response. This guarantees the user always lands inside the app
+        // after a successful Apple authorization, instead of seeing the
+        // sign-in sheet error out post-authorization.
+        let user: User
+        do {
+            user = try await api.request(.me, token: exchange.accessToken)
+        } catch {
+            fxWarn(.auth, "signInWithApple: /me failed (\(error.localizedDescription)) — proceeding with exchange response")
+            user = User(
+                id: exchange.userId,
+                name: nil,
+                email: nil,
+                avatarUrl: nil,
+                publicUsername: exchange.publicUsername,
+                usernameSet: exchange.usernameSet,
+                usernameChangeUsed: false,
+                favoriteTeamSlug: nil,
+                tutorialDismissedAt: nil,
+                createdAt: Date()
+            )
+        }
         state = .authenticated(user)
         fxLog(.auth, "signInWithApple: state=authenticated user=\(user.id)")
 
