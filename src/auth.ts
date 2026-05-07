@@ -57,10 +57,14 @@ export const auth = (async (...args: any[]) => {
 
   const sessionIssuedAtMs = session.user.sessionIssuedAtMs;
 
+  // Compare in whole seconds — JWT iat is integer seconds (rounded down),
+  // so a freshly-issued token would otherwise be ~hundreds of ms before the
+  // ms-precise sessionValidAfter set at user-creation time and get rejected
+  // immediately on the very first authenticated request.
   if (
     user?.sessionValidAfter &&
     typeof sessionIssuedAtMs === "number" &&
-    sessionIssuedAtMs < user.sessionValidAfter.getTime()
+    sessionIssuedAtMs < Math.floor(user.sessionValidAfter.getTime() / 1000) * 1000
   ) {
     return null;
   }

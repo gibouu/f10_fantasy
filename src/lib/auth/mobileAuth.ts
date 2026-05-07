@@ -49,6 +49,11 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
 
   // Apply revocation check — if the DB is unavailable, allow the session
   // rather than locking out all mobile users during a transient outage.
+  // JWT `iat` is integer seconds, so a token issued at the same instant a
+  // user is created (sessionValidAfter @default(now()), ms-precise) appears
+  // ~hundreds of ms before sessionValidAfter once iat is rounded down.
+  // Compare in whole seconds so a brand-new account is never rejected by
+  // its own freshly-issued token.
   try {
     const user = await db.user.findUnique({
       where: { id: userId },
@@ -58,7 +63,8 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
     if (
       user?.sessionValidAfter &&
       sessionIssuedAtMs !== null &&
-      sessionIssuedAtMs < user.sessionValidAfter.getTime()
+      sessionIssuedAtMs <
+        Math.floor(user.sessionValidAfter.getTime() / 1000) * 1000
     ) {
       return null // Token has been revoked via POST /api/auth/revoke-session
     }
