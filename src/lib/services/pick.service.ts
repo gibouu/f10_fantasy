@@ -379,10 +379,14 @@ export async function getPicksForSeason(
   userId: string,
   seasonId: string,
 ): Promise<PickSetWithScore[]> {
+  // Hide picks on CANCELLED races. The race itself is filtered from /races,
+  // and the pick can never score (no results), so surfacing it on the user
+  // profile would be a UX honesty gap (the user can't view, edit, or refund
+  // it from anywhere else). PickSet rows stay in DB for audit history.
   const pickSets = await db.pickSet.findMany({
     where: {
       userId,
-      race: { seasonId },
+      race: { seasonId, status: { not: 'CANCELLED' } },
     },
     include: {
       scoreBreakdown: true,
@@ -439,10 +443,12 @@ export async function getPickedRaceIds(
   userId: string,
   seasonId: string,
 ): Promise<Set<string>> {
+  // Match getPicksForSeason: exclude picks on CANCELLED races so the "you
+  // picked" badge logic stays consistent with the user-visible profile view.
   const picks = await db.pickSet.findMany({
     where: {
       userId,
-      race: { seasonId },
+      race: { seasonId, status: { not: 'CANCELLED' } },
     },
     select: { raceId: true },
   })
