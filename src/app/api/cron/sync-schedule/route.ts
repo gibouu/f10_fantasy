@@ -272,9 +272,62 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── 6.5. Reconcile orphan races ────────────────────────────────────────────
+  // Sync-schedule is otherwise additive (upserts only). If OpenF1 drops a race
+  // mid-season — e.g. a provisional weekend that gets cancelled, or one that
+  // never existed at all and was synced from stale upstream data — the row
+  // sits forever in DB as UPCOMING. This step cancels any UPCOMING + future
+  // row in the active season that wasn't matched by the upsert loop above.
+  //
+  // Status ownership note: the 2026-05-02 21:00 worklog records that
+  // sync-schedule does not write status on update, leaving UPCOMING→LIVE
+  // (lock-picks) and LIVE→COMPLETED (ingest-results) to the dedicated crons.
+  // This step adds a third explicit transition — UPCOMING→CANCELLED for
+  // orphan-from-upstream cases — but it is gated to rows that this run did
+  // NOT touch and only ever moves to CANCELLED, never to any other state.
+  //
+  // Safety guards:
+  //   - Refuse if OpenF1 returned fewer than 10 meetings (probable upstream
+  //     outage / partial response).
+  //   - Only touch UPCOMING rows whose scheduledStartUtc is still in the
+  //     future — prevents accidentally cancelling a race that just transitioned
+  //     to LIVE between the upsert loop and this step.
+  //   - Never touch COMPLETED, LIVE, or already-CANCELLED rows.
+  //   - Never resurrect a CANCELLED row (we don't upsert here at all).
+  let reconciled = 0
+  const MIN_MEETINGS_FOR_RECONCILE = 10
+  if (meetings.length >= MIN_MEETINGS_FOR_RECONCILE) {
+    const touchedIds = new Set(raceIdBySessionKey.values())
+    const orphanCandidates = await db.race.findMany({
+      where: {
+        seasonId: season.id,
+        status: "UPCOMING",
+        scheduledStartUtc: { gt: new Date() },
+      },
+      select: { id: true, name: true, type: true, round: true },
+    })
+    const orphans = orphanCandidates.filter((r) => !touchedIds.has(r.id))
+    if (orphans.length > 0) {
+      const result = await db.race.updateMany({
+        where: { id: { in: orphans.map((o) => o.id) } },
+        data: { status: "CANCELLED" },
+      })
+      reconciled = result.count
+      for (const o of orphans) {
+        console.log(
+          `[f10:cron:sync-schedule] reconcile CANCELLED R${o.round} ${o.type} "${o.name}" (id=${o.id}) — no longer in OpenF1`,
+        )
+      }
+    }
+  } else {
+    console.warn(
+      `[f10:cron:sync-schedule] reconcile SKIPPED — OpenF1 returned only ${meetings.length} meetings (threshold ${MIN_MEETINGS_FOR_RECONCILE})`,
+    )
+  }
+
   // Skip the remaining steps if no driver data was fetched
   if (sessionDrivers.every((sd) => sd.drivers.length === 0)) {
-    return NextResponse.json({ synced, year, driversSkipped: true })
+    return NextResponse.json({ synced, reconciled, year, driversSkipped: true })
   }
 
   // ── 7. Batch upsert Constructors ───────────────────────────────────────────
@@ -389,5 +442,5 @@ export async function POST(req: NextRequest) {
     db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
   ])
 
-  return NextResponse.json({ synced, year })
+  return NextResponse.json({ synced, reconciled, year })
 }
