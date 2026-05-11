@@ -76,6 +76,15 @@ Do not log temporary debugging notes here.
 - Affected areas: `prisma/schema.prisma` (PickSet snapshot cols), `src/lib/services/lock.service.ts`, `src/lib/services/scoring.service.ts`, `prisma/triggers/`, `scripts/install-pickset-triggers.ts`, `scripts/backfill-locked-snapshots.ts`, `scripts/find-cheated-picks.ts`, `scripts/test-pickset-trigger.ts`.
 - Follow-up: After any prod schema reset, re-run `install-pickset-triggers.ts`. The diagnostic flags both updatedAt drift and snapshot drift — run periodically or wire into `/api/diag/health` if monitoring becomes important.
 
+### 2026-05-11 — sync-schedule cron-side orphan reconciliation
+- Status: accepted
+- Context: `sync-schedule` cron was additive-only (upserts only). When OpenF1 drops a race mid-season (e.g. a provisional weekend gets cancelled, or a row was synced from stale upstream data), the orphan row stays in DB as UPCOMING forever. Manifested as the R7 Emilia-Romagna 2026 phantom (#17) and similar drift across the season. Manual one-off scripts (`scripts/cleanup-orphaned-races.ts`, `scripts/reconcile-2026-calendar.ts`) plugged the gap but recurrence is only a matter of time.
+- Decision: Extend `sync-schedule` with a post-upsert reconciliation step (§6.5). Any UPCOMING + future-start race row in the active season that wasn't matched by the upsert loop is flipped to CANCELLED. Logged per-row.
+- Reason: Closes the orphan class at the cron layer so the same problem doesn't recur. Treats the absence of a matching OpenF1 session as authoritative evidence that the race no longer exists upstream.
+- Tradeoffs: Refines the 2026-05-02 21:00 worklog note ("sync-schedule no longer writes status on update"). The new transition is explicit and narrowly scoped: UPCOMING → CANCELLED for orphans only, never any other transition, never resurrection. Guarded by: (1) OpenF1 must return ≥10 meetings (probable outage detection), (2) only touches future-start rows (avoids racing with lock-picks on rows that just transitioned to LIVE), (3) never touches COMPLETED/LIVE/CANCELLED rows. F1-official drops that OpenF1 hasn't reflected (Bahrain GP, Saudi Arabian GP for 2026) are NOT auto-cancelled by this step — those require manual intervention because OpenF1 still reports them.
+- Affected areas: `src/app/api/cron/sync-schedule/route.ts` (step 6.5), response shape now includes `reconciled` count.
+- Follow-up: Monitor cron logs after deploy to confirm reconciliation runs (`reconciled: 0` is the steady state). If F1 ever officially drops a race that OpenF1 doesn't reflect, fall back to the manual script.
+
 ### 2026-04-15 — resolveTeam() injection at service layer, not component level
 - Status: accepted
 - Context: Driver photos and team logos need to be available in UI components.
