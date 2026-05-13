@@ -49,6 +49,12 @@ export function msUntilLock(race: Pick<Race, 'lockCutoffUtc'>): number {
  * column-to-column copy and the lockedAt write happen in a single SQL
  * statement so the snapshot is always consistent with the lock timestamp.
  *
+ * Also captures the **early-bird** snapshot: `lockedSubmittedBeforeQualifying`
+ * is true iff the user's last edit (`PickSet.updatedAt`) is strictly before
+ * `Race.qualifyingStartUtc`. The comparison uses the OLD `updatedAt` (before
+ * this UPDATE's `@updatedAt` writes the new value), so it reflects the user's
+ * last edit rather than the lock cron's own write.
+ *
  * Idempotent — already-locked sets are skipped by the WHERE clause.
  *
  * Returns the count of pick sets that were locked in this invocation.
@@ -56,20 +62,28 @@ export function msUntilLock(race: Pick<Race, 'lockCutoffUtc'>): number {
 export async function lockPicksForRace(raceId: string): Promise<number> {
   const now = new Date()
 
-  // Single SQL statement: copy live driver/seat into locked* fields and set
-  // lockedAt atomically. Postgres ensures the snapshot reflects the row state
-  // at this exact moment.
+  // UPDATE ... FROM joins Race so we can read qualifyingStartUtc per row.
+  // Postgres evaluates SET expressions against the OLD row state, so
+  // "PickSet"."updatedAt" inside the SET reads the value BEFORE this
+  // statement bumps it — exactly what we want for the early-bird check.
+  // qualifyingStartUtc IS NULL → flag = false (no bonus).
   const count = await db.$executeRaw`
-    UPDATE "PickSet"
-    SET "lockedAt"                 = ${now},
-        "lockedTenthPlaceDriverId" = "tenthPlaceDriverId",
-        "lockedTenthPlaceSeatKey"  = "tenthPlaceSeatKey",
-        "lockedWinnerDriverId"     = "winnerDriverId",
-        "lockedWinnerSeatKey"      = "winnerSeatKey",
-        "lockedDnfDriverId"        = "dnfDriverId",
-        "lockedDnfSeatKey"         = "dnfSeatKey"
-    WHERE "raceId"   = ${raceId}
-      AND "lockedAt" IS NULL
+    UPDATE "PickSet" AS p
+    SET "lockedAt"                       = ${now},
+        "lockedTenthPlaceDriverId"       = p."tenthPlaceDriverId",
+        "lockedTenthPlaceSeatKey"        = p."tenthPlaceSeatKey",
+        "lockedWinnerDriverId"           = p."winnerDriverId",
+        "lockedWinnerSeatKey"            = p."winnerSeatKey",
+        "lockedDnfDriverId"              = p."dnfDriverId",
+        "lockedDnfSeatKey"               = p."dnfSeatKey",
+        "lockedSubmittedBeforeQualifying" = (
+          r."qualifyingStartUtc" IS NOT NULL
+          AND p."updatedAt" < r."qualifyingStartUtc"
+        )
+    FROM "Race" AS r
+    WHERE p."raceId"   = ${raceId}
+      AND r."id"       = p."raceId"
+      AND p."lockedAt" IS NULL
   `
 
   return Number(count)

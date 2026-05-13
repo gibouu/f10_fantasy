@@ -50,6 +50,9 @@ export default async function RacePickPage({
     ...race,
     scheduledStartUtc: race.scheduledStartUtc.toISOString(),
     lockCutoffUtc: race.lockCutoffUtc.toISOString(),
+    qualifyingStartUtc: race.qualifyingStartUtc
+      ? race.qualifyingStartUtc.toISOString()
+      : null,
   }
 
   const pickSerialized: SerializedPickSetWithScore | null = resolvedPick
@@ -62,6 +65,9 @@ export default async function RacePickPage({
           ...resolvedPick.race,
           scheduledStartUtc: resolvedPick.race.scheduledStartUtc.toISOString(),
           lockCutoffUtc: resolvedPick.race.lockCutoffUtc.toISOString(),
+          qualifyingStartUtc: resolvedPick.race.qualifyingStartUtc
+            ? resolvedPick.race.qualifyingStartUtc.toISOString()
+            : null,
         },
         scoreBreakdown: resolvedPick.scoreBreakdown
           ? {

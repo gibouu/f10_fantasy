@@ -27,6 +27,7 @@ function mapRace(race: {
   scheduledStartUtc: Date
   lockCutoffUtc: Date
   status: string
+  qualifyingStartUtc?: Date | null
 }): RaceSummary {
   return {
     id: race.id,
@@ -39,6 +40,7 @@ function mapRace(race: {
     scheduledStartUtc: race.scheduledStartUtc,
     lockCutoffUtc: race.lockCutoffUtc,
     status: race.status as RaceStatus,
+    qualifyingStartUtc: race.qualifyingStartUtc ?? null,
   }
 }
 
@@ -62,14 +64,20 @@ export async function getActiveSeason(): Promise<{
 }
 
 /**
- * Return all races for a season ordered by round number ascending.
+ * Return all races for a season ordered chronologically (earliest first).
+ *
+ * Ordering by `scheduledStartUtc` (not `round`) so the list stays in real-world
+ * order regardless of the rounds DB rows carry. Necessary because rows inserted
+ * after the season started (see `scripts/reconcile-2026-calendar.ts`) land at
+ * high temporary round numbers that don't match their chronological slot, and
+ * because OpenF1 occasionally republishes meetings out of canonical order.
  */
 export async function getRacesForSeason(
   seasonId: string,
 ): Promise<RaceSummary[]> {
   const races = await db.race.findMany({
     where: { seasonId },
-    orderBy: { round: 'asc' },
+    orderBy: { scheduledStartUtc: 'asc' },
     select: {
       id: true,
       seasonId: true,
@@ -81,6 +89,7 @@ export async function getRacesForSeason(
       scheduledStartUtc: true,
       lockCutoffUtc: true,
       status: true,
+      qualifyingStartUtc: true,
     },
   })
 
@@ -90,9 +99,13 @@ export async function getRacesForSeason(
 /**
  * Return the "current" race for a season using the following priority:
  *   1. LIVE race (if one exists)
- *   2. Next UPCOMING race (lowest round number)
- *   3. Most recently COMPLETED race (highest round number, as fallback when
- *      the season is over)
+ *   2. Next UPCOMING race (soonest scheduledStartUtc)
+ *   3. Most recently COMPLETED race (latest scheduledStartUtc, as fallback
+ *      when the season is over)
+ *
+ * Ordering by scheduledStartUtc rather than `round` because round numbers
+ * can be out of chronological order on rows inserted after the season started
+ * (see `scripts/reconcile-2026-calendar.ts`). Date is always authoritative.
  *
  * Returns null if the season has no races at all.
  */
@@ -102,7 +115,7 @@ export async function getCurrentRace(
   // Check for a live race first
   const live = await db.race.findFirst({
     where: { seasonId, status: 'LIVE' },
-    orderBy: { round: 'asc' },
+    orderBy: { scheduledStartUtc: 'asc' },
   })
 
   if (live) return mapRace(live)
@@ -110,7 +123,7 @@ export async function getCurrentRace(
   // Next upcoming race
   const upcoming = await db.race.findFirst({
     where: { seasonId, status: 'UPCOMING' },
-    orderBy: { round: 'asc' },
+    orderBy: { scheduledStartUtc: 'asc' },
   })
 
   if (upcoming) return mapRace(upcoming)
@@ -118,7 +131,7 @@ export async function getCurrentRace(
   // Fallback: most recently completed
   const completed = await db.race.findFirst({
     where: { seasonId, status: 'COMPLETED' },
-    orderBy: { round: 'desc' },
+    orderBy: { scheduledStartUtc: 'desc' },
   })
 
   return completed ? mapRace(completed) : null

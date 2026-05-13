@@ -75,6 +75,12 @@ export type RaceSummary = {
   /** Picks are locked at or after this time */
   lockCutoffUtc: Date
   status: RaceStatus
+  /**
+   * Start time of the paired OpenF1 Qualifying session. Picks made (last
+   * edited) strictly before this time qualify for the 2x early-bird bonus.
+   * Null when OpenF1 hasn't published the qualifying session yet.
+   */
+  qualifyingStartUtc: Date | null
 }
 
 export type RaceResultRecord = {
@@ -108,6 +114,12 @@ export type PickSetData = {
   updatedAt: Date
   /** Set when the pick set is locked; null means still editable */
   lockedAt: Date | null
+  /**
+   * Snapshot at lock time of whether the user's last edit was strictly
+   * before race.qualifyingStartUtc. True → scoring applies a 2x bonus.
+   * Null on legacy rows that were locked before this column existed.
+   */
+  lockedSubmittedBeforeQualifying: boolean | null
 }
 
 // ─────────────────────────────────────────────
@@ -118,6 +130,12 @@ export type ScoreBreakdownData = {
   tenthPlaceScore: number
   winnerBonus: number
   dnfBonus: number
+  /**
+   * 2x bonus awarded when the user submitted their pick before the race
+   * weekend's Qualifying session started. Equals the base score (so
+   * totalScore = base × 2) when active, 0 otherwise.
+   */
+  earlyBirdBonus: number
   totalScore: number
   computedAt: Date
 }
@@ -171,9 +189,13 @@ export type FriendRequestData = {
 // Next.js cannot serialize Date instances across the RSC/client boundary.
 // ─────────────────────────────────────────────
 
-export type SerializedRaceSummary = Omit<RaceSummary, 'scheduledStartUtc' | 'lockCutoffUtc'> & {
+export type SerializedRaceSummary = Omit<
+  RaceSummary,
+  'scheduledStartUtc' | 'lockCutoffUtc' | 'qualifyingStartUtc'
+> & {
   scheduledStartUtc: string
   lockCutoffUtc: string
+  qualifyingStartUtc: string | null
 }
 
 export type SerializedScoreBreakdownData = Omit<ScoreBreakdownData, 'computedAt'> & {

@@ -203,6 +203,9 @@ export async function computeAndStoreScoresForRace(
         resolveSeatKey(f.dnfSeatKey, pickSet.dnfDriver),
         f.dnfDriverId,
       ),
+      // Early-bird snapshot — null on legacy rows is treated as false.
+      submittedBeforeQualifying:
+        pickSet.lockedSubmittedBeforeQualifying === true,
     }
   })
 
@@ -269,6 +272,14 @@ export async function computeAndStoreScoresForRace(
       scoringCtx,
     )
 
+    // Early-bird bonus: equal to the base score when the pick was last
+    // edited before qualifying. Stored as a separate column so the breakdown
+    // UI can show "+X early-bird" and total = base × 2 when active.
+    const baseScore =
+      score.tenthPlaceScore + score.winnerBonus + score.dnfBonus
+    const earlyBirdBonus = ps.submittedBeforeQualifying ? baseScore : 0
+    const totalScore = baseScore + earlyBirdBonus
+
     await client.scoreBreakdown.upsert({
       where: { pickSetId: ps.id },
       create: {
@@ -276,14 +287,16 @@ export async function computeAndStoreScoresForRace(
         tenthPlaceScore: score.tenthPlaceScore,
         winnerBonus: score.winnerBonus,
         dnfBonus: score.dnfBonus,
-        totalScore: score.totalScore,
+        earlyBirdBonus,
+        totalScore,
         computedAt: now,
       },
       update: {
         tenthPlaceScore: score.tenthPlaceScore,
         winnerBonus: score.winnerBonus,
         dnfBonus: score.dnfBonus,
-        totalScore: score.totalScore,
+        earlyBirdBonus,
+        totalScore,
         computedAt: now,
       },
     })
@@ -436,6 +449,13 @@ export async function recomputeScoreForPickSet(
 
   const now = new Date()
 
+  // Early-bird bonus mirrors computeAndStoreScoresForRace.
+  const baseScore =
+    score.tenthPlaceScore + score.winnerBonus + score.dnfBonus
+  const submittedBeforeQualifying = ps.lockedSubmittedBeforeQualifying === true
+  const earlyBirdBonus = submittedBeforeQualifying ? baseScore : 0
+  const totalScore = baseScore + earlyBirdBonus
+
   await db.scoreBreakdown.upsert({
     where: { pickSetId: ps.id },
     create: {
@@ -443,14 +463,16 @@ export async function recomputeScoreForPickSet(
       tenthPlaceScore: score.tenthPlaceScore,
       winnerBonus: score.winnerBonus,
       dnfBonus: score.dnfBonus,
-      totalScore: score.totalScore,
+      earlyBirdBonus,
+      totalScore,
       computedAt: now,
     },
     update: {
       tenthPlaceScore: score.tenthPlaceScore,
       winnerBonus: score.winnerBonus,
       dnfBonus: score.dnfBonus,
-      totalScore: score.totalScore,
+      earlyBirdBonus,
+      totalScore,
       computedAt: now,
     },
   })
@@ -459,7 +481,8 @@ export async function recomputeScoreForPickSet(
     tenthPlaceScore: score.tenthPlaceScore,
     winnerBonus: score.winnerBonus,
     dnfBonus: score.dnfBonus,
-    totalScore: score.totalScore,
+    earlyBirdBonus,
+    totalScore,
     computedAt: now,
   }
 }

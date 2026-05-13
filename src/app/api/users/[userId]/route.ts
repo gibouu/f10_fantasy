@@ -216,6 +216,7 @@ export async function GET(
           tenthPlaceScore: ps.scoreBreakdown.tenthPlaceScore,
           winnerBonus: ps.scoreBreakdown.winnerBonus,
           dnfBonus: ps.scoreBreakdown.dnfBonus,
+          earlyBirdBonus: ps.scoreBreakdown.earlyBirdBonus,
           totalScore: ps.scoreBreakdown.totalScore,
         }
       : null,
