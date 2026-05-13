@@ -75,6 +75,7 @@ function mapPickSetToData(
     createdAt: Date
     updatedAt: Date
     lockedAt: Date | null
+    lockedSubmittedBeforeQualifying?: boolean | null
   },
 ): PickSetData {
   return {
@@ -90,6 +91,7 @@ function mapPickSetToData(
     createdAt: ps.createdAt,
     updatedAt: ps.updatedAt,
     lockedAt: ps.lockedAt,
+    lockedSubmittedBeforeQualifying: ps.lockedSubmittedBeforeQualifying ?? null,
   }
 }
 
@@ -104,6 +106,7 @@ function mapRaceToSummary(race: {
   scheduledStartUtc: Date
   lockCutoffUtc: Date
   status: string
+  qualifyingStartUtc?: Date | null
 }): RaceSummary {
   return {
     id: race.id,
@@ -116,6 +119,7 @@ function mapRaceToSummary(race: {
     scheduledStartUtc: race.scheduledStartUtc,
     lockCutoffUtc: race.lockCutoffUtc,
     status: race.status as RaceStatus,
+    qualifyingStartUtc: race.qualifyingStartUtc ?? null,
   }
 }
 
@@ -364,6 +368,7 @@ export async function getPickForRace(
           tenthPlaceScore: pickSet.scoreBreakdown.tenthPlaceScore,
           winnerBonus: pickSet.scoreBreakdown.winnerBonus,
           dnfBonus: pickSet.scoreBreakdown.dnfBonus,
+          earlyBirdBonus: pickSet.scoreBreakdown.earlyBirdBonus,
           totalScore: pickSet.scoreBreakdown.totalScore,
           computedAt: pickSet.scoreBreakdown.computedAt,
         }
@@ -428,6 +433,7 @@ export async function getPicksForSeason(
           tenthPlaceScore: ps.scoreBreakdown.tenthPlaceScore,
           winnerBonus: ps.scoreBreakdown.winnerBonus,
           dnfBonus: ps.scoreBreakdown.dnfBonus,
+          earlyBirdBonus: ps.scoreBreakdown.earlyBirdBonus,
           totalScore: ps.scoreBreakdown.totalScore,
           computedAt: ps.scoreBreakdown.computedAt,
         }

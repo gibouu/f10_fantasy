@@ -30,6 +30,7 @@ export default async function RacesPage() {
     ...r,
     scheduledStartUtc: r.scheduledStartUtc.toISOString(),
     lockCutoffUtc: r.lockCutoffUtc.toISOString(),
+    qualifyingStartUtc: r.qualifyingStartUtc ? r.qualifyingStartUtc.toISOString() : null,
   }))
 
   return (

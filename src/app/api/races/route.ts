@@ -17,6 +17,9 @@ export async function GET() {
     ...r,
     scheduledStartUtc: r.scheduledStartUtc.toISOString(),
     lockCutoffUtc: r.lockCutoffUtc.toISOString(),
+    qualifyingStartUtc: r.qualifyingStartUtc
+      ? r.qualifyingStartUtc.toISOString()
+      : null,
   }))
 
   return NextResponse.json({ races: serialized, season })

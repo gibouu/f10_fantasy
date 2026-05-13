@@ -96,6 +96,25 @@ export function ScoreBreakdown({ scoreBreakdown, raceType }: ScoreBreakdownProps
             explanation={explanations[2]}
           />
 
+          {/* Early-bird 2x bonus — only shown when active (>0) */}
+          {scoreBreakdown.earlyBirdBonus > 0 && (
+            <div className="flex items-start gap-3 py-3 border-b border-[var(--border)]">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-text-primary">
+                  Early-bird 2x bonus
+                </p>
+                <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">
+                  Picks locked in before qualifying → base score doubled
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-sm font-bold text-[#30d158]">
+                  +{scoreBreakdown.earlyBirdBonus}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Divider + total */}
           <div className="flex items-center justify-between pt-3">
             <span className="text-sm font-semibold text-text-primary">Total</span>
@@ -108,7 +127,9 @@ export function ScoreBreakdown({ scoreBreakdown, raceType }: ScoreBreakdownProps
               >
                 {scoreBreakdown.totalScore}
               </span>
-              <span className="text-text-tertiary text-sm">/{caps.total}</span>
+              <span className="text-text-tertiary text-sm">
+                /{caps.total * (scoreBreakdown.earlyBirdBonus > 0 ? 2 : 1)}
+              </span>
             </div>
           </div>
         </div>

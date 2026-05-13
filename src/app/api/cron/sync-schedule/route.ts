@@ -147,17 +147,21 @@ export async function POST(req: NextRequest) {
       session.scheduledStartUtc.getTime() - 30 * 60 * 1000,
     )
 
-    const qualifyingSessionKey =
-      allQualifyingSessions
-        .filter(
-          (q) =>
-            q.meetingKey === session.meetingKey &&
-            q.scheduledStartUtc.getTime() < session.scheduledStartUtc.getTime(),
-        )
-        .sort(
-          (a, b) =>
-            b.scheduledStartUtc.getTime() - a.scheduledStartUtc.getTime(),
-        )[0]?.sessionKey ?? null
+    // Find the qualifying session that pairs with this race/sprint session.
+    // Non-sprint weekend: single Qualifying → pairs with Main. Sprint weekend:
+    // Sprint Shootout pairs with Sprint; main Qualifying pairs with Sunday Main.
+    const pairedQualifyingSession = allQualifyingSessions
+      .filter(
+        (q) =>
+          q.meetingKey === session.meetingKey &&
+          q.scheduledStartUtc.getTime() < session.scheduledStartUtc.getTime(),
+      )
+      .sort(
+        (a, b) =>
+          b.scheduledStartUtc.getTime() - a.scheduledStartUtc.getTime(),
+      )[0]
+    const qualifyingSessionKey = pairedQualifyingSession?.sessionKey ?? null
+    const qualifyingStartUtc = pairedQualifyingSession?.scheduledStartUtc ?? null
 
     // Status is owned by lock-picks (UPCOMING → LIVE) and ingest-results
     // (LIVE → COMPLETED, after results are actually written). sync-schedule
@@ -204,6 +208,10 @@ export async function POST(req: NextRequest) {
       lockCutoffUtc,
       openf1MeetingKey: session.meetingKey,
       openf1QualifyingSessionKey: qualifyingSessionKey,
+      // Used by the early-bird bonus rule. Null when no qualifying session
+      // is paired yet (e.g. brand-new weekend, OpenF1 hasn't published) —
+      // lockPicksForRace treats null as "no bonus".
+      qualifyingStartUtc,
     }
 
     const createPayload = {

@@ -27,6 +27,7 @@ function mapRace(race: {
   scheduledStartUtc: Date
   lockCutoffUtc: Date
   status: string
+  qualifyingStartUtc?: Date | null
 }): RaceSummary {
   return {
     id: race.id,
@@ -39,6 +40,7 @@ function mapRace(race: {
     scheduledStartUtc: race.scheduledStartUtc,
     lockCutoffUtc: race.lockCutoffUtc,
     status: race.status as RaceStatus,
+    qualifyingStartUtc: race.qualifyingStartUtc ?? null,
   }
 }
 
@@ -87,6 +89,7 @@ export async function getRacesForSeason(
       scheduledStartUtc: true,
       lockCutoffUtc: true,
       status: true,
+      qualifyingStartUtc: true,
     },
   })
 

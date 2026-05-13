@@ -84,6 +84,12 @@ model Race {
   openf1SessionKey           Int?               @unique
   openf1QualifyingSessionKey Int?
   openf1MeetingKey           Int?
+  // Start of the matched OpenF1 Qualifying session for this race weekend.
+  // Used by the early-bird bonus rule: a PickSet whose updatedAt is strictly
+  // before this timestamp earns a 2x multiplier on its scored race. Null when
+  // OpenF1 hasn't published / paired the qualifying session yet — null is
+  // treated as "no bonus" by lockPicksForRace.
+  qualifyingStartUtc         DateTime?
   createdAt                  DateTime           @default(now())
   updatedAt                  DateTime           @updatedAt
   pickSets                   PickSet[]
@@ -186,6 +192,11 @@ model PickSet {
   lockedWinnerSeatKey      String?
   lockedDnfDriverId        String?
   lockedDnfSeatKey         String?
+  // Early-bird snapshot. Set by lockPicksForRace at the moment of lock based
+  // on whether the user's last edit (PickSet.updatedAt) happened strictly
+  // before race.qualifyingStartUtc. Null for legacy rows that were locked
+  // before this column existed — treated as false (no bonus) by scoring.
+  lockedSubmittedBeforeQualifying Boolean?
   dnfDriver                Driver          @relation("DnfPicks", fields: [dnfDriverId], references: [id])
   race                     Race            @relation(fields: [raceId], references: [id], onDelete: Cascade)
   tenthPlaceDriver         Driver          @relation("TenthPlacePicks", fields: [tenthPlaceDriverId], references: [id])
@@ -202,6 +213,12 @@ model ScoreBreakdown {
   tenthPlaceScore Int
   winnerBonus     Int
   dnfBonus        Int
+  // Early-bird bonus: equal to (tenthPlaceScore + winnerBonus + dnfBonus)
+  // when PickSet.lockedSubmittedBeforeQualifying is true, else 0. Stored
+  // separately so the breakdown UI can show "+X early-bird" as its own line.
+  // totalScore = tenthPlaceScore + winnerBonus + dnfBonus + earlyBirdBonus,
+  // which is 2x base when bonus applies.
+  earlyBirdBonus  Int      @default(0)
   totalScore      Int
   computedAt      DateTime @default(now())
   pickSet         PickSet  @relation(fields: [pickSetId], references: [id], onDelete: Cascade)
