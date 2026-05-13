@@ -45,6 +45,9 @@ export async function GET(
       ...race,
       scheduledStartUtc: race.scheduledStartUtc.toISOString(),
       lockCutoffUtc: race.lockCutoffUtc.toISOString(),
+      qualifyingStartUtc: race.qualifyingStartUtc
+        ? race.qualifyingStartUtc.toISOString()
+        : null,
     },
     entrants,
     results,

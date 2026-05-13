@@ -418,6 +418,44 @@ export function PickHero({
         </div>
       </div>
 
+      {/* Early-bird 2x bonus banner — only shown pre-lock when qualifying is in the future */}
+      {!isLocked && (() => {
+        if (!race.qualifyingStartUtc) return null
+        const qualiStart = new Date(race.qualifyingStartUtc)
+        const now = new Date()
+        if (qualiStart <= now) {
+          // Qualifying already started — no bonus available; show a faded note only
+          // when the user has an existing pick (so they understand why no bonus).
+          if (!existingPick) return null
+          const pickEdit = new Date(existingPick.updatedAt)
+          const eligible = pickEdit < qualiStart
+          if (eligible) {
+            return (
+              <div className="mt-3 rounded-2xl border border-[#30d158]/30 bg-[#30d158]/8 px-4 py-2.5">
+                <p className="text-xs font-semibold text-[#30d158]">
+                  ✨ Early-bird locked in — your score will be doubled
+                </p>
+              </div>
+            )
+          }
+          return null
+        }
+        // qualiStart is in the future — encourage the user
+        return (
+          <div className="mt-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-2.5">
+            <p className="text-xs font-semibold text-accent">
+              ⚡ Lock in before {qualiStart.toLocaleString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })} (qualifying) for <strong>2x bonus</strong>
+            </p>
+          </div>
+        )
+      })()}
+
       {/* Save / status */}
       {!isLocked && (
         <div className="flex flex-col gap-2 mt-1">
