@@ -142,7 +142,8 @@ function SortDropdown({
         <option value="season">{seasonYear} Season (total)</option>
         {completedRaces.map((race) => (
           <option key={race.id} value={race.id}>
-            R{race.round} · {race.name}
+            R{race.round}
+            {race.type === "SPRINT" ? "S" : ""} · {race.name}
           </option>
         ))}
       </select>
