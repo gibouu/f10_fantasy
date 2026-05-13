@@ -70,7 +70,10 @@ function RaceCard({ race, picked, locked }: RaceCardProps) {
         className="flex items-center gap-4 bg-surface rounded-2xl px-4 py-3.5 border border-[var(--border)] active:opacity-70 transition-opacity"
       >
         <div className="w-8 shrink-0 text-center">
-          <span className="text-xs font-bold text-text-tertiary">R{race.round}</span>
+          <span className="text-xs font-bold text-text-tertiary">
+            R{race.round}
+            {race.type === "SPRINT" ? "S" : ""}
+          </span>
         </div>
 
         <div className="flex-1 min-w-0">

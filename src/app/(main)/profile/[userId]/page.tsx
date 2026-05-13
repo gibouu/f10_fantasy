@@ -217,6 +217,7 @@ function PickRow({
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-widest text-text-tertiary">
             R{pick.race.round}
+            {pick.race.type === 'SPRINT' ? 'S' : ''}
           </p>
           <p className="truncate text-sm font-semibold text-text-primary">{pick.race.name}</p>
         </div>
