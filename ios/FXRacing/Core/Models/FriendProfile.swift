@@ -31,6 +31,9 @@ struct ProfileRace: Decodable, Sendable {
     let type: String
     let status: String
     let scheduledStartUtc: Date
+
+    /// Round label with "S" suffix for sprint rows — matches Race.roundLabel.
+    var roundLabel: String { "R\(round)\(type == "SPRINT" ? "S" : "")" }
 }
 
 struct SlotSummaries: Decodable, Sendable {
