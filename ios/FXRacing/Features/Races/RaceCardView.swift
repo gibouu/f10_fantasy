@@ -5,11 +5,12 @@ struct RaceCardView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Round badge
-            Text("R\(race.round)")
+            // Round badge — appends "S" for sprint rows so a shared-round
+            // weekend (R9 British Sprint + R9 British GP) is distinguishable.
+            Text(race.roundLabel)
                 .font(.system(size: 12, weight: .black, design: .monospaced))
                 .foregroundStyle(FXTheme.Colors.textTertiary)
-                .frame(width: 30, alignment: .center)
+                .frame(width: 36, alignment: .center)
 
             // Race name + circuit
             VStack(alignment: .leading, spacing: 4) {

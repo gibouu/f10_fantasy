@@ -87,7 +87,7 @@ struct ProfileView: View {
                     Section {
                         pickRow(pick)
                     } header: {
-                        Text("R\(pick.race.round) · \(pick.race.name)")
+                        Text("\(pick.race.roundLabel) · \(pick.race.name)")
                     }
                 }
             }

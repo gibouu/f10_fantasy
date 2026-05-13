@@ -11,10 +11,26 @@ struct Race: Codable, Sendable, Identifiable {
     let scheduledStartUtc: Date
     let lockCutoffUtc: Date
     let status: RaceStatus
+    /// Start of the paired Qualifying session. Picks last-edited strictly
+    /// before this earn the 2x early-bird bonus. Optional because legacy
+    /// API responses may omit it; nil → no bonus available.
+    let qualifyingStartUtc: Date?
 
     var isLocked: Bool { Date() >= lockCutoffUtc }
     var isSprint: Bool { type == .sprint }
     var flagEmoji: String { Race.flag(for: country) }
+
+    /// Display label for the round badge — appends "S" for sprint rows so a
+    /// shared-round weekend (e.g. R9 British Sprint + R9 British GP) is
+    /// visually distinguishable on race cards.
+    var roundLabel: String { "R\(round)\(isSprint ? "S" : "")" }
+
+    /// True while qualifying is still in the future and a new pick would
+    /// qualify for the early-bird 2x bonus.
+    var earlyBirdAvailable: Bool {
+        guard let qualifyingStartUtc else { return false }
+        return Date() < qualifyingStartUtc
+    }
 
     /// Maximum scores for each slot, used to colour-code score badges.
     var scoreCaps: ScoreCaps {

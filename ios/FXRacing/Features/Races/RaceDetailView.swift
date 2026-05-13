@@ -213,6 +213,28 @@ struct RaceDetailView: View {
                 Spacer()
             }
 
+            // Show the early-bird bonus on completed races
+            if isCompleted,
+               let bonus = viewModel.serverPick?.scoreBreakdown?.earlyBirdBonus,
+               bonus > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.caption.weight(.bold))
+                    Text("Early-bird 2x bonus locked in: +\(bonus) pts")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                }
+                .foregroundStyle(Color(red: 0.18, green: 0.78, blue: 0.35))
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(Color(red: 0.18, green: 0.78, blue: 0.35).opacity(0.10))
+                .cornerRadius(FXTheme.Radius.sm)
+            }
+
+            // Pre-lock early-bird CTA / status banner
+            if !isLocked && !isCompleted {
+                earlyBirdBanner(race: race)
+            }
+
             if !isLocked && !isCompleted {
                 if let err = viewModel.errorMessage {
                     Text(err)
@@ -266,6 +288,27 @@ struct RaceDetailView: View {
         }
         .padding(FXTheme.Spacing.md)
         .fxCardSurface()
+    }
+
+    @ViewBuilder
+    private func earlyBirdBanner(race: Race) -> some View {
+        if let qualifyingStart = race.qualifyingStartUtc, qualifyingStart > Date() {
+            // Quali still in the future — encourage user to lock in for 2x.
+            HStack(spacing: 8) {
+                Image(systemName: "bolt.fill")
+                    .font(.caption.weight(.bold))
+                Group {
+                    Text("Lock in before \(qualifyingStart.formatted(date: .abbreviated, time: .shortened)) for ")
+                        .font(.caption)
+                    + Text("2x bonus").font(.caption.weight(.bold))
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(FXTheme.Colors.accent)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(FXTheme.Colors.accent.opacity(0.10))
+            .cornerRadius(FXTheme.Radius.sm)
+        }
     }
 
     @ViewBuilder
