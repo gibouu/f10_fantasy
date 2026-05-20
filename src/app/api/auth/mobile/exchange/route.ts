@@ -27,6 +27,7 @@ import { NextResponse } from 'next/server'
 import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose'
 import { db } from '@/lib/db/client'
 import { mobileSigningKey } from '@/lib/auth/mobileAuth'
+import { verifiedProviderEmail } from '@/lib/auth/providerEmail'
 
 // 60 days. Native iOS users expect to stay signed in across launches; the 8h
 // expiry forced re-sign-in every day. Server-side revocation is still
@@ -70,7 +71,7 @@ async function verifyAppleToken(idToken: string): Promise<ProviderClaims | null>
       return {
         sub: payload.sub as string,
         email: (payload.email as string) ?? '',
-        email_verified: payload.email_verified as boolean | undefined,
+        email_verified: payload.email_verified as boolean | string | undefined,
         name: (payload.name as string) ?? undefined,
       }
     } catch {
@@ -97,7 +98,7 @@ async function verifyGoogleToken(idToken: string): Promise<ProviderClaims | null
       return {
         sub: payload.sub as string,
         email: (payload.email as string) ?? '',
-        email_verified: payload.email_verified as boolean | undefined,
+        email_verified: payload.email_verified as boolean | string | undefined,
         name: (payload.name as string) ?? undefined,
         picture: (payload.picture as string) ?? undefined,
       }
@@ -144,8 +145,8 @@ async function findOrCreateUser(
     return existingAccount.user
   }
 
-  // 2. No Account found — check if a User with this email already exists
-  const email = claims.email
+  // 2. No Account found — check if a User with this verified email already exists
+  const email = verifiedProviderEmail(claims)
   const existingUser = email
     ? await db.user.findUnique({
         where: { email },
@@ -179,7 +180,7 @@ async function findOrCreateUser(
       email: email || `${provider}.${providerAccountId}@placeholder.fxracing`,
       name: claims.name ?? null,
       image: claims.picture ?? null,
-      emailVerified: claims.email_verified ? new Date() : null,
+      emailVerified: email ? new Date() : null,
       accounts: {
         create: {
           type: 'oauth',
