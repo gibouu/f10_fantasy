@@ -21,6 +21,7 @@ declare global {
 }
 
 const buckets = globalThis.__rateLimitBuckets ?? new Map<string, Bucket>()
+const TRUSTED_CLIENT_IP_HEADERS = ["x-vercel-forwarded-for", "cf-connecting-ip"]
 
 if (!globalThis.__rateLimitBuckets) {
   globalThis.__rateLimitBuckets = buckets
@@ -75,14 +76,12 @@ export function rateLimit({
 }
 
 export function getClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for")
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown"
+  for (const header of TRUSTED_CLIENT_IP_HEADERS) {
+    const value = request.headers.get(header)?.split(",")[0]?.trim()
+    if (value) {
+      return value
+    }
   }
 
-  return (
-    request.headers.get("x-real-ip") ??
-    request.headers.get("cf-connecting-ip") ??
-    "unknown"
-  )
+  return "unknown"
 }
