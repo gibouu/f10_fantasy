@@ -9,6 +9,11 @@ import type { NextRequest } from "next/server"
 import { db } from "@/lib/db/client"
 import { computeAndStoreScoresForRace } from "@/lib/services/scoring.service"
 
+const SCORABLE_COMPLETED_RACE_WHERE = {
+  status: "COMPLETED" as const,
+  results: { some: {} },
+}
+
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
 function validateCronSecret(req: NextRequest): boolean {
@@ -52,9 +57,8 @@ export async function POST(req: NextRequest) {
   if (raceType) {
     const races = await db.race.findMany({
       where: {
+        ...SCORABLE_COMPLETED_RACE_WHERE,
         type: raceType,
-        status: "COMPLETED",
-        results: { some: {} },
       },
       orderBy: { scheduledStartUtc: "asc" },
       select: { id: true },
@@ -82,15 +86,15 @@ export async function POST(req: NextRequest) {
 
   if (!raceId) {
     const lastCompleted = await db.race.findFirst({
-      where: { status: "COMPLETED" },
+      where: SCORABLE_COMPLETED_RACE_WHERE,
       orderBy: { scheduledStartUtc: "desc" },
       select: { id: true, name: true },
     })
 
     if (!lastCompleted) {
-      console.warn("[f10:cron:scores] no completed races to score")
+      console.warn("[f10:cron:scores] no completed races with results to score")
       return NextResponse.json(
-        { error: "No completed races found to score" },
+        { error: "No completed races with results found to score" },
         { status: 404 },
       )
     }
