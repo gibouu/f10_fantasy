@@ -81,7 +81,16 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[f10:cron:scores] done in ${Date.now() - startedAt}ms`)
-    return NextResponse.json({ raceType, processed: results })
+    const failedCount = results.filter((result) => result.error).length
+    return NextResponse.json(
+      {
+        raceType,
+        processedCount: results.length,
+        failedCount,
+        processed: results,
+      },
+      { status: failedCount > 0 ? 500 : 200 },
+    )
   }
 
   if (!raceId) {
