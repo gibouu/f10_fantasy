@@ -55,8 +55,15 @@ export function decryptTokenValue(value: string): string {
     return value;
   }
 
-  const [, ivRaw, authTagRaw, encryptedRaw] = value.split(":");
-  if (!ivRaw || !authTagRaw || !encryptedRaw) {
+  const [prefix, version, ivRaw, authTagRaw, encryptedRaw, ...extra] =
+    value.split(":");
+  if (
+    `${prefix}:${version}` !== ENCRYPTED_TOKEN_PREFIX ||
+    !ivRaw ||
+    !authTagRaw ||
+    !encryptedRaw ||
+    extra.length > 0
+  ) {
     console.warn("[token-crypto] Malformed ciphertext, returning raw value");
     return value;
   }
