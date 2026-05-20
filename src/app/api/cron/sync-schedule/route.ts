@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
 
   const raceIdBySessionKey = new Map<number, string>()
   let synced = 0
+  let hadRaceUpsertFailure = false
 
   for (const session of relevantSessions) {
     const meeting = meetingMap.get(session.meetingKey)
@@ -272,6 +273,7 @@ export async function POST(req: NextRequest) {
       raceIdBySessionKey.set(session.sessionKey, raceId)
       synced++
     } catch (err) {
+      hadRaceUpsertFailure = true
       const message = err instanceof Error ? err.message : String(err)
       console.warn(
         `[f10:cron:sync-schedule] upsert FAIL sessionKey=${session.sessionKey} (${meeting.name} ${raceType}): ${message}`,
@@ -297,6 +299,8 @@ export async function POST(req: NextRequest) {
   // Safety guards:
   //   - Refuse if OpenF1 returned fewer than 10 meetings (probable upstream
   //     outage / partial response).
+  //   - Refuse if any race upsert failed — an untouched DB row may be a local
+  //     write failure, not an upstream deletion.
   //   - Only touch UPCOMING rows whose scheduledStartUtc is still in the
   //     future — prevents accidentally cancelling a race that just transitioned
   //     to LIVE between the upsert loop and this step.
@@ -307,7 +311,8 @@ export async function POST(req: NextRequest) {
   const MIN_RACE_SESSIONS_FOR_RECONCILE = 10
   if (
     meetings.length >= MIN_MEETINGS_FOR_RECONCILE &&
-    relevantSessions.length >= MIN_RACE_SESSIONS_FOR_RECONCILE
+    relevantSessions.length >= MIN_RACE_SESSIONS_FOR_RECONCILE &&
+    !hadRaceUpsertFailure
   ) {
     const touchedIds = new Set(raceIdBySessionKey.values())
     const orphanCandidates = await db.race.findMany({
@@ -333,7 +338,7 @@ export async function POST(req: NextRequest) {
     }
   } else {
     console.warn(
-      `[f10:cron:sync-schedule] reconcile SKIPPED — OpenF1 returned ${meetings.length} meetings / ${relevantSessions.length} race sessions (thresholds ${MIN_MEETINGS_FOR_RECONCILE}/${MIN_RACE_SESSIONS_FOR_RECONCILE})`,
+      `[f10:cron:sync-schedule] reconcile SKIPPED — OpenF1 returned ${meetings.length} meetings / ${relevantSessions.length} race sessions (thresholds ${MIN_MEETINGS_FOR_RECONCILE}/${MIN_RACE_SESSIONS_FOR_RECONCILE}); raceUpsertFailure=${hadRaceUpsertFailure}`,
     )
   }
 
