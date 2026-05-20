@@ -17,6 +17,7 @@ struct LocalPick: Codable, Sendable {
 final class LocalPickStore {
 
     private static let key = "localPicks_v1"
+    private static let legacyKey = "localPicks"
     private(set) var picks: [String: LocalPick] = [:]
 
     init() {
@@ -59,10 +60,19 @@ final class LocalPickStore {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.key),
-              let decoded = try? JSONDecoder().decode([String: LocalPick].self, from: data)
+        if let data = UserDefaults.standard.data(forKey: Self.key),
+           let decoded = try? JSONDecoder().decode([String: LocalPick].self, from: data) {
+            picks = decoded
+            return
+        }
+
+        guard let legacyData = UserDefaults.standard.data(forKey: Self.legacyKey),
+              let legacyPicks = try? JSONDecoder().decode([String: LocalPick].self, from: legacyData)
         else { return }
-        picks = decoded
+
+        picks = legacyPicks
+        persist()
+        UserDefaults.standard.removeObject(forKey: Self.legacyKey)
     }
 
     private func persist() {

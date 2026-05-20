@@ -113,7 +113,7 @@ Sign-in trigger:
 
 ## Local persistence
 
-### LocalPickStore (`UserDefaults` key: `"localPicks"`)
+### LocalPickStore (`UserDefaults` key: `"localPicks_v1"`)
 ```swift
 struct LocalPick: Codable {
   raceId, winnerId, p10Id, dnfId: String
@@ -122,6 +122,7 @@ struct LocalPick: Codable {
 }
 // Stored as [raceId: LocalPick] JSON
 ```
+- On first launch after upgrade, reads legacy `"localPicks"` if `"localPicks_v1"` is absent, persists under `"localPicks_v1"`, then removes the legacy key
 - Survives app backgrounding and device restart
 - Does NOT survive reinstall (acceptable)
 - Does NOT require auth
