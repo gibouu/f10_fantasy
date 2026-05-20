@@ -304,7 +304,11 @@ export async function POST(req: NextRequest) {
   //   - Never resurrect a CANCELLED row (we don't upsert here at all).
   let reconciled = 0
   const MIN_MEETINGS_FOR_RECONCILE = 10
-  if (meetings.length >= MIN_MEETINGS_FOR_RECONCILE) {
+  const MIN_RACE_SESSIONS_FOR_RECONCILE = 10
+  if (
+    meetings.length >= MIN_MEETINGS_FOR_RECONCILE &&
+    relevantSessions.length >= MIN_RACE_SESSIONS_FOR_RECONCILE
+  ) {
     const touchedIds = new Set(raceIdBySessionKey.values())
     const orphanCandidates = await db.race.findMany({
       where: {
@@ -329,7 +333,7 @@ export async function POST(req: NextRequest) {
     }
   } else {
     console.warn(
-      `[f10:cron:sync-schedule] reconcile SKIPPED — OpenF1 returned only ${meetings.length} meetings (threshold ${MIN_MEETINGS_FOR_RECONCILE})`,
+      `[f10:cron:sync-schedule] reconcile SKIPPED — OpenF1 returned ${meetings.length} meetings / ${relevantSessions.length} race sessions (thresholds ${MIN_MEETINGS_FOR_RECONCILE}/${MIN_RACE_SESSIONS_FOR_RECONCILE})`,
     )
   }
 
