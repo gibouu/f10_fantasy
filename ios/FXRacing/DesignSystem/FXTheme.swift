@@ -1,9 +1,9 @@
 import SwiftUI
 
-// MARK: - Liquid Glass surface modifier
+// MARK: - Card surface modifier
 
 extension View {
-    /// Card surface: .glassEffect on iOS 26+, FXTheme.Colors.surface + cornerRadius on iOS 17-25.
+    /// Card surface for the current Xcode 16/iOS 17+ toolchain.
     func fxCardSurface(radius: CGFloat = FXTheme.Radius.lg) -> some View {
         modifier(FXCardSurfaceModifier(radius: radius))
     }
@@ -13,14 +13,9 @@ private struct FXCardSurfaceModifier: ViewModifier {
     let radius: CGFloat
 
     func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius))
-        } else {
-            content
-                .background(FXTheme.Colors.surface)
-                .cornerRadius(radius)
-        }
+        content
+            .background(FXTheme.Colors.surface)
+            .cornerRadius(radius)
     }
 }
 
