@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import NextAuth from "next-auth";
 import { authConfig } from "@/auth.config";
 import type { Session } from "next-auth";
+import { isBearerAuthApiRoute } from "@/lib/auth/bearerRoute";
 
 const { auth } = NextAuth(authConfig);
 
@@ -88,10 +89,11 @@ export default auth((req: NextAuthRequest) => {
 
   // ── 4. Unauthenticated users → redirect to /signin ────────────────────
   if (!session) {
-    // API requests that carry a Bearer token are authenticated in the route
-    // handler itself via mobileAuth(req). Let them through without redirect.
+    // Only explicit Bearer-capable API routes bypass the web-session redirect.
+    // Those handlers must validate either mobileAuth(req) or CRON_SECRET.
     if (
       pathname.startsWith(API_PREFIX) &&
+      isBearerAuthApiRoute(pathname, req.method) &&
       req.headers.get("authorization")?.startsWith("Bearer ")
     ) {
       return NextResponse.next();
