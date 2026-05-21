@@ -32,7 +32,37 @@ type FriendsData = {
 // Helpers
 // ─────────────────────────────────────────────
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+async function parseJson(response: Response): Promise<unknown> {
+  return response.json().catch(() => null)
+}
+
+function errorMessage(data: unknown, fallback: string): string {
+  return (
+    data &&
+    typeof data === 'object' &&
+    'error' in data &&
+    typeof data.error === 'string'
+  )
+    ? data.error
+    : fallback
+}
+
+async function fetcher<T>(url: string): Promise<T> {
+  const response = await fetch(url)
+  const data = await parseJson(response)
+  if (!response.ok) {
+    throw new Error(errorMessage(data, 'Failed to load friends'))
+  }
+  return data as T
+}
+
+async function request(url: string, init: RequestInit, fallback: string): Promise<void> {
+  const response = await fetch(url, init)
+  if (!response.ok) {
+    const data = await parseJson(response)
+    throw new Error(errorMessage(data, fallback))
+  }
+}
 
 function useDebounce<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = React.useState(value)
@@ -50,15 +80,16 @@ function useDebounce<T>(value: T, ms: number): T {
 export function FriendSearch() {
   const [query, setQuery] = React.useState('')
   const debouncedQuery = useDebounce(query, 300)
+  const [actionError, setActionError] = React.useState<string | null>(null)
 
   // Friends + pending requests
-  const { data: friendsData, mutate: mutateFriends } = useSWR<FriendsData>(
+  const { data: friendsData, error: friendsError, mutate: mutateFriends } = useSWR<FriendsData>(
     '/api/friends',
     fetcher,
   )
 
   // Search results — only fire when query is non-empty
-  const { data: searchResults } = useSWR<SearchResult[]>(
+  const { data: searchResults, error: searchError } = useSWR<SearchResult[]>(
     debouncedQuery.trim().length >= 2
       ? `/api/friends?q=${encodeURIComponent(debouncedQuery.trim())}`
       : null,
@@ -75,14 +106,17 @@ export function FriendSearch() {
   // ── Send friend request ───────────────────────────────────────────────────
   const handleAdd = async (addresseeId: string) => {
     markPending(addresseeId)
+    setActionError(null)
     try {
-      await fetch('/api/friends', {
+      await request('/api/friends', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addresseeId }),
-      })
+      }, 'Failed to send friend request')
       // Refresh friends list
-      mutateFriends()
+      await mutateFriends()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to send friend request')
     } finally {
       clearPending(addresseeId)
     }
@@ -94,13 +128,16 @@ export function FriendSearch() {
     action: 'accept' | 'reject',
   ) => {
     markPending(requestId)
+    setActionError(null)
     try {
-      await fetch(`/api/friends/${requestId}`, {
+      await request(`/api/friends/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
-      })
-      mutateFriends()
+      }, `Failed to ${action} friend request`)
+      await mutateFriends()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : `Failed to ${action} friend request`)
     } finally {
       clearPending(requestId)
     }
@@ -120,6 +157,13 @@ export function FriendSearch() {
         <h2 className="text-base font-semibold text-text-primary">Manage Friends</h2>
         <span className="text-sm text-text-tertiary">{friends.length} friends</span>
       </div>
+
+      {(friendsError || actionError) && (
+        <p className="text-sm text-red-400">
+          {actionError ??
+            (friendsError instanceof Error ? friendsError.message : 'Could not load friends')}
+        </p>
+      )}
 
       {/* Search input */}
       <div className="relative">
@@ -190,6 +234,11 @@ export function FriendSearch() {
             })
           )}
         </div>
+      )}
+      {debouncedQuery.trim().length >= 2 && searchError && (
+        <p className="text-sm text-text-secondary text-center py-3">
+          {searchError instanceof Error ? searchError.message : 'Could not search players'}
+        </p>
       )}
 
       {/* Pending received requests */}
