@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
   const userId = session.user.id
 
   const { searchParams } = request.nextUrl
-  const searchQuery = searchParams.get('q')
+  const searchQuery = searchParams.get('search') ?? searchParams.get('q')
 
-  // Delegate to search if ?q= param is present
+  // Delegate to search if ?search= or legacy ?q= param is present
   if (searchQuery !== null) {
     const results = await searchUsers(searchQuery, userId)
     return NextResponse.json(results)
