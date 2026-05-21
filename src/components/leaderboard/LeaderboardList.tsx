@@ -156,7 +156,14 @@ function SortDropdown({
 // SWR fetcher
 // ─────────────────────────────────────────────
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+async function fetcher(url: string) {
+  const response = await fetch(url)
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(data?.error ?? 'Failed to load leaderboard')
+  }
+  return data
+}
 
 // ─────────────────────────────────────────────
 // Main component
@@ -180,7 +187,7 @@ export function LeaderboardList({
   const shouldFetch =
     scope !== initialScope || sort !== initialSort
 
-  const { data: fetchedData, isLoading } = useSWR<{
+  const { data: fetchedData, error, isLoading, mutate } = useSWR<{
     rows: LeaderboardRow[]
     userRank: number | null
     userRow: LeaderboardRow | null
@@ -191,9 +198,10 @@ export function LeaderboardList({
     fetcher,
   )
 
-  const rows = shouldFetch ? (fetchedData?.rows ?? (isLoading ? [] : initialRows)) : initialRows
+  const rows = shouldFetch ? (fetchedData?.rows ?? []) : initialRows
   const currentUserRank = shouldFetch ? (fetchedData?.userRank ?? null) : userRank
   const currentUserRow = shouldFetch ? (fetchedData?.userRow ?? null) : userRow
+  const loadError = shouldFetch ? error : null
 
   const userInList = rows.some((r) => r.userId === userId)
   const showPinned = !userInList && currentUserRow !== null
@@ -264,8 +272,25 @@ export function LeaderboardList({
         </div>
       )}
 
+      {/* Error state */}
+      {loadError && !isLoading && (
+        <div className="rounded-2xl bg-surface border border-[var(--border)] p-6 text-center">
+          <p className="text-sm font-semibold text-text-primary">Could not load rankings</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            {loadError instanceof Error ? loadError.message : 'Please try again.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void mutate()}
+            className="mt-4 rounded-full bg-accent px-4 py-2 text-xs font-bold text-black"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Leaderboard rows */}
-      {!isEmpty && !isLoading && rows.length > 0 && (
+      {!loadError && !isEmpty && !isLoading && rows.length > 0 && (
         <div className="flex flex-col gap-1">
           {rows.map((row) => (
             <LeaderboardRowItem
@@ -286,7 +311,7 @@ export function LeaderboardList({
       )}
 
       {/* Empty state */}
-      {!isEmpty && !isLoading && rows.length === 0 && (
+      {!loadError && !isEmpty && !isLoading && rows.length === 0 && (
         <div className="rounded-2xl bg-surface border border-[var(--border)] p-6 text-center">
           <p className="text-sm text-text-secondary">
             No scores yet — picks are scored after each race.
