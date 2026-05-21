@@ -25,6 +25,7 @@
 
 import { NextResponse } from 'next/server'
 import { createRemoteJWKSet, jwtVerify, SignJWT } from 'jose'
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import { mobileSigningKey } from '@/lib/auth/mobileAuth'
 import { verifiedProviderEmail } from '@/lib/auth/providerEmail'
@@ -52,6 +53,21 @@ type ProviderClaims = {
   email_verified?: boolean | string
   name?: string
   picture?: string
+}
+
+const mobileUserSelect = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+  publicUsername: true,
+  usernameSet: true,
+} as const
+
+type MobileExchangeUser = Prisma.UserGetPayload<{ select: typeof mobileUserSelect }>
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 }
 
 async function verifyAppleToken(idToken: string): Promise<ProviderClaims | null> {
@@ -114,29 +130,16 @@ async function verifyGoogleToken(idToken: string): Promise<ProviderClaims | null
 async function findOrCreateUser(
   provider: 'apple' | 'google',
   claims: ProviderClaims,
-): Promise<{
-  id: string
-  name: string | null
-  email: string
-  image: string | null
-  publicUsername: string | null
-  usernameSet: boolean
-}> {
+): Promise<MobileExchangeUser> {
   const providerAccountId = claims.sub
+  const email = verifiedProviderEmail(claims)
 
   // 1. Look up existing Account link
   const existingAccount = await db.account.findUnique({
     where: { provider_providerAccountId: { provider, providerAccountId } },
     include: {
       user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-          publicUsername: true,
-          usernameSet: true,
-        },
+        select: mobileUserSelect,
       },
     },
   })
@@ -146,60 +149,98 @@ async function findOrCreateUser(
   }
 
   // 2. No Account found — check if a User with this verified email already exists
-  const email = verifiedProviderEmail(claims)
   const existingUser = email
     ? await db.user.findUnique({
         where: { email },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-          publicUsername: true,
-          usernameSet: true,
-        },
+        select: mobileUserSelect,
       })
     : null
 
   if (existingUser) {
-    // Link the new provider account to the existing user
-    await db.account.create({
-      data: {
+    // Link the new provider account to the existing user. Upsert makes a
+    // concurrent first exchange for the same provider identity idempotent.
+    const linkedAccount = await db.account.upsert({
+      where: { provider_providerAccountId: { provider, providerAccountId } },
+      update: {},
+      create: {
         userId: existingUser.id,
         type: 'oauth',
         provider,
         providerAccountId,
       },
+      include: {
+        user: {
+          select: mobileUserSelect,
+        },
+      },
     })
-    return existingUser
+    return linkedAccount.user
   }
 
   // 3. Brand new user — create User + Account atomically
-  const newUser = await db.user.create({
-    data: {
-      email: email || `${provider}.${providerAccountId}@placeholder.fxracing`,
-      name: claims.name ?? null,
-      image: claims.picture ?? null,
-      emailVerified: email ? new Date() : null,
-      accounts: {
+  try {
+    const newUser = await db.user.create({
+      data: {
+        email: email || `${provider}.${providerAccountId}@placeholder.fxracing`,
+        name: claims.name ?? null,
+        image: claims.picture ?? null,
+        emailVerified: email ? new Date() : null,
+        accounts: {
+          create: {
+            type: 'oauth',
+            provider,
+            providerAccountId,
+          },
+        },
+      },
+      select: mobileUserSelect,
+    })
+
+    return newUser
+  } catch (err) {
+    if (!isUniqueConstraintError(err)) {
+      throw err
+    }
+
+    const racedAccount = await db.account.findUnique({
+      where: { provider_providerAccountId: { provider, providerAccountId } },
+      include: {
+        user: {
+          select: mobileUserSelect,
+        },
+      },
+    })
+    if (racedAccount) {
+      return racedAccount.user
+    }
+
+    const racedUser = email
+      ? await db.user.findUnique({
+          where: { email },
+          select: mobileUserSelect,
+        })
+      : null
+    if (racedUser) {
+      const linkedAccount = await db.account.upsert({
+        where: { provider_providerAccountId: { provider, providerAccountId } },
+        update: {},
         create: {
+          userId: racedUser.id,
           type: 'oauth',
           provider,
           providerAccountId,
         },
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      publicUsername: true,
-      usernameSet: true,
-    },
-  })
+        include: {
+          user: {
+            select: mobileUserSelect,
+          },
+        },
+      })
+      return linkedAccount.user
+    }
 
-  return newUser
+    throw err
+  }
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────
