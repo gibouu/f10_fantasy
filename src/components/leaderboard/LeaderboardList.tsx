@@ -321,7 +321,7 @@ export function LeaderboardList({
 
       {/* Manage Friends — only on Friends tab */}
       {scope === 'friends' && userId && (
-        <FriendSearch currentUserId={userId} />
+        <FriendSearch />
       )}
     </div>
   )
