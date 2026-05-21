@@ -200,16 +200,9 @@ export class OpenF1Provider implements F1ProviderAdapter {
   async getLiveClassification(
     sessionKey: number,
   ): Promise<NormalizedLiveClassification | null> {
-    let raw: OpenF1Position[]
-
-    try {
-      raw = await openF1Fetch<OpenF1Position>(
-        `/position?session_key=${sessionKey}`,
-      )
-    } catch {
-      // No data available yet — not an error for live classification
-      return null
-    }
+    const raw = await openF1Fetch<OpenF1Position>(
+      `/position?session_key=${sessionKey}`,
+    )
 
     if (raw.length === 0) return null
 
