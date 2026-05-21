@@ -173,10 +173,13 @@ export async function acceptFriendRequest(
     throw new Error(`Friend request is already ${fr.status}`)
   }
 
-  await db.friendRequest.update({
-    where: { id: requestId },
+  const updated = await db.friendRequest.updateMany({
+    where: { id: requestId, addresseeId: userId, status: 'PENDING' },
     data: { status: 'ACCEPTED' },
   })
+  if (updated.count !== 1) {
+    throw new Error('Friend request is no longer pending')
+  }
 }
 
 /**
@@ -207,10 +210,17 @@ export async function rejectFriendRequest(
     throw new Error('Cannot reject an already accepted friend request')
   }
 
-  await db.friendRequest.update({
-    where: { id: requestId },
+  const updated = await db.friendRequest.updateMany({
+    where: {
+      id: requestId,
+      status: 'PENDING',
+      OR: [{ requesterId: userId }, { addresseeId: userId }],
+    },
     data: { status: 'REJECTED' },
   })
+  if (updated.count !== 1) {
+    throw new Error('Friend request is no longer pending')
+  }
 }
 
 /**
