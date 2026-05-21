@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
           openf1MeetingKey: session.meetingKey,
           type: raceType as "MAIN" | "SPRINT",
         },
-        select: { id: true },
+        select: { id: true, status: true },
       })
 
       if (!existing) {
@@ -252,17 +252,19 @@ export async function POST(req: NextRequest) {
               lte: new Date(start + windowMs),
             },
           },
-          select: { id: true },
+          select: { id: true, status: true },
         })
       }
 
       let raceId: string
       if (existing) {
-        await db.race.update({
-          where: { id: existing.id },
-          data: { ...updatePayload, openf1SessionKey: session.sessionKey },
-        })
         raceId = existing.id
+        if (existing.status !== "COMPLETED") {
+          await db.race.update({
+            where: { id: existing.id },
+            data: { ...updatePayload, openf1SessionKey: session.sessionKey },
+          })
+        }
       } else {
         const created = await db.race.create({
           data: createPayload,
