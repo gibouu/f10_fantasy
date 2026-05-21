@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import type { FriendRequestData } from '@/types/domain'
-import { FriendRequestStatus } from '@/types/domain'
 
 // ─────────────────────────────────────────────
 // Types
@@ -27,10 +26,6 @@ type FriendsData = {
   friends: SearchResult[]
   pendingReceived: FriendRequestData[]
   pendingSent: FriendRequestData[]
-}
-
-interface FriendSearchProps {
-  currentUserId: string
 }
 
 // ─────────────────────────────────────────────
@@ -52,7 +47,7 @@ function useDebounce<T>(value: T, ms: number): T {
 // Main component
 // ─────────────────────────────────────────────
 
-export function FriendSearch({ currentUserId }: FriendSearchProps) {
+export function FriendSearch() {
   const [query, setQuery] = React.useState('')
   const debouncedQuery = useDebounce(query, 300)
 
