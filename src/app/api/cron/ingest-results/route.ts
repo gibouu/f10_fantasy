@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const startedAt = Date.now()
   let targetRaceIds: string[]
-  let mode: 'force' | 'targeted' | 'auto' | 'fallback-latest' = 'auto'
+  let mode: 'force' | 'targeted' | 'auto' = 'auto'
 
   try {
     const body = await req.json()
@@ -68,18 +68,6 @@ export async function POST(req: NextRequest) {
       findRacesNeedingQualifyingIngestion(),
     ])
     targetRaceIds = Array.from(new Set([...needResults, ...needQuali]))
-  }
-
-  if (targetRaceIds.length === 0) {
-    const latest = await db.race.findFirst({
-      where: { status: 'COMPLETED', openf1SessionKey: { not: null } },
-      orderBy: { scheduledStartUtc: 'desc' },
-      select: { id: true },
-    })
-    if (latest) {
-      mode = 'fallback-latest'
-      targetRaceIds = [latest.id]
-    }
   }
 
   console.log(
