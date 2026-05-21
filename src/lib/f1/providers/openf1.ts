@@ -263,6 +263,7 @@ export class OpenF1Provider implements F1ProviderAdapter {
     //    are marked DNF. This catches mid-race retirements while keeping lapped
     //    cars (typically 1–2 laps down) as CLASSIFIED.
     const retiredDriverNumbers = new Set<number>()
+    const dnsDriverNumbers = new Set<number>()
     try {
       const stintRaw = await openF1Fetch<OpenF1Stint>(`/stints?session_key=${sessionKey}`)
 
@@ -284,7 +285,7 @@ export class OpenF1Provider implements F1ProviderAdapter {
         // OpenF1 includes DNS drivers in /position at their grid slot.
         for (const driverNumber of Array.from(latestByDriver.keys())) {
           if (!lastLap.has(driverNumber)) {
-            retiredDriverNumbers.add(driverNumber)
+            dnsDriverNumbers.add(driverNumber)
           }
         }
       }
@@ -298,10 +299,11 @@ export class OpenF1Provider implements F1ProviderAdapter {
       latestByDriver.values(),
     ).map((entry) => {
       const isRetired = retiredDriverNumbers.has(entry.driver_number)
+      const isDns = dnsDriverNumbers.has(entry.driver_number)
       return {
         driverNumber: entry.driver_number,
-        position: isRetired ? null : entry.position,
-        status: isRetired ? 'DNF' : 'CLASSIFIED',
+        position: isRetired || isDns ? null : entry.position,
+        status: isDns ? 'DNS' : isRetired ? 'DNF' : 'CLASSIFIED',
       } satisfies NormalizedFinalResult
     })
 
