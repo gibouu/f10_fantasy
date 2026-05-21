@@ -20,20 +20,11 @@ export const authConfig: NextAuthConfig = {
   providers: [],
 
   callbacks: {
-    jwt({ token, user, trigger, session }) {
+    jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.publicUsername = (user as { publicUsername?: string | null }).publicUsername ?? null;
         token.usernameSet = (user as { usernameSet?: boolean }).usernameSet ?? false;
-      }
-
-      if (trigger === "update" && session) {
-        if (typeof session.publicUsername === "string") {
-          token.publicUsername = session.publicUsername;
-        }
-        if (typeof session.usernameSet === "boolean") {
-          token.usernameSet = session.usernameSet;
-        }
       }
 
       return token;
