@@ -9,18 +9,18 @@ import {
 import { getActiveSeason } from '@/lib/services/race.service'
 
 export async function GET(request: NextRequest) {
-  // Auth check
-  const session = (await auth()) ?? (await mobileAuth(request))
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  const userId = session.user.id
-
   // Parse query params
   const { searchParams } = request.nextUrl
   const scope = searchParams.get('scope') === 'friends' ? 'friends' : 'global'
   // sort = 'season' (full season) or a specific raceId
   const sort = searchParams.get('sort') ?? 'season'
+
+  // Auth is required for Friends scope and optional for Global scope.
+  const session = (await auth()) ?? (await mobileAuth(request))
+  const userId = session?.user?.id ?? null
+  if (scope === 'friends' && !userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   // Determine season — prefer explicit param, fall back to active season
   const seasonIdParam = searchParams.get('seasonId')
@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
       : await getGlobalLeaderboard(seasonId, sort, 20)
 
   // User's own rank on the global season board (for pinned row logic)
-  const userRank = await getUserSeasonRank(userId, seasonId)
+  const userRank = userId ? await getUserSeasonRank(userId, seasonId) : null
 
   // Find the user's row in the returned set (may be null if they're outside top 20)
-  const userRow = rows.find((r) => r.userId === userId) ?? null
+  const userRow = userId ? (rows.find((r) => r.userId === userId) ?? null) : null
 
   return NextResponse.json({ rows, userRank, userRow })
 }

@@ -12,7 +12,7 @@ struct LeaderboardView: View {
             if vm.isLoading && vm.rows.isEmpty {
                 leaderboardSkeleton
             } else if let err = vm.errorMessage, vm.rows.isEmpty {
-                RetryView(message: err) { await vm.load(token: authManager.accessToken) }
+                RetryView(message: err) { await loadIfAllowed() }
             } else {
                 list
             }
@@ -34,7 +34,7 @@ struct LeaderboardView: View {
             }
         }
         .sheet(isPresented: $showFriendSearch, onDismiss: {
-            Task { await vm.load(token: authManager.accessToken) }
+            Task { await loadIfAllowed() }
         }) {
             FriendSearchView()
         }
@@ -42,12 +42,10 @@ struct LeaderboardView: View {
             SignInPromptView(reason: "Sign in to add friends and see the Friends leaderboard.")
         }
         .task {
-            guard authManager.isAuthenticated else { return }
-            await vm.load(token: authManager.accessToken)
+            await loadIfAllowed()
         }
         .refreshable {
-            guard authManager.isAuthenticated else { return }
-            await vm.load(token: authManager.accessToken)
+            await loadIfAllowed()
         }
         .safeAreaInset(edge: .bottom) {
             if !tutorialStore.hasSeenLeaderboardTutorial && !authManager.isAuthenticated {
@@ -86,8 +84,7 @@ struct LeaderboardView: View {
                 // tap immediately — avoids a visible bounce-back while the
                 // async load runs.
                 vm.scope = newScope
-                guard authManager.isAuthenticated else { return }
-                Task { await vm.load(token: authManager.accessToken) }
+                Task { await loadIfAllowed() }
             }
         )) {
             ForEach(LeaderboardViewModel.Scope.allCases, id: \.self) {
@@ -101,15 +98,15 @@ struct LeaderboardView: View {
     @ViewBuilder
     private var list: some View {
         List {
-            if !authManager.isAuthenticated {
+            if vm.scope == .friends && !authManager.isAuthenticated {
                 Section {
                     VStack(spacing: 16) {
-                        Image(systemName: "trophy")
+                        Image(systemName: "person.2")
                             .font(.system(size: 40))
                             .foregroundStyle(FXTheme.Colors.accent)
-                        Text("Sign in to view your ranking")
+                        Text("Sign in to view friends")
                             .font(.headline)
-                        Text("Compete on the global and friends leaderboards by signing in.")
+                        Text("Global rankings are public. Sign in to add friends and compare private leaderboards.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -161,6 +158,11 @@ struct LeaderboardView: View {
     private var currentUserId: String? {
         if case .authenticated(let user) = authManager.state { return user.id }
         return nil
+    }
+
+    private func loadIfAllowed() async {
+        guard vm.scope == .global || authManager.isAuthenticated else { return }
+        await vm.load(token: authManager.accessToken)
     }
 
     private var leaderboardSkeleton: some View {
