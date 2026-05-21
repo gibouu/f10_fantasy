@@ -169,10 +169,20 @@ export async function changeUsername(
       throw new Error(`Username "${username}" is already taken`)
     }
 
-    await tx.user.update({
-      where: { id: userId },
-      data: { publicUsername: stored, usernameChangeUsed: true },
+    const updated = await tx.user.updateMany({
+      where: {
+        id: userId,
+        usernameSet: true,
+        usernameChangeUsed: false,
+      },
+      data: {
+        publicUsername: stored,
+        usernameChangeUsed: true,
+      },
     })
+    if (updated.count !== 1) {
+      throw new Error('You have already used your one-time username change')
+    }
   })
 
   return stored
