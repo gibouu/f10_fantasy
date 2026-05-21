@@ -112,6 +112,14 @@ function RaceCard({ race, picked, locked }: RaceCardProps) {
   )
 }
 
+function shouldPollRaces(races: SerializedRaceSummary[], now: number): boolean {
+  return races.some(
+    (r) =>
+      r.status === "LIVE" ||
+      (r.status === "UPCOMING" && now >= new Date(r.lockCutoffUtc).getTime()),
+  )
+}
+
 interface RacesListClientProps {
   initialRaces: SerializedRaceSummary[]
   pickedIds: string[]
@@ -122,15 +130,22 @@ export function RacesListClient({
   pickedIds,
 }: RacesListClientProps) {
   const pickedSet = React.useMemo(() => new Set(pickedIds), [pickedIds])
+  const [now, setNow] = React.useState(() => Date.now())
 
-  // Determine the polling interval based on the *current* races. If anything
-  // is LIVE we poll every 60s; otherwise we don't poll (SWR refresh on focus
-  // is enough).
-  const hasLiveInitial = initialRaces.some((r) => r.status === "LIVE")
+  const hasPendingRace = initialRaces.some(
+    (r) => r.status === "UPCOMING" || r.status === "LIVE",
+  )
+
+  React.useEffect(() => {
+    if (!hasPendingRace) return
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [hasPendingRace])
 
   const { data } = useSWR<RacesApiResponse>("/api/races", fetcher, {
     fallbackData: { races: initialRaces, season: null },
-    refreshInterval: hasLiveInitial ? 60_000 : 0,
+    refreshInterval: (latestData) =>
+      shouldPollRaces(latestData?.races ?? initialRaces, now) ? 60_000 : 0,
     refreshWhenHidden: false,
     revalidateOnFocus: true,
   })
