@@ -33,6 +33,25 @@ const nextAuth = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
 
+    async jwt({ token, user, trigger }) {
+      if (user) {
+        token.id = user.id;
+        token.publicUsername = user.publicUsername ?? null;
+        token.usernameSet = user.usernameSet ?? false;
+      }
+
+      if (trigger === "update" && typeof token.id === "string") {
+        const currentUser = await db.user.findUnique({
+          where: { id: token.id },
+          select: { publicUsername: true, usernameSet: true },
+        });
+        token.publicUsername = currentUser?.publicUsername ?? null;
+        token.usernameSet = currentUser?.usernameSet ?? false;
+      }
+
+      return token;
+    },
+
     async signIn({ user }) {
       return Boolean(user.email ?? user.id);
     },
