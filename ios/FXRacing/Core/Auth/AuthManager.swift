@@ -150,7 +150,10 @@ final class AuthManager {
 
     // MARK: - Convenience
 
-    var accessToken: String? { KeychainService.loadToken() }
+    var accessToken: String? {
+        guard isAuthenticated else { return nil }
+        return KeychainService.loadToken()
+    }
 
     var isAuthenticated: Bool {
         if case .authenticated = state { return true }
