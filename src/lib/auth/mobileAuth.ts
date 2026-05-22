@@ -43,6 +43,7 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   const userId = (payload.id ?? payload.sub) as string | undefined
   console.log('[mobileAuth] token keys:', Object.keys(payload), 'userId:', userId)
   if (!userId) return null
+  if (typeof payload.exp !== 'number') return null
 
   const sessionIssuedAtMs =
     typeof payload.iat === 'number' ? payload.iat * 1000 : null
@@ -85,8 +86,6 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
       usernameSet: Boolean(payload.usernameSet),
       sessionIssuedAtMs,
     },
-    expires: new Date(
-      ((payload.exp as number) ?? 0) * 1000,
-    ).toISOString(),
+    expires: new Date(payload.exp * 1000).toISOString(),
   } as Session
 }
