@@ -10,9 +10,25 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json().catch(() => null)
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !Object.prototype.hasOwnProperty.call(body, 'slug')
+  ) {
+    return NextResponse.json({ error: 'slug is required' }, { status: 400 })
+  }
   // slug can be a valid TeamSlug string or null (to clear)
-  const slug: TeamSlug | null = body?.slug ?? null
+  const slugValue = (body as { slug: unknown }).slug
+  if (slugValue !== null && typeof slugValue !== 'string') {
+    return NextResponse.json({ error: 'slug must be a string or null' }, { status: 400 })
+  }
+  const slug: TeamSlug | null = slugValue === null ? null : (slugValue as TeamSlug)
 
   try {
     await setFavoriteTeam(session.user.id, slug)
