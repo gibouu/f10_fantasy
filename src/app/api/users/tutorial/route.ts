@@ -11,10 +11,13 @@ export async function PATCH(request: NextRequest) {
   }
 
   let body: { dismissed?: unknown } = {}
-  try {
-    body = await request.json()
-  } catch {
-    // Empty body is treated as dismiss=true for this simple endpoint.
+  const rawBody = await request.text()
+  if (rawBody.trim().length > 0) {
+    try {
+      body = JSON.parse(rawBody)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
   }
 
   if (body.dismissed === false) {
