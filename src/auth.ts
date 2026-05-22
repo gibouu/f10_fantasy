@@ -73,6 +73,9 @@ export const auth = (async (...args: any[]) => {
     where: { id: session.user.id },
     select: { sessionValidAfter: true },
   });
+  if (!user) {
+    return null;
+  }
 
   const sessionIssuedAtMs = session.user.sessionIssuedAtMs;
 
@@ -81,7 +84,7 @@ export const auth = (async (...args: any[]) => {
   // ms-precise sessionValidAfter set at user-creation time and get rejected
   // immediately on the very first authenticated request.
   if (
-    user?.sessionValidAfter &&
+    user.sessionValidAfter &&
     typeof sessionIssuedAtMs === "number" &&
     sessionIssuedAtMs < Math.floor(user.sessionValidAfter.getTime() / 1000) * 1000
   ) {
