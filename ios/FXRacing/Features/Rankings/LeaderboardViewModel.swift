@@ -13,28 +13,43 @@ final class LeaderboardViewModel {
     var userRow: LeaderboardRow? = nil
     var isLoading = false
     var errorMessage: String? = nil
-    var scope: Scope = .global
+    private var loadGeneration = 0
+    var scope: Scope = .global {
+        didSet {
+            guard oldValue != scope else { return }
+            loadGeneration += 1
+            isLoading = false
+        }
+    }
 
     private let client = APIClient()
 
     func load(token: String?) async {
+        loadGeneration += 1
+        let generation = loadGeneration
+        let requestedScope = scope
+
         isLoading = true
         errorMessage = nil
-        fxLog(.score, "leaderboard load scope=\(scope.rawValue)")
+        fxLog(.score, "leaderboard load scope=\(requestedScope.rawValue)")
         do {
             let response: LeaderboardResponse = try await client.request(
-                .leaderboard(scope: scope.rawValue, sort: "season"),
+                .leaderboard(scope: requestedScope.rawValue, sort: "season"),
                 token: token
             )
+            guard generation == loadGeneration, scope == requestedScope else { return }
             rows = response.rows
             userRank = response.userRank
             userRow = response.userRow
             fxLog(.score, "leaderboard rows=\(response.rows.count) userRank=\(response.userRank.map(String.init) ?? "nil")")
         } catch {
+            guard generation == loadGeneration, scope == requestedScope else { return }
             errorMessage = error.localizedDescription
-            fxError(.score, "leaderboard load failed scope=\(scope.rawValue): \(error.localizedDescription)")
+            fxError(.score, "leaderboard load failed scope=\(requestedScope.rawValue): \(error.localizedDescription)")
         }
-        isLoading = false
+        if generation == loadGeneration, scope == requestedScope {
+            isLoading = false
+        }
     }
 
     func switchScope(to newScope: Scope, token: String?) async {
