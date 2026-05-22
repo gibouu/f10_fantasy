@@ -16,6 +16,8 @@ import type { NextRequest } from 'next/server'
 import { db } from '@/lib/db/client'
 import { createF1Provider } from '@/lib/f1/adapter'
 
+const MIN_VALID_ENTRY_COUNT = 10
+
 function validateCronSecret(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
   if (!secret) return false
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
       id: true,
       name: true,
       openf1SessionKey: true,
+      _count: { select: { entries: true } },
     },
   })
 
@@ -152,15 +155,30 @@ export async function POST(req: NextRequest) {
 
   // Rebuild RaceEntry rows for each refreshed race.
   let refreshed = 0
+  const skipped: Array<{ raceId: string; reason: string }> = []
 
   for (const { race, drivers } of sessionResults) {
-    if (drivers.length === 0) continue
+    if (drivers.length === 0) {
+      skipped.push({ raceId: race.id, reason: 'no-provider-drivers' })
+      continue
+    }
 
     const entries = drivers
       .map((d) => ({ raceId: race.id, driverId: driverIdByNumber.get(d.driverNumber) }))
       .filter((e): e is { raceId: string; driverId: string } => e.driverId !== undefined)
 
-    if (entries.length === 0) continue
+    const existingCount = race._count.entries
+    if (entries.length < MIN_VALID_ENTRY_COUNT) {
+      skipped.push({ raceId: race.id, reason: `too-few-entries:${entries.length}` })
+      continue
+    }
+    if (existingCount > 0 && entries.length < existingCount) {
+      skipped.push({
+        raceId: race.id,
+        reason: `entry-count-regression:${existingCount}->${entries.length}`,
+      })
+      continue
+    }
 
     await db.$transaction([
       db.raceEntry.deleteMany({ where: { raceId: race.id } }),
@@ -170,5 +188,5 @@ export async function POST(req: NextRequest) {
     refreshed++
   }
 
-  return NextResponse.json({ refreshed, total: upcomingRaces.length })
+  return NextResponse.json({ refreshed, skipped, total: upcomingRaces.length })
 }
