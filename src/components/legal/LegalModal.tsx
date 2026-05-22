@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -122,59 +123,40 @@ export function LegalModal() {
   const [open, setOpen] = React.useState(false)
   const [tab, setTab] = React.useState<Tab>('Privacy')
 
-  // Reset tab when reopening
-  const handleOpen = () => {
-    setTab('Privacy')
-    setOpen(true)
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) setTab('Privacy')
+    setOpen(nextOpen)
   }
-
-  // Close on backdrop click
-  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) setOpen(false)
-  }
-
-  // Close on Escape
-  React.useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
 
   return (
-    <>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       {/* ── Trigger ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-center gap-3 py-6 text-text-tertiary">
         <span className="text-xs">© FX Racing 2026</span>
         <span className="text-xs opacity-40">·</span>
-        <button
-          type="button"
-          onClick={handleOpen}
+        <Dialog.Trigger
           className="text-xs hover:text-text-secondary transition-colors"
         >
           boring legal stuff
-        </button>
+        </Dialog.Trigger>
       </div>
 
       {/* ── Modal ───────────────────────────────────────────────────── */}
-      {open && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4"
-          onClick={handleBackdrop}
-        >
-          <div className="w-full max-w-[400px] rounded-[28px] bg-surface shadow-[0_32px_96px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden max-h-[80vh]">
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/70" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[80] flex max-h-[80vh] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[28px] bg-surface shadow-[0_32px_96px_rgba(0,0,0,0.5)]">
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
-              <span className="text-sm font-bold text-text-primary">Legal &amp; Support</span>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
+              <Dialog.Title className="text-sm font-bold text-text-primary">
+                Legal &amp; Support
+              </Dialog.Title>
+              <Dialog.Close
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated hover:bg-surface-elevated/80 transition-colors"
                 aria-label="Close"
               >
                 <X className="h-4 w-4 text-text-tertiary" />
-              </button>
+              </Dialog.Close>
             </div>
 
             {/* Tab strip */}
@@ -202,9 +184,8 @@ export function LegalModal() {
             <div className="overflow-y-auto px-5 py-5">
               {CONTENT[tab]}
             </div>
-          </div>
-        </div>
-      )}
-    </>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
