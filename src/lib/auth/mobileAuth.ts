@@ -59,9 +59,12 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
       where: { id: userId },
       select: { sessionValidAfter: true },
     })
+    if (!user) {
+      return null
+    }
 
     if (
-      user?.sessionValidAfter &&
+      user.sessionValidAfter &&
       sessionIssuedAtMs !== null &&
       sessionIssuedAtMs <
         Math.floor(user.sessionValidAfter.getTime() / 1000) * 1000
