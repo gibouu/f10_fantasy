@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test:routes": "node --test src/app/api/account/delete-handler.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
