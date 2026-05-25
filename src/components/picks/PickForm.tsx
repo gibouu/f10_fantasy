@@ -242,15 +242,32 @@ export function PickForm({
   existingPick,
   isLocked,
 }: PickFormProps) {
-  const [selected, setSelected] = React.useState<SelectedDrivers>({
-    tenth: existingPick?.tenthPlaceDriverId ?? null,
-    winner: existingPick?.winnerDriverId ?? null,
-    dnf: existingPick?.dnfDriverId ?? null,
-  })
+  const tenthPlaceDriverId = existingPick?.tenthPlaceDriverId ?? null
+  const winnerDriverId = existingPick?.winnerDriverId ?? null
+  const dnfDriverId = existingPick?.dnfDriverId ?? null
+
+  const initialSelected = React.useMemo(
+    () => ({
+      tenth: tenthPlaceDriverId,
+      winner: winnerDriverId,
+      dnf: dnfDriverId,
+    }),
+    [tenthPlaceDriverId, winnerDriverId, dnfDriverId],
+  )
+
+  const [selected, setSelected] = React.useState<SelectedDrivers>(() =>
+    initialSelected,
+  )
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
 
   const groups = React.useMemo(() => groupByTeam(entrants), [entrants])
+
+  React.useEffect(() => {
+    setSelected(initialSelected)
+    setStatus('idle')
+    setErrorMsg(null)
+  }, [race.id, initialSelected])
 
   const handleSelect = (slot: PickSlot, driverId: string) => {
     setSelected((prev) => ({
