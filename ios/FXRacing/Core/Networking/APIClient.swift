@@ -39,14 +39,14 @@ struct APIClient: Sendable {
         case 200...299:
             fxLog(.network, "\(pathTag) → \(http.statusCode) (\(ms)ms, \(data.count)B, \(auth))")
             do {
-                return try JSONDecoder.api.decode(T.self, from: data)
+                return try JSONDecoder.api().decode(T.self, from: data)
             } catch {
                 let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
                 fxError(.network, "\(pathTag) — decode \(T.self) failed: \(error.localizedDescription); body[0..200]=\(preview)")
                 throw APIError.decodingFailed(error)
             }
         case 401:
-            let message = (try? JSONDecoder.api.decode(APIErrorBody.self, from: data))?.error
+            let message = (try? JSONDecoder.api().decode(APIErrorBody.self, from: data))?.error
             fxWarn(.network, "\(pathTag) → 401 (\(ms)ms, \(auth)) \(message ?? "")")
             if let message {
                 throw APIError.serverError(401, message)
@@ -56,7 +56,7 @@ struct APIClient: Sendable {
             fxWarn(.network, "\(pathTag) → 404 (\(ms)ms, \(auth))")
             throw APIError.notFound
         default:
-            let message = (try? JSONDecoder.api.decode(APIErrorBody.self, from: data))?.error
+            let message = (try? JSONDecoder.api().decode(APIErrorBody.self, from: data))?.error
             fxWarn(.network, "\(pathTag) → \(http.statusCode) (\(ms)ms, \(auth)) \(message ?? "")")
             throw APIError.serverError(http.statusCode, message)
         }
@@ -98,9 +98,9 @@ private struct APIErrorBody: Decodable {
 }
 
 extension JSONDecoder {
-    static let api: JSONDecoder = {
+    static func api() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
-    }()
+    }
 }
