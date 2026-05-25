@@ -243,14 +243,22 @@ export async function getFriendsLeaderboard(
 }
 
 /**
- * Get a single user's rank on the global season leaderboard.
+ * Get a single user's rank on the selected global leaderboard.
  * Returns null if the user has no scored picks in the season.
  */
+export async function getUserLeaderboardRank(
+  userId: string,
+  seasonId: string,
+  sort: string,
+): Promise<number | null> {
+  const leaderboard = await getGlobalLeaderboard(seasonId, sort, 10_000)
+  const entry = leaderboard.find((row) => row.userId === userId)
+  return entry?.rank ?? null
+}
+
 export async function getUserSeasonRank(
   userId: string,
   seasonId: string,
 ): Promise<number | null> {
-  const leaderboard = await getGlobalLeaderboard(seasonId, 'season', 10_000)
-  const entry = leaderboard.find((row) => row.userId === userId)
-  return entry?.rank ?? null
+  return getUserLeaderboardRank(userId, seasonId, 'season')
 }

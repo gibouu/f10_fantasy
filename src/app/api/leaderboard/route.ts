@@ -1,51 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
   getGlobalLeaderboard,
   getFriendsLeaderboard,
-  getUserSeasonRank,
+  getUserLeaderboardRank,
 } from '@/lib/services/leaderboard.service'
 import { getActiveSeason } from '@/lib/services/race.service'
+import { handleLeaderboardGet } from './get-handler'
 
 export async function GET(request: NextRequest) {
-  // Parse query params
-  const { searchParams } = request.nextUrl
-  const scope = searchParams.get('scope') === 'friends' ? 'friends' : 'global'
-  // sort = 'season' (full season) or a specific raceId
-  const sort = searchParams.get('sort') ?? 'season'
-
-  // Auth is required for Friends scope and optional for Global scope.
-  const session = (await auth()) ?? (await mobileAuth(request))
-  const userId = session?.user?.id ?? null
-  if (scope === 'friends' && !userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Determine season — prefer explicit param, fall back to active season
-  const seasonIdParam = searchParams.get('seasonId')
-  let seasonId: string | null = seasonIdParam
-
-  if (!seasonId) {
-    const active = await getActiveSeason()
-    seasonId = active?.id ?? null
-  }
-
-  if (!seasonId) {
-    return NextResponse.json({ rows: [], userRank: null, userRow: null })
-  }
-
-  // Fetch rows
-  const rows =
-    scope === 'friends'
-      ? await getFriendsLeaderboard(userId, seasonId, sort)
-      : await getGlobalLeaderboard(seasonId, sort, 20)
-
-  // User's own rank on the global season board (for pinned row logic)
-  const userRank = userId ? await getUserSeasonRank(userId, seasonId) : null
-
-  // Find the user's row in the returned set (may be null if they're outside top 20)
-  const userRow = userId ? (rows.find((r) => r.userId === userId) ?? null) : null
-
-  return NextResponse.json({ rows, userRank, userRow })
+  return handleLeaderboardGet(request, {
+    auth,
+    mobileAuth,
+    getActiveSeason,
+    getGlobalLeaderboard,
+    getFriendsLeaderboard,
+    getUserLeaderboardRank,
+  })
 }
