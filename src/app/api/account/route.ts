@@ -8,23 +8,11 @@
  *   Account, Session, PickSet → ScoreBreakdown, FriendRequest (both directions)
  */
 
-import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import { deleteUser } from '@/lib/services/user.service'
+import { deleteAccountForSession } from './delete-handler'
 
 export async function DELETE(req: Request) {
-  const session = (await auth()) ?? (await mobileAuth(req))
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  try {
-    await deleteUser(session.user.id)
-    console.log(`[account/delete] userId=${session.user.id}`)
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    console.error('[account/delete] failed:', err)
-    return NextResponse.json({ error: 'Deletion failed' }, { status: 500 })
-  }
+  return deleteAccountForSession(req, { auth, mobileAuth, deleteUser })
 }
