@@ -111,13 +111,16 @@ export async function setUsername(
       throw new Error(`Username "${username}" is already taken`)
     }
 
-    await tx.user.update({
-      where: { id: userId },
+    const updated = await tx.user.updateMany({
+      where: { id: userId, usernameSet: false },
       data: {
         publicUsername: stored,
         usernameSet: true,
       },
     })
+    if (updated.count !== 1) {
+      throw new Error('Username is already set')
+    }
   })
 
   return stored
