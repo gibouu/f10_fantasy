@@ -57,3 +57,51 @@ test("GET keeps season as the default userRank sort", async () => {
   assert.deepEqual(rankCalls, [{ userId: "user-1", seasonId: "season-1", sort: "season" }])
   assert.equal((await response.json()).userRank, 2)
 })
+
+test("GET allows unauthenticated global leaderboard reads", async () => {
+  const globalCalls = []
+  const rankCalls = []
+  const response = await handleLeaderboardGet(
+    request("http://localhost/api/leaderboard?scope=global&sort=season&seasonId=season-1"),
+    dependencies({
+      auth: async () => null,
+      mobileAuth: async () => null,
+      getGlobalLeaderboard: async (seasonId, sort, limit) => {
+        globalCalls.push({ seasonId, sort, limit })
+        return [{ userId: "user-2", rank: 1 }]
+      },
+      getUserLeaderboardRank: async (...args) => {
+        rankCalls.push(args)
+        return 1
+      },
+    }),
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(globalCalls, [{ seasonId: "season-1", sort: "season", limit: 20 }])
+  assert.deepEqual(rankCalls, [])
+  assert.deepEqual(await response.json(), {
+    rows: [{ userId: "user-2", rank: 1 }],
+    userRank: null,
+    userRow: null,
+  })
+})
+
+test("GET requires authentication for friends leaderboard reads", async () => {
+  const friendsCalls = []
+  const response = await handleLeaderboardGet(
+    request("http://localhost/api/leaderboard?scope=friends&sort=season&seasonId=season-1"),
+    dependencies({
+      auth: async () => null,
+      mobileAuth: async () => null,
+      getFriendsLeaderboard: async (...args) => {
+        friendsCalls.push(args)
+        return []
+      },
+    }),
+  )
+
+  assert.equal(response.status, 401)
+  assert.deepEqual(friendsCalls, [])
+  assert.deepEqual(await response.json(), { error: "Unauthorized" })
+})
