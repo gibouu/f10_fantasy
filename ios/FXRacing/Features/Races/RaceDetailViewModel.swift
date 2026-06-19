@@ -59,6 +59,13 @@ final class RaceDetailViewModel {
             return
         }
 
+        errorMessage = nil
+        serverPick = nil
+        isLocalOnly = false
+        selectedWinner = nil
+        selectedP10 = nil
+        selectedDNF = nil
+
         // Populate selections: server pick takes precedence over local pick
         if let token {
             do {
