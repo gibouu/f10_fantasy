@@ -10,6 +10,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { db } from "@/lib/db/client"
 import { createF1Provider } from "@/lib/f1/adapter"
+import { fetchDriversForSessions } from "./driver-fetch"
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -111,18 +112,12 @@ export async function POST(req: NextRequest) {
     ...qualifyingSessions,
   ]
 
-  // ── 5. Fetch drivers for all relevant sessions in parallel ─────────────────
+  // ── 5. Fetch drivers for all relevant sessions with bounded concurrency ────
   type DriverList = Awaited<ReturnType<typeof provider.getDriversForSession>>
-  const sessionDrivers = await Promise.all(
-    driverFetchSessions.map(async (session) => {
-      try {
-        const drivers = await provider.getDriversForSession(session.sessionKey)
-        return { session, drivers }
-      } catch {
-        return { session, drivers: [] as DriverList }
-      }
-    }),
-  )
+  const sessionDrivers = await fetchDriversForSessions(driverFetchSessions, {
+    getDriversForSession: (sessionKey: number) =>
+      provider.getDriversForSession(sessionKey),
+  })
 
   // ── 6. Upsert Race records (Race + Sprint sessions only) ───────────────────
   // For each Race row we also pair the qualifying session that precedes it
