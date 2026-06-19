@@ -76,8 +76,8 @@ export async function POST(req: NextRequest) {
         : undefined
 
     if (newStatus) {
-      await db.race.update({
-        where: { id: race.id },
+      await db.race.updateMany({
+        where: { id: race.id, status: "UPCOMING" },
         data: { status: newStatus },
       })
     }
