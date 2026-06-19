@@ -42,10 +42,16 @@ type DriftRow = {
   raceStatus: string
   liveTenth: string
   lockedTenth: string | null
+  liveTenthSeatKey: string | null
+  lockedTenthSeatKey: string | null
   liveWinner: string
   lockedWinner: string | null
+  liveWinnerSeatKey: string | null
+  lockedWinnerSeatKey: string | null
   liveDnf: string
   lockedDnf: string | null
+  liveDnfSeatKey: string | null
+  lockedDnfSeatKey: string | null
 }
 
 async function main() {
@@ -87,19 +93,28 @@ async function main() {
       r.status::text                 AS "raceStatus",
       ps."tenthPlaceDriverId"        AS "liveTenth",
       ps."lockedTenthPlaceDriverId"  AS "lockedTenth",
+      ps."tenthPlaceSeatKey"         AS "liveTenthSeatKey",
+      ps."lockedTenthPlaceSeatKey"   AS "lockedTenthSeatKey",
       ps."winnerDriverId"            AS "liveWinner",
       ps."lockedWinnerDriverId"      AS "lockedWinner",
+      ps."winnerSeatKey"             AS "liveWinnerSeatKey",
+      ps."lockedWinnerSeatKey"       AS "lockedWinnerSeatKey",
       ps."dnfDriverId"               AS "liveDnf",
-      ps."lockedDnfDriverId"         AS "lockedDnf"
+      ps."lockedDnfDriverId"         AS "lockedDnf",
+      ps."dnfSeatKey"                AS "liveDnfSeatKey",
+      ps."lockedDnfSeatKey"          AS "lockedDnfSeatKey"
     FROM "PickSet" ps
     JOIN "Race" r ON r.id = ps."raceId"
     JOIN "User" u ON u.id = ps."userId"
     WHERE ps."lockedAt" IS NOT NULL
       AND ps."lockedTenthPlaceDriverId" IS NOT NULL
       AND (
-        ps."tenthPlaceDriverId" <> ps."lockedTenthPlaceDriverId" OR
-        ps."winnerDriverId"     <> ps."lockedWinnerDriverId"     OR
-        ps."dnfDriverId"        <> ps."lockedDnfDriverId"
+        ps."tenthPlaceDriverId" IS DISTINCT FROM ps."lockedTenthPlaceDriverId" OR
+        ps."winnerDriverId"     IS DISTINCT FROM ps."lockedWinnerDriverId"     OR
+        ps."dnfDriverId"        IS DISTINCT FROM ps."lockedDnfDriverId"        OR
+        ps."tenthPlaceSeatKey"  IS DISTINCT FROM ps."lockedTenthPlaceSeatKey"  OR
+        ps."winnerSeatKey"      IS DISTINCT FROM ps."lockedWinnerSeatKey"      OR
+        ps."dnfSeatKey"         IS DISTINCT FROM ps."lockedDnfSeatKey"
       )
     ORDER BY r."scheduledStartUtc" DESC
   `
@@ -131,7 +146,7 @@ async function main() {
 
   if (drift.length > 0) {
     console.log(
-      `[snapshot drift] Found ${drift.length} PickSet(s) where live driver IDs no longer match the locked snapshot — direct evidence of tampering (trigger missing/bypassed):\n`,
+      `[snapshot drift] Found ${drift.length} PickSet(s) where live driver/seat fields no longer match the locked snapshot — direct evidence of tampering (trigger missing/bypassed):\n`,
     )
     for (const d of drift) {
       console.log(
@@ -140,10 +155,16 @@ async function main() {
       console.log(`             pickSetId=${d.pickSetId}`)
       if (d.liveTenth !== d.lockedTenth)
         console.log(`             tenthPlace: live=${d.liveTenth}  locked=${d.lockedTenth}`)
+      if (d.liveTenthSeatKey !== d.lockedTenthSeatKey)
+        console.log(`             tenthSeat : live=${d.liveTenthSeatKey}  locked=${d.lockedTenthSeatKey}`)
       if (d.liveWinner !== d.lockedWinner)
         console.log(`             winner    : live=${d.liveWinner}  locked=${d.lockedWinner}`)
+      if (d.liveWinnerSeatKey !== d.lockedWinnerSeatKey)
+        console.log(`             winnerSeat: live=${d.liveWinnerSeatKey}  locked=${d.lockedWinnerSeatKey}`)
       if (d.liveDnf !== d.lockedDnf)
         console.log(`             dnf       : live=${d.liveDnf}  locked=${d.lockedDnf}`)
+      if (d.liveDnfSeatKey !== d.lockedDnfSeatKey)
+        console.log(`             dnfSeat   : live=${d.liveDnfSeatKey}  locked=${d.lockedDnfSeatKey}`)
       console.log()
     }
   }
