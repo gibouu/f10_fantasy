@@ -156,6 +156,7 @@ export async function getRaceById(
       scheduledStartUtc: true,
       lockCutoffUtc: true,
       status: true,
+      qualifyingStartUtc: true,
     },
   })
 
