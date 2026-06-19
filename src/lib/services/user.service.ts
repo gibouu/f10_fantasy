@@ -3,6 +3,7 @@
  */
 
 import { db } from '@/lib/db/client'
+import { nextSessionRevocationCutoff } from '@/lib/auth/session-cutoff'
 import { TEAMS } from '@/lib/f1/teams'
 import type { TeamSlug } from '@/lib/f1/teams'
 
@@ -273,7 +274,7 @@ export async function deleteUser(userId: string): Promise<void> {
 export async function revokeUserSessions(userId: string): Promise<Date> {
   const user = await db.user.update({
     where: { id: userId },
-    data: { sessionValidAfter: new Date() },
+    data: { sessionValidAfter: nextSessionRevocationCutoff() },
     select: { sessionValidAfter: true },
   })
 
