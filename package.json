@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "test:routes": "node --test src/app/api/account/delete-handler.test.mjs src/app/api/users/username/post-handler.test.mjs src/app/api/picks/post-handler.test.mjs src/app/api/leaderboard/get-handler.test.mjs src/app/api/cron/sync-schedule/driver-fetch.test.mjs",
+    "test:scripts": "node --test scripts/find-cheated-picks.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
