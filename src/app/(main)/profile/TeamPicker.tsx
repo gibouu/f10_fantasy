@@ -13,9 +13,12 @@ interface TeamPickerProps {
 export function TeamPicker({ teams, initialSlug }: TeamPickerProps) {
   const [selected, setSelected] = React.useState<string | null>(initialSlug)
   const [status, setStatus] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const saveRequestRef = React.useRef(0)
 
   async function pick(slug: string | null) {
+    const previous = selected
     const next = selected === slug ? null : slug
+    const requestId = ++saveRequestRef.current
     setSelected(next)
     setStatus('saving')
 
@@ -26,12 +29,18 @@ export function TeamPicker({ teams, initialSlug }: TeamPickerProps) {
         body: JSON.stringify({ slug: next }),
       })
       if (!res.ok) throw new Error()
+      if (saveRequestRef.current !== requestId) return
       setStatus('saved')
-      setTimeout(() => setStatus('idle'), 1500)
+      setTimeout(() => {
+        if (saveRequestRef.current === requestId) setStatus('idle')
+      }, 1500)
     } catch {
-      setSelected(selected) // revert
+      if (saveRequestRef.current !== requestId) return
+      setSelected(previous)
       setStatus('error')
-      setTimeout(() => setStatus('idle'), 2000)
+      setTimeout(() => {
+        if (saveRequestRef.current === requestId) setStatus('idle')
+      }, 2000)
     }
   }
 
