@@ -115,6 +115,7 @@ export default async function RacePickPage({
 
   const showResults =
     race.status === RaceStatus.COMPLETED || existingPick?.scoreBreakdown != null
+  const signInHref = `/signin?callbackUrl=${encodeURIComponent(`/races/${params.raceId}`)}`
 
   return (
     <div className="px-4 pt-3 pb-6 flex flex-col gap-4">
@@ -146,7 +147,7 @@ export default async function RacePickPage({
             <div className="rounded-2xl bg-surface border border-[var(--border)] p-4 text-center">
               <p className="text-sm text-text-secondary mb-3">Sign in to see your picks and score</p>
               <Link
-                href={`/signin?callbackUrl=/races/${params.raceId}`}
+                href={signInHref}
                 className="inline-flex items-center justify-center rounded-xl bg-accent text-white text-sm font-semibold px-5 py-2.5"
               >
                 Sign in
