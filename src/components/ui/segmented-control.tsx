@@ -37,6 +37,7 @@ export function SegmentedControl({
           <button
             key={opt.value}
             type="button"
+            aria-pressed={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
               'relative flex-1 py-1.5 text-sm font-medium rounded-full transition-colors duration-150',
