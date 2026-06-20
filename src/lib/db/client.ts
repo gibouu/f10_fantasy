@@ -3,6 +3,7 @@ import {
   decryptTokenValue,
   encryptTokenValue,
 } from "@/lib/security/account-token-crypto";
+import { transformTokenFields } from "@/lib/db/token-field-transform";
 
 // Extend the global type to hold the cached client in dev.
 // This prevents multiple PrismaClient instances from being created
@@ -10,54 +11,6 @@ import {
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
-}
-
-const TOKEN_FIELDS = new Set(["access_token", "refresh_token", "id_token"]);
-
-function transformTokenFields(
-  value: unknown,
-  transform: (token: string) => string,
-): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => transformTokenFields(entry, transform));
-  }
-
-  if (value instanceof Date || Buffer.isBuffer(value)) {
-    return value;
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const record = value as Record<string, unknown>;
-  const nextRecord: Record<string, unknown> = {};
-
-  for (const [key, raw] of Object.entries(record)) {
-    if (TOKEN_FIELDS.has(key)) {
-      if (typeof raw === "string") {
-        nextRecord[key] = transform(raw);
-        continue;
-      }
-
-      if (
-        raw &&
-        typeof raw === "object" &&
-        "set" in raw &&
-        typeof (raw as { set?: unknown }).set === "string"
-      ) {
-        nextRecord[key] = {
-          ...(raw as Record<string, unknown>),
-          set: transform((raw as { set: string }).set),
-        };
-        continue;
-      }
-    }
-
-    nextRecord[key] = transformTokenFields(raw, transform);
-  }
-
-  return nextRecord;
 }
 
 function createPrismaClient(): PrismaClient {
