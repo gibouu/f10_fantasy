@@ -163,7 +163,9 @@ struct UsernameChangeView: View {
 
     var body: some View {
         NavigationStack {
-            UsernamePickerView(isChange: true)
+            UsernamePickerView(isChange: true) {
+                dismiss()
+            }
                 .navigationTitle("Change Username")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
