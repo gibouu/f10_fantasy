@@ -20,9 +20,11 @@ export function UsernameChangeForm({ currentUsername }: { currentUsername: strin
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const availabilityRequestRef = useRef(0)
 
   const checkAvailability = useCallback((value: string) => {
     if (debounce.current) clearTimeout(debounce.current)
+    const requestId = ++availabilityRequestRef.current
     const fmt = validateUsername(value)
     if (fmt || !value) { setIsAvailable(null); setIsChecking(false); return }
     setIsChecking(true)
@@ -30,14 +32,16 @@ export function UsernameChangeForm({ currentUsername }: { currentUsername: strin
       try {
         const res = await fetch(`/api/users/username?username=${encodeURIComponent(value)}`)
         const data: { available: boolean } = await res.json()
+        if (availabilityRequestRef.current !== requestId) return
         setIsAvailable(data.available)
         if (!data.available) setError('Username already taken.')
         else setError(null)
       } catch {
+        if (availabilityRequestRef.current !== requestId) return
         setIsAvailable(null)
         setError("Couldn't verify username. Please try again.")
       } finally {
-        setIsChecking(false)
+        if (availabilityRequestRef.current === requestId) setIsChecking(false)
       }
     }, 400)
   }, [])
