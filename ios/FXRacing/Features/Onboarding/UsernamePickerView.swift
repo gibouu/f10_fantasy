@@ -4,9 +4,11 @@ struct UsernamePickerView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(GuestStore.self)  private var guestStore
     @State private var viewModel: UsernamePickerViewModel
+    private let onSuccess: (() -> Void)?
 
-    init(isChange: Bool = false) {
+    init(isChange: Bool = false, onSuccess: (() -> Void)? = nil) {
         _viewModel = State(initialValue: UsernamePickerViewModel(isChange: isChange))
+        self.onSuccess = onSuccess
     }
     @FocusState private var fieldFocused: Bool
 
@@ -101,7 +103,12 @@ struct UsernamePickerView: View {
 
         return Button {
             fieldFocused = false
-            Task { await viewModel.submit(authManager: authManager) }
+            Task {
+                let didSubmit = await viewModel.submit(authManager: authManager)
+                if didSubmit {
+                    onSuccess?()
+                }
+            }
         } label: {
             Group {
                 if viewModel.isSubmitting {
