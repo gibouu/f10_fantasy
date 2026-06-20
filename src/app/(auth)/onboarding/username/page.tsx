@@ -42,6 +42,7 @@ export default function UsernameOnboardingPage() {
 
   // Ref to cancel stale availability checks
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const availabilityRequestRef = useRef(0)
 
   // Fetch suggestions once on mount
   useEffect(() => {
@@ -56,6 +57,7 @@ export default function UsernameOnboardingPage() {
   // Debounced availability check: fires 400ms after the user stops typing
   const checkAvailability = useCallback((value: string) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    const requestId = ++availabilityRequestRef.current
 
     const formatError = validateUsername(value)
     if (formatError || value.length === 0) {
@@ -71,6 +73,7 @@ export default function UsernameOnboardingPage() {
           `/api/users/username?username=${encodeURIComponent(value)}`,
         )
         const data: { available: boolean } = await res.json()
+        if (availabilityRequestRef.current !== requestId) return
         setIsAvailable(data.available)
         if (!data.available) {
           setError("Username already taken.")
@@ -78,10 +81,11 @@ export default function UsernameOnboardingPage() {
           setError(null)
         }
       } catch {
+        if (availabilityRequestRef.current !== requestId) return
         setIsAvailable(null)
         setError("Couldn't verify username. Please try again.")
       } finally {
-        setIsChecking(false)
+        if (availabilityRequestRef.current === requestId) setIsChecking(false)
       }
     }, 400)
   }, [])
