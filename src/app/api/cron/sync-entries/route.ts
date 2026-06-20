@@ -2,7 +2,7 @@
  * Cron: lightweight refresh of RaceEntry rows for upcoming races.
  *
  * Unlike sync-schedule (which fetches all sessions and meetings for the year),
- * this route only touches races that are not yet completed — using the
+ * this route only touches upcoming/live races — using the
  * openf1SessionKey already stored in the Race record to fetch current drivers.
  *
  * Safe to run hourly. Handles mid-season driver swaps and substitutes.
@@ -33,11 +33,11 @@ export async function POST(req: NextRequest) {
 
   const provider = createF1Provider()
 
-  // Only process races that are not yet completed and have a known OpenF1 session key.
+  // Only process races whose entry lists can still change and have a known OpenF1 session key.
   // LIVE races are included so the entry list stays accurate right up to race start.
   const upcomingRaces = await db.race.findMany({
     where: {
-      status: { not: 'COMPLETED' },
+      status: { in: ['UPCOMING', 'LIVE'] },
       openf1SessionKey: { not: null },
     },
     select: {
