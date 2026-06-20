@@ -1,0 +1,12 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
+
+const page = await readFile(new URL("./page.tsx", import.meta.url), "utf8")
+
+test("onboarding username availability ignores stale async responses", () => {
+  assert.match(page, /availabilityRequestRef = useRef\(0\)/)
+  assert.match(page, /const requestId = \+\+availabilityRequestRef\.current/)
+  assert.match(page, /availabilityRequestRef\.current !== requestId/)
+  assert.match(page, /availabilityRequestRef\.current === requestId/)
+})
