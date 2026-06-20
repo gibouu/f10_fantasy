@@ -35,11 +35,19 @@ final class SyncManager {
                 continue
             }
 
-            // Check if server already has a pick (server wins on conflict)
-            if await checkServerPick(raceId: localPick.raceId, token: token) {
+            // Check if server already has a pick (server wins on conflict).
+            // Unknown preflight failures must not be treated as missing; leave
+            // the local pick unsynced so a later migration can retry safely.
+            switch await checkServerPick(raceId: localPick.raceId, token: token) {
+            case .exists:
                 fxLog(.sync, "skip raceId=\(localPick.raceId) (server already has pick)")
                 localPickStore.markSynced(raceId: localPick.raceId)
                 continue
+            case .failed:
+                fxWarn(.sync, "server pick check failed raceId=\(localPick.raceId) — will retry on next sign-in")
+                continue
+            case .missing:
+                break
             }
 
             // Upload
@@ -55,14 +63,20 @@ final class SyncManager {
 
     // MARK: - Private
 
-    private func checkServerPick(raceId: String, token: String) async -> Bool {
+    private enum ServerPickStatus {
+        case exists
+        case missing
+        case failed
+    }
+
+    private func checkServerPick(raceId: String, token: String) async -> ServerPickStatus {
         do {
             let _: PickWrapper = try await api.request(.pickForRace(raceId: raceId), token: token)
-            return true
+            return .exists
         } catch APIError.notFound {
-            return false
+            return .missing
         } catch {
-            return false  // conservative — treat unknown errors as "no pick found"
+            return .failed
         }
     }
 
