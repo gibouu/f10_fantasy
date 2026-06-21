@@ -47,8 +47,14 @@ export default function UsernameOnboardingPage() {
   // Fetch suggestions once on mount
   useEffect(() => {
     fetch("/api/users/suggest-usernames")
-      .then((r) => r.json())
-      .then((data: { suggestions: string[] }) => setSuggestions(data.suggestions))
+      .then(async (r) => {
+        if (!r.ok) return []
+
+        const data: unknown = await r.json()
+        const suggestions = (data as { suggestions?: unknown }).suggestions
+        return Array.isArray(suggestions) ? suggestions : []
+      })
+      .then(setSuggestions)
       .catch(() => {
         // Suggestions are non-critical — silently ignore network errors
       })
