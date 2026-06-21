@@ -7,10 +7,16 @@ import {
 } from "@/lib/services/leaderboard.service"
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList"
 import Link from "next/link"
+import {
+  normalizeLeaderboardScope,
+  normalizeLeaderboardSort,
+} from "./search-params"
+
+type LeaderboardSearchParamValue = string | string[] | undefined
 
 interface LeaderboardSearchParams {
-  scope?: string
-  sort?: string
+  scope?: LeaderboardSearchParamValue
+  sort?: LeaderboardSearchParamValue
 }
 
 export default async function LeaderboardPage({
@@ -21,10 +27,6 @@ export default async function LeaderboardPage({
   const session = await auth()
   const userId = session?.user?.id ?? null
 
-  // Guests can only see global leaderboard
-  const scope = userId && searchParams.scope === "friends" ? "friends" : "global"
-  const sort = searchParams.sort ?? "season"
-
   const season = await getActiveSeason()
   if (!season) {
     return (
@@ -34,10 +36,17 @@ export default async function LeaderboardPage({
     )
   }
 
+  // Guests can only see global leaderboard.
+  const scope = normalizeLeaderboardScope(searchParams.scope, Boolean(userId))
+
   const allRaces = await getRacesForSeason(season.id)
   const completedRaces = allRaces
     .filter((r) => r.status === "COMPLETED")
     .map((r) => ({ id: r.id, round: r.round, name: r.name, type: r.type }))
+  const sort = normalizeLeaderboardSort(
+    searchParams.sort,
+    completedRaces.map((race) => race.id),
+  )
 
   const [rows, userRank] = await Promise.all([
     scope === "friends" && userId
