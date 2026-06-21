@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { Lock, X, Check, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -12,11 +12,48 @@ import type { DriverSummary, SerializedPickSetData, SerializedRaceSummary } from
 type Slot = 'tenth' | 'winner' | 'dnf'
 
 const SLOT_ORDER: Slot[] = ['winner', 'tenth', 'dnf'] // P1 left · P10 center · DNF right
+const PENDING_PICK_STORAGE_PREFIX = 'fxracing.pendingPick.'
 
 const SLOT_META: Record<Slot, { label: string; title: string; pickSize: number; resultSize: number }> = {
   tenth:  { label: 'P10', title: 'Pick P10 Driver',   pickSize: 92,  resultSize: 50 },
   winner: { label: 'P1',  title: 'Pick Race Winner',  pickSize: 66,  resultSize: 38 },
   dnf:    { label: 'DNF', title: 'Pick DNF Driver',   pickSize: 66,  resultSize: 38 },
+}
+
+interface PickPayload {
+  raceId: string
+  tenthPlaceDriverId: string
+  winnerDriverId: string
+  dnfDriverId: string
+}
+
+function pendingPickStorageKey(raceId: string): string {
+  return `${PENDING_PICK_STORAGE_PREFIX}${raceId}`
+}
+
+function parsePendingPick(raw: string | null, raceId: string): PickPayload | null {
+  if (!raw) return null
+
+  try {
+    const data = JSON.parse(raw) as Partial<PickPayload>
+    if (
+      data.raceId !== raceId ||
+      typeof data.tenthPlaceDriverId !== 'string' ||
+      typeof data.winnerDriverId !== 'string' ||
+      typeof data.dnfDriverId !== 'string'
+    ) {
+      return null
+    }
+
+    return {
+      raceId: data.raceId,
+      tenthPlaceDriverId: data.tenthPlaceDriverId,
+      winnerDriverId: data.winnerDriverId,
+      dnfDriverId: data.dnfDriverId,
+    }
+  } catch {
+    return null
+  }
 }
 
 // ─── Pick bubble ─────────────────────────────────────────────────────────────
@@ -303,12 +340,77 @@ export function PickHero({
   const allPicked = SLOT_ORDER.every((s) => selected[s] !== null)
   const canSave = allPicked && !isLocked && saveStatus !== 'loading'
 
+  const buildPickPayload = useCallback((pickState: Record<Slot, string | null>): PickPayload | null => {
+    if (!pickState.tenth || !pickState.winner || !pickState.dnf) return null
+
+    return {
+      raceId: race.id,
+      tenthPlaceDriverId: pickState.tenth,
+      winnerDriverId: pickState.winner,
+      dnfDriverId: pickState.dnf,
+    }
+  }, [race.id])
+
+  const submitPickPayload = useCallback(async (payload: PickPayload) => {
+    const res = await fetch('/api/picks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error((data as { error?: string }).error ?? 'Failed to save picks')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (requiresSignIn || isLocked) return
+
+    const storageKey = pendingPickStorageKey(race.id)
+
+    if (existingPick) {
+      window.localStorage.removeItem(storageKey)
+      return
+    }
+
+    const pendingPick = parsePendingPick(window.localStorage.getItem(storageKey), race.id)
+    if (!pendingPick) return
+
+    window.localStorage.removeItem(storageKey)
+    setSelected({
+      tenth: pendingPick.tenthPlaceDriverId,
+      winner: pendingPick.winnerDriverId,
+      dnf: pendingPick.dnfDriverId,
+    })
+    setSaveStatus('loading')
+    setErrorMsg(null)
+
+    let cancelled = false
+    submitPickPayload(pendingPick)
+      .then(() => {
+        if (!cancelled) setSaveStatus('success')
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setSaveStatus('error')
+        setErrorMsg(err instanceof Error ? err.message : 'Something went wrong')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [existingPick, isLocked, race.id, requiresSignIn, submitPickPayload])
+
   const handleSave = async () => {
     if (!canSave) return
+    const payload = buildPickPayload(selected)
+    if (!payload) return
 
     if (requiresSignIn) {
       setErrorMsg(null)
       setSaveStatus('loading')
+      window.localStorage.setItem(pendingPickStorageKey(race.id), JSON.stringify(payload))
       await signIn('google', { callbackUrl: `/races/${race.id}` })
       setSaveStatus('idle')
       return
@@ -318,22 +420,7 @@ export function PickHero({
     setErrorMsg(null)
 
     try {
-      const res = await fetch('/api/picks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          raceId: race.id,
-          tenthPlaceDriverId: selected.tenth,
-          winnerDriverId: selected.winner,
-          dnfDriverId: selected.dnf,
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error((data as { error?: string }).error ?? 'Failed to save picks')
-      }
-
+      await submitPickPayload(payload)
       setSaveStatus('success')
     } catch (err) {
       setSaveStatus('error')
