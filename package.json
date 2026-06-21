@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test:routes": "node --test src/app/api/account/delete-handler.test.mjs src/app/api/users/username/post-handler.test.mjs src/app/api/picks/post-handler.test.mjs src/app/api/leaderboard/get-handler.test.mjs src/app/api/friends/patch-handler.test.mjs src/app/api/cron/sync-schedule/driver-fetch.test.mjs src/app/api/cron/lock-picks/route.test.mjs src/app/api/cron/sync-entries/route.test.mjs",
+    "test:routes": "node --test src/app/api/account/delete-handler.test.mjs src/app/api/users/username/post-handler.test.mjs src/app/api/picks/post-handler.test.mjs src/app/api/leaderboard/get-handler.test.mjs src/app/api/friends/patch-handler.test.mjs src/app/api/cron/sync-schedule/driver-fetch.test.mjs src/app/api/cron/lock-picks/route.test.mjs src/app/api/cron/sync-entries/route.test.mjs src/app/api/diag/race/route.test.mjs",
     "test:auth": "node --test src/lib/auth/session-cutoff.test.mjs",
     "test:db": "node --test src/lib/db/token-field-transform.test.mjs",
     "test:components": "node --test src/components/ui/segmented-control.test.mjs 'src/app/(main)/profile/profile-async-guards.test.mjs' src/components/picks/PickHero.test.mjs",
