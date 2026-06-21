@@ -10,3 +10,9 @@ test("onboarding username availability ignores stale async responses", () => {
   assert.match(page, /availabilityRequestRef\.current !== requestId/)
   assert.match(page, /availabilityRequestRef\.current === requestId/)
 })
+
+test("onboarding username suggestions ignore non-success and malformed payloads", () => {
+  assert.match(page, /if \(!r\.ok\) return \[\]/)
+  assert.match(page, /Array\.isArray\(suggestions\)/)
+  assert.doesNotMatch(page, /setSuggestions\(data\.suggestions\)/)
+})
