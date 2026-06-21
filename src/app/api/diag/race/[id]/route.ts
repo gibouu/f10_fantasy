@@ -91,6 +91,7 @@ export async function GET(
   const now = new Date()
   const lockCutoffPassed = race.lockCutoffUtc <= now
   const startedScheduled = race.scheduledStartUtc <= now
+  const lockPicksOwnsRace = race.status === "UPCOMING" || race.status === "LIVE"
 
   // Heuristic mismatch flags — surface anything obviously off so the user can
   // decide which cron to re-run from their phone.
@@ -126,7 +127,7 @@ export async function GET(
     )
   }
   if (
-    race.status !== "COMPLETED" &&
+    lockPicksOwnsRace &&
     startedScheduled &&
     race.status !== "LIVE"
   ) {
@@ -135,7 +136,7 @@ export async function GET(
     )
   }
   if (
-    race.status !== "COMPLETED" &&
+    lockPicksOwnsRace &&
     lockCutoffPassed &&
     pickSetCount > 0
   ) {
