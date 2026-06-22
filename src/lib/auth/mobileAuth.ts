@@ -41,7 +41,6 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   }
 
   const userId = (payload.id ?? payload.sub) as string | undefined
-  console.log('[mobileAuth] token keys:', Object.keys(payload), 'userId:', userId)
   if (!userId) return null
   if (typeof payload.exp !== 'number') return null
 
