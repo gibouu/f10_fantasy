@@ -7,12 +7,21 @@ const source = await readFile(
   "utf8",
 )
 
-test("sendFriendRequest verifies the addressee exists before creating a request", () => {
-  const sendBlock = source.match(
-    /export async function sendFriendRequest[\s\S]*?\/\*\*\n \* Accept a friend request/,
-  )?.[0]
+function serviceBlock(startText, endText) {
+  const start = source.indexOf(startText)
+  const end = source.indexOf(endText, start)
 
-  assert.ok(sendBlock, "sendFriendRequest source block should exist")
+  assert.notEqual(start, -1, `${startText} source block should exist`)
+  assert.notEqual(end, -1, `${endText} source block should follow ${startText}`)
+
+  return source.slice(start, end)
+}
+
+test("sendFriendRequest verifies the addressee exists before creating a request", () => {
+  const sendBlock = serviceBlock(
+    "export async function sendFriendRequest",
+    "export async function acceptFriendRequest",
+  )
   const existenceCheckIndex = sendBlock.indexOf("tx.user.findUnique")
   const createIndex = sendBlock.indexOf("tx.friendRequest.create")
 
@@ -25,4 +34,38 @@ test("sendFriendRequest verifies the addressee exists before creating a request"
     "addressee existence should be checked before friendRequest.create",
   )
   assert.match(sendBlock, /throw new Error\('Friend request recipient not found'\)/)
+})
+
+test("acceptFriendRequest conditionally accepts only pending requests for the addressee", () => {
+  const acceptBlock = serviceBlock(
+    "export async function acceptFriendRequest",
+    "export async function rejectFriendRequest",
+  )
+
+  assert.doesNotMatch(acceptBlock, /friendRequest\.update\(/)
+  assert.match(
+    acceptBlock,
+    /db\.friendRequest\.updateMany\(\{\s*where: \{ id: requestId, addresseeId: userId, status: 'PENDING' \},\s*data: \{ status: 'ACCEPTED' \},\s*\}\)/,
+  )
+  assert.match(
+    acceptBlock,
+    /if \(updated\.count !== 1\) \{\s*throw new Error\('Friend request is no longer pending'\)\s*\}/,
+  )
+})
+
+test("rejectFriendRequest conditionally rejects only pending requests for either party", () => {
+  const rejectBlock = serviceBlock(
+    "export async function rejectFriendRequest",
+    "export async function getPendingRequests",
+  )
+
+  assert.doesNotMatch(rejectBlock, /friendRequest\.update\(/)
+  assert.match(
+    rejectBlock,
+    /db\.friendRequest\.updateMany\(\{\s*where: \{\s*id: requestId,\s*status: 'PENDING',\s*OR: \[\{ requesterId: userId \}, \{ addresseeId: userId \}\],\s*\},\s*data: \{ status: 'REJECTED' \},\s*\}\)/,
+  )
+  assert.match(
+    rejectBlock,
+    /if \(updated\.count !== 1\) \{\s*throw new Error\('Friend request is no longer pending'\)\s*\}/,
+  )
 })
