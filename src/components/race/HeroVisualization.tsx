@@ -4,7 +4,6 @@ import * as React from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 
-import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { LockCountdown } from '@/components/race/LockCountdown'
 import type { SerializedRaceSummary, SerializedPickSetWithScore, DriverSummary } from '@/types/domain'
