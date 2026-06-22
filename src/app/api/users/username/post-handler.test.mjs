@@ -14,6 +14,20 @@ function validFormat() {
   return { valid: true }
 }
 
+test("POST rejects valid JSON null bodies", async () => {
+  const response = await handleUsernamePost(jsonRequest(null), {
+    auth: async () => ({ user: { id: "user-1" } }),
+    mobileAuth: async () => null,
+    validateUsernameFormat: validFormat,
+    setUsername: async () => {
+      throw new Error("setUsername should not run")
+    },
+  })
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: "username must be a non-empty string" })
+})
+
 test("POST rejects users that already set a username", async () => {
   let storedUsername = "oldname"
 
