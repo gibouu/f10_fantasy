@@ -2,7 +2,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import type { DriverSummary, RaceResultRecord } from '@/types/domain'
 import { ResultStatus } from '@/types/domain'
-import { getResultScoreGuide, getScoringCaps } from '@/lib/scoring/formula'
+import { getResultScoreGuide } from '@/lib/scoring/formula'
 
 interface RaceResultsCardProps {
   results: RaceResultRecord[]
@@ -31,8 +31,6 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
     return 0
   })
 
-  const caps = getScoringCaps(raceType)
-
   return (
     <div className="rounded-2xl bg-surface border border-[var(--border)] overflow-hidden">
       {/* Header */}
@@ -55,7 +53,7 @@ export function RaceResultsCard({ results, entrants, raceType }: RaceResultsCard
           let ptsLabel: string
           let ptsColor: string
           if (isWinner) {
-            ptsLabel = `+${caps.winner}W`
+            ptsLabel = `+${guide.winner}W`
             ptsColor = 'text-[#30d158]'
           } else if (isNonClassified) {
             ptsLabel = `+${guide.dnf}D`
