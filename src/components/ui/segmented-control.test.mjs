@@ -8,3 +8,10 @@ test("SegmentedControl exposes selected button state to assistive technology", (
   assert.match(source, /role="group"/)
   assert.match(source, /aria-pressed=\{isActive\}/)
 })
+
+test("SegmentedControl scopes the active pill layout id per instance", () => {
+  assert.match(source, /React\.useId\(\)/)
+  assert.match(source, /const activePillLayoutId = `segmented-control-pill-\$\{controlId\}`/)
+  assert.match(source, /layoutId=\{activePillLayoutId\}/)
+  assert.doesNotMatch(source, /layoutId="segmented-control-pill"/)
+})

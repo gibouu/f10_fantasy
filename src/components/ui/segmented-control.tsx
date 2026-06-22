@@ -23,6 +23,9 @@ export function SegmentedControl({
   onChange,
   className,
 }: SegmentedControlProps) {
+  const controlId = React.useId()
+  const activePillLayoutId = `segmented-control-pill-${controlId}`
+
   return (
     <div
       className={cn(
@@ -48,7 +51,7 @@ export function SegmentedControl({
             {/* Sliding indicator — sits behind label text */}
             {isActive && (
               <motion.span
-                layoutId="segmented-control-pill"
+                layoutId={activePillLayoutId}
                 className="absolute inset-0 rounded-full bg-[rgba(0,0,0,0.07)] shadow-sm"
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               />
