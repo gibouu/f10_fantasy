@@ -1,3 +1,5 @@
+import { readJsonObjectBody } from "../../../lib/api/request-body.js"
+
 const DOMAIN_ERROR_STATUSES = [
   [/^Friend request recipient not found$/, 404],
   [/^You cannot send a friend request to yourself$/, 400],
@@ -23,14 +25,14 @@ export async function handleFriendRequestPost(
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
+  const parsedBody = await readJsonObjectBody(request, {
+    nonObjectMessage: "addresseeId is required",
+  })
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
 
-  const addresseeId = body && typeof body === "object" ? body.addresseeId : undefined
+  const addresseeId = parsedBody.body.addresseeId
   if (typeof addresseeId !== "string" || !addresseeId) {
     return Response.json({ error: "addresseeId is required" }, { status: 400 })
   }

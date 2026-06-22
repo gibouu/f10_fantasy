@@ -10,6 +10,13 @@ function jsonRequest(body) {
   })
 }
 
+function rawRequest(body) {
+  return new Request("http://localhost/api/picks", {
+    method: "POST",
+    body,
+  })
+}
+
 function dependencies(overrides = {}) {
   return {
     auth: async () => ({ user: { id: "user-1" } }),
@@ -35,6 +42,35 @@ test("POST returns a generic 500 for unexpected pick save failures", async () =>
   assert.deepEqual(await response.json(), { error: "Failed to save pick" })
   assert.equal(logs.length, 1)
   assert.equal(String(logs[0][1].message).includes("Prisma connection"), true)
+})
+
+test("POST rejects non-object pick bodies before validation", async () => {
+  const response = await handlePickPost(jsonRequest([]), dependencies({
+    createPickSchema: {
+      parse: () => {
+        throw new Error("schema should not parse non-object bodies")
+      },
+    },
+    createOrUpdatePick: async () => {
+      throw new Error("createOrUpdatePick should not run")
+    },
+  }))
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: "Request body must be a JSON object" })
+})
+
+test("POST rejects malformed pick JSON before validation", async () => {
+  const response = await handlePickPost(rawRequest("{"), dependencies({
+    createPickSchema: {
+      parse: () => {
+        throw new Error("schema should not parse malformed JSON")
+      },
+    },
+  }))
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: "Invalid JSON body" })
 })
 
 test("POST preserves locked race domain errors", async () => {

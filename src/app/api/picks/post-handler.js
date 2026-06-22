@@ -1,3 +1,5 @@
+import { readJsonObjectBody } from "../../../lib/api/request-body.js"
+
 export async function handlePickPost(
   req,
   {
@@ -15,16 +17,14 @@ export async function handlePickPost(
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let body
-  try {
-    body = await req.json()
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
+  const parsedBody = await readJsonObjectBody(req)
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
 
   let input
   try {
-    input = createPickSchema.parse(body)
+    input = createPickSchema.parse(parsedBody.body)
   } catch (err) {
     if (isValidationError(err)) {
       return Response.json(

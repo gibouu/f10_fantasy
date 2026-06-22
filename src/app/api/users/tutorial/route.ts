@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { readJsonObjectBody } from '@/lib/api/request-body'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import { dismissTutorial } from '@/lib/services/user.service'
 
@@ -10,15 +11,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { dismissed?: unknown } = {}
-  const rawBody = await request.text()
-  if (rawBody.trim().length > 0) {
-    try {
-      body = JSON.parse(rawBody)
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-    }
+  const parsedBody = await readJsonObjectBody(request, { allowEmpty: true })
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
+  const body = parsedBody.body
 
   if (body.dismissed === false) {
     return NextResponse.json({ error: 'dismissed must be true' }, { status: 400 })

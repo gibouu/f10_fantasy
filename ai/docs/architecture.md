@@ -141,6 +141,7 @@ Only CLASSIFIED drivers count for position scoring.
 ## Common Patterns
 
 - Service layer owns all business logic — API routes are thin wrappers
+- API routes that parse JSON object bodies use `src/lib/api/request-body.js` before destructuring request data
 - `resolveTeam()` + `DRIVER_PHOTOS` are injected in `getRaceEntrants()` — never at the component level
 - Guest access: middleware allows public routes; pages handle `userId = null` gracefully
 - Client components that need data use SWR; server components use direct service calls

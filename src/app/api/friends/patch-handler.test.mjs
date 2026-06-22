@@ -36,6 +36,24 @@ test("PATCH returns a generic 500 for unexpected friendship failures", async () 
   assert.deepEqual(await response.json(), { error: "Failed to update friend request" })
 })
 
+test("PATCH rejects non-object friend action bodies before service calls", async () => {
+  const response = await handleFriendRequestPatch(
+    jsonRequest([]),
+    { id: "request-1" },
+    authedDeps({
+      acceptFriendRequest: async () => {
+        throw new Error("acceptFriendRequest should not run")
+      },
+      rejectFriendRequest: async () => {
+        throw new Error("rejectFriendRequest should not run")
+      },
+    }),
+  )
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: 'action must be "accept" or "reject"' })
+})
+
 test("PATCH preserves expected friendship domain errors as 4xx", async () => {
   const response = await handleFriendRequestPatch(
     jsonRequest({ action: "reject" }),
