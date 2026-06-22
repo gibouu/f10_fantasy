@@ -1,15 +1,12 @@
 import { readJsonObjectBody } from "../../../lib/api/request-body.js"
+import { sanitizedErrorResponse } from "../../../lib/api/errors.js"
 
-const DOMAIN_ERROR_STATUSES = [
-  [/^Friend request recipient not found$/, 404],
-  [/^You cannot send a friend request to yourself$/, 400],
-  [/^You are already friends with this user$/, 409],
-  [/^A friend request already exists between these users$/, 409],
+const FRIEND_REQUEST_DOMAIN_ERRORS = [
+  { pattern: /^Friend request recipient not found$/, status: 404 },
+  { pattern: /^You cannot send a friend request to yourself$/, status: 400 },
+  { pattern: /^You are already friends with this user$/, status: 409 },
+  { pattern: /^A friend request already exists between these users$/, status: 409 },
 ]
-
-function mapDomainError(message) {
-  return DOMAIN_ERROR_STATUSES.find(([pattern]) => pattern.test(message))?.[1] ?? null
-}
 
 export async function handleFriendRequestPost(
   request,
@@ -41,16 +38,11 @@ export async function handleFriendRequestPost(
     const friendRequest = await sendFriendRequest(session.user.id, addresseeId)
     return Response.json(friendRequest, { status: 201 })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to send friend request"
-    const domainStatus = mapDomainError(message)
-    if (domainStatus) {
-      return Response.json({ error: message }, { status: domainStatus })
-    }
-
-    logError("[friends] Failed to send friend request", err)
-    return Response.json(
-      { error: "Failed to send friend request" },
-      { status: 500 },
-    )
+    return sanitizedErrorResponse(err, {
+      domainErrors: FRIEND_REQUEST_DOMAIN_ERRORS,
+      fallbackMessage: "Failed to send friend request",
+      logger: logError,
+      logMessage: "[friends] Failed to send friend request",
+    })
   }
 }

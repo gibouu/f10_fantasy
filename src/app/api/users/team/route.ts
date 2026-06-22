@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
+import { sanitizedErrorResponse } from '@/lib/api/errors'
 import { readJsonObjectBody } from '@/lib/api/request-body'
 import { setFavoriteTeam } from '@/lib/services/user.service'
 import type { TeamSlug } from '@/lib/f1/teams'
@@ -35,9 +36,10 @@ export async function PATCH(req: Request) {
     await setFavoriteTeam(session.user.id, slug)
     return NextResponse.json({ ok: true })
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to update team' },
-      { status: 400 },
-    )
+    return sanitizedErrorResponse(err, {
+      domainErrors: [{ pattern: /^Unknown team slug:/, status: 400 }],
+      fallbackMessage: 'Failed to update team',
+      logMessage: '[users/team] Failed to update team',
+    })
   }
 }

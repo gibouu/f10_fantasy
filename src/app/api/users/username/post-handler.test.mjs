@@ -45,6 +45,24 @@ test("POST rejects users that already set a username", async () => {
   assert.equal(storedUsername, "oldname")
 })
 
+test("POST returns a generic 500 for unexpected username persistence failures", async () => {
+  const logs = []
+  const response = await handleUsernamePost(jsonRequest({ username: "newname" }), {
+    auth: async () => ({ user: { id: "user-1" } }),
+    mobileAuth: async () => null,
+    validateUsernameFormat: validFormat,
+    setUsername: async () => {
+      throw new Error("Prisma connection string leaked")
+    },
+    logger: { error: (...args) => logs.push(args) },
+  })
+
+  assert.equal(response.status, 500)
+  assert.deepEqual(await response.json(), { error: "Failed to set username" })
+  assert.equal(logs.length, 1)
+  assert.equal(String(logs[0][1].message).includes("Prisma connection"), true)
+})
+
 test("POST sets an initial username", async () => {
   const response = await handleUsernamePost(jsonRequest({ username: "FirstName" }), {
     auth: async () => ({ user: { id: "user-1" } }),

@@ -1,4 +1,13 @@
 import { readJsonObjectBody } from "../../../../lib/api/request-body.js"
+import { sanitizedErrorResponse } from "../../../../lib/api/errors.js"
+
+const USERNAME_SET_DOMAIN_ERRORS = [
+  { pattern: /^Username is already set$/, status: 400 },
+  { pattern: /already taken/, status: 409 },
+  { pattern: /^Username must /, status: 400 },
+  { pattern: /^Only letters and numbers allowed\.$/, status: 400 },
+  { pattern: /^Invalid username format$/, status: 400 },
+]
 
 export async function handleUsernamePost(
   req,
@@ -8,6 +17,7 @@ export async function handleUsernamePost(
     setUsername,
     validateUsernameFormat,
     isUniqueConstraintError = (_err) => false,
+    logger = console,
   },
 ) {
   const session = (await auth()) ?? (await mobileAuth(req))
@@ -40,17 +50,19 @@ export async function handleUsernamePost(
   try {
     stored = await setUsername(session.user.id, username)
   } catch (err) {
-    if (isUniqueConstraintError(err)) {
-      return Response.json({ error: "Username is already taken" }, { status: 409 })
-    }
-
-    const message = err instanceof Error ? err.message : "Unknown error"
-
-    if (message.includes("already taken")) {
-      return Response.json({ error: message }, { status: 409 })
-    }
-
-    return Response.json({ error: message }, { status: 400 })
+    return sanitizedErrorResponse(err, {
+      domainErrors: [
+        {
+          when: isUniqueConstraintError,
+          message: "Username is already taken",
+          status: 409,
+        },
+        ...USERNAME_SET_DOMAIN_ERRORS,
+      ],
+      fallbackMessage: "Failed to set username",
+      logger,
+      logMessage: "[users/username] Failed to set username",
+    })
   }
 
   return Response.json({ ok: true, username: stored })

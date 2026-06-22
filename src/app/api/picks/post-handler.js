@@ -1,4 +1,12 @@
 import { readJsonObjectBody } from "../../../lib/api/request-body.js"
+import { sanitizedErrorResponse } from "../../../lib/api/errors.js"
+
+const PICK_SAVE_DOMAIN_ERRORS = [
+  { pattern: /locked/i, status: 423 },
+  { pattern: /^Race not found:/, status: 404 },
+  { pattern: /^The following driver IDs are not registered entrants for this race:/, status: 400 },
+  { pattern: /^A pick set already exists for this race/, status: 409 },
+]
 
 export async function handlePickPost(
   req,
@@ -39,17 +47,11 @@ export async function handlePickPost(
     const pick = await createOrUpdatePick(session.user.id, input)
     return Response.json({ pick })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error"
-
-    if (message.toLowerCase().includes("locked")) {
-      return Response.json({ error: message }, { status: 423 })
-    }
-
-    if (message.includes("not found")) {
-      return Response.json({ error: message }, { status: 404 })
-    }
-
-    logger.error("Failed to save pick", err)
-    return Response.json({ error: "Failed to save pick" }, { status: 500 })
+    return sanitizedErrorResponse(err, {
+      domainErrors: PICK_SAVE_DOMAIN_ERRORS,
+      fallbackMessage: "Failed to save pick",
+      logger,
+      logMessage: "Failed to save pick",
+    })
   }
 }

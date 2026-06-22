@@ -11,6 +11,7 @@ import {
   changeUsername,
 } from "@/lib/services/user.service"
 import { readJsonObjectBody } from "@/lib/api/request-body"
+import { sanitizedErrorResponse, type DomainErrorRule } from "@/lib/api/errors"
 import { getClientIp, rateLimit } from "@/lib/security/rate-limit"
 
 export const dynamic = "force-dynamic"
@@ -18,6 +19,16 @@ export const dynamic = "force-dynamic"
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
 }
+
+const USERNAME_CHANGE_DOMAIN_ERRORS: DomainErrorRule[] = [
+  { pattern: /already taken/, status: 409 },
+  { pattern: /^You must set a username before changing it$/, status: 400 },
+  { pattern: /^You have already used your one-time username change$/, status: 400 },
+  { pattern: /^That is already your username$/, status: 400 },
+  { pattern: /^Username must /, status: 400 },
+  { pattern: /^Only letters and numbers allowed\.$/, status: 400 },
+  { pattern: /^Invalid username format$/, status: 400 },
+]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/users/username — set username during onboarding
@@ -64,15 +75,19 @@ export async function PATCH(req: NextRequest) {
   try {
     stored = await changeUsername(session.user.id, username)
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return NextResponse.json({ error: "Username is already taken" }, { status: 409 })
-    }
-
-    const message = err instanceof Error ? err.message : "Unknown error"
-    if (message.includes("already taken")) {
-      return NextResponse.json({ error: message }, { status: 409 })
-    }
-    return NextResponse.json({ error: message }, { status: 400 })
+    return sanitizedErrorResponse(err, {
+      domainErrors: [
+        {
+          when: (error) =>
+            error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002",
+          message: "Username is already taken",
+          status: 409,
+        },
+        ...USERNAME_CHANGE_DOMAIN_ERRORS,
+      ],
+      fallbackMessage: "Failed to change username",
+      logMessage: "[users/username] Failed to change username",
+    })
   }
 
   return NextResponse.json({ ok: true, username: stored })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { auth } from '@/auth'
+import { sanitizedErrorResponse } from '@/lib/api/errors'
 import { readJsonObjectBody } from '@/lib/api/request-body'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import { dismissTutorial } from '@/lib/services/user.service'
@@ -27,7 +28,9 @@ export async function PATCH(request: NextRequest) {
       tutorialDismissedAt: tutorialDismissedAt.toISOString(),
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update tutorial state'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return sanitizedErrorResponse(error, {
+      fallbackMessage: 'Failed to update tutorial state',
+      logMessage: '[users/tutorial] Failed to update tutorial state',
+    })
   }
 }
