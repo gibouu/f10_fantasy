@@ -7,7 +7,10 @@ import type { Session } from "next-auth"
 type User = Session["user"] | null
 
 function getInitials(user: NonNullable<User>): string {
-  const name = user.name ?? user.email ?? user.publicUsername ?? "?"
+  const candidates = [user.name, user.email, user.publicUsername]
+  const name = candidates
+    .map((value) => value?.trim())
+    .find((value): value is string => Boolean(value)) ?? "?"
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase()
