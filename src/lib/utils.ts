@@ -61,15 +61,15 @@ export function msToCountdown(ms: number): string {
 // ─────────────────────────────────────────────
 
 /**
- * Return an inline CSS `color` style string for a team color hex value.
+ * Return an inline CSS `color` style object for a team color hex value.
  *
  * Usage in JSX: `<span style={{ ...getTeamColorStyle('#E8002D') }}>`
  *
  * @param hex - Full hex string with or without '#' prefix
  */
-export function getTeamColorClass(hex: string): string {
+export function getTeamColorStyle(hex: string): { color: string } {
   const normalized = hex.startsWith('#') ? hex : `#${hex}`
-  return `color: ${normalized}`
+  return { color: normalized }
 }
 
 /**
