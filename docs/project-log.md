@@ -12,7 +12,7 @@ Full project scaffold generated. Every major layer now has working TypeScript fi
 - `.env.example` — all required vars documented with setup notes
 - `next.config.mjs` — image domains, Auth.js v5 compat
 - `tsconfig.json` — updated to `moduleResolution: bundler` for App Router
-- `vercel.json` — cron job schedule (sync-schedule daily, lock-picks every min, compute-scores every 15min)
+- Cron schedules now live outside the repo in AWS EventBridge/Lambda; see `ai/docs/cron-operations.md`
 
 #### Auth
 - `src/auth.ts` — Auth.js v5 config with Google + Apple providers, PrismaAdapter, JWT session strategy
@@ -88,7 +88,7 @@ Full project scaffold generated. Every major layer now has working TypeScript fi
 
 **OpenF1 as provider**: `OpenF1Provider` implements `F1ProviderAdapter`. Final results derived from last position snapshot + race control messages for DNF detection (with TODO for refinement). Provider swappable by replacing one file.
 
-**Lock cron**: `vercel.json` runs `/api/cron/lock-picks` every minute. Route finds all races past `lockCutoffUtc` and locks their pick sets via `lockPicksForRace()`. This means lock is always within 60s of cutoff.
+**Lock cron**: AWS EventBridge/Lambda invokes `/api/cron/lock-picks` on the external schedule. Route finds all races past `lockCutoffUtc` and locks their pick sets via `lockPicksForRace()`.
 
 **Idempotent scoring**: `computeAndStoreScoresForRace(raceId)` is safe to call repeatedly. Uses upsert. `computeAndStoreScoresForRace` runs after result ingestion and also on a 15-minute cron.
 

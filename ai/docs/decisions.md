@@ -35,7 +35,7 @@ Do not log temporary debugging notes here.
 - Reason: More control over scheduling, retries, and execution environment. No cron config lives in the repo.
 - Tradeoffs: External dependency on AWS; schedules not visible in the repo.
 - Affected areas: All `/api/cron/*` routes. Any new cron requires an AWS Lambda trigger to be configured externally.
-- Follow-up: Document the AWS Lambda config somewhere accessible.
+- Follow-up: Runbook lives in `ai/docs/cron-operations.md`.
 
 ### 2026-04-15 — No DB migrations, use db:push
 - Status: accepted
