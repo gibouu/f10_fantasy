@@ -3,6 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
+import { ClientErrorReporter } from "./ClientErrorReporter"
 import { shouldRefreshForSessionStatus } from "./session-sync"
 
 /**
@@ -29,6 +30,7 @@ function SessionSync() {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
+      <ClientErrorReporter />
       <SessionSync />
       {children}
     </SessionProvider>

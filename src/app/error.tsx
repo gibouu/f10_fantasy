@@ -1,6 +1,7 @@
 'use client';
  
 import { useEffect } from 'react';
+import { reportClientError } from '@/lib/observability/report-client-error';
  
 export default function Error({
   error,
@@ -10,8 +11,11 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Optionally log the error to an error reporting service
-    console.error(error);
+    reportClientError({
+      kind: 'boundary',
+      message: error.message || 'Client error boundary',
+      digest: error.digest,
+    });
   }, [error]);
  
   return (
