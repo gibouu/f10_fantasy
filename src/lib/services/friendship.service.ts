@@ -132,6 +132,15 @@ export async function sendFriendRequest(
       throw new Error('A friend request already exists between these users')
     }
 
+    const addressee = await tx.user.findUnique({
+      where: { id: addresseeId },
+      select: { id: true },
+    })
+
+    if (!addressee) {
+      throw new Error('Friend request recipient not found')
+    }
+
     const fr = await tx.friendRequest.create({
       data: {
         requesterId,
