@@ -1,17 +1,14 @@
 import { readJsonObjectBody } from "../../../../lib/api/request-body.js"
+import { sanitizedErrorResponse } from "../../../../lib/api/errors.js"
 
-const DOMAIN_ERROR_STATUSES = [
-  [/^Friend request not found:/, 404],
-  [/^Only the addressee can accept a friend request$/, 403],
-  [/^You are not a party to this friend request$/, 403],
-  [/^Friend request is already /, 400],
-  [/^Friend request is no longer pending$/, 400],
-  [/^Cannot reject an already accepted friend request$/, 400],
+const FRIEND_ACTION_DOMAIN_ERRORS = [
+  { pattern: /^Friend request not found:/, status: 404 },
+  { pattern: /^Only the addressee can accept a friend request$/, status: 403 },
+  { pattern: /^You are not a party to this friend request$/, status: 403 },
+  { pattern: /^Friend request is already /, status: 400 },
+  { pattern: /^Friend request is no longer pending$/, status: 400 },
+  { pattern: /^Cannot reject an already accepted friend request$/, status: 400 },
 ]
-
-function mapDomainError(message) {
-  return DOMAIN_ERROR_STATUSES.find(([pattern]) => pattern.test(message))?.[1] ?? null
-}
 
 export async function handleFriendRequestPatch(
   request,
@@ -56,16 +53,11 @@ export async function handleFriendRequestPatch(
     }
     return Response.json({ success: true })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update request"
-    const domainStatus = mapDomainError(message)
-    if (domainStatus) {
-      return Response.json({ error: message }, { status: domainStatus })
-    }
-
-    logError("[friends/:id] Failed to update friend request", err)
-    return Response.json(
-      { error: "Failed to update friend request" },
-      { status: 500 },
-    )
+    return sanitizedErrorResponse(err, {
+      domainErrors: FRIEND_ACTION_DOMAIN_ERRORS,
+      fallbackMessage: "Failed to update friend request",
+      logger: logError,
+      logMessage: "[friends/:id] Failed to update friend request",
+    })
   }
 }

@@ -83,3 +83,16 @@ test("POST preserves locked race domain errors", async () => {
   assert.equal(response.status, 423)
   assert.deepEqual(await response.json(), { error: "Race is locked" })
 })
+
+test("POST preserves pick validation domain errors", async () => {
+  const response = await handlePickPost(jsonRequest({ raceId: "race-1" }), dependencies({
+    createOrUpdatePick: async () => {
+      throw new Error("The following driver IDs are not registered entrants for this race: driver-1")
+    },
+  }))
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), {
+    error: "The following driver IDs are not registered entrants for this race: driver-1",
+  })
+})
