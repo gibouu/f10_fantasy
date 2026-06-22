@@ -5,6 +5,10 @@ struct ProfileView: View {
     @State private var vm: FriendProfileViewModel? = nil
     @State private var showSettings = false
 
+    private var profileRefreshKey: ProfileRefreshKey {
+        ProfileRefreshKey(user: authManager.authenticatedUser)
+    }
+
     var body: some View {
         Group {
             if authManager.isAuthenticated {
@@ -53,7 +57,7 @@ struct ProfileView: View {
                 ownProfileList(profile, vm: profileVm)
             }
         }
-        .task { await profileVm.load(token: authManager.accessToken) }
+        .task(id: profileRefreshKey) { await profileVm.load(token: authManager.accessToken) }
         .refreshable { await profileVm.load(token: authManager.accessToken) }
     }
 
@@ -173,5 +177,17 @@ struct ProfileView: View {
         Circle()
             .fill(color)
             .frame(width: 6, height: 6)
+    }
+}
+
+private struct ProfileRefreshKey: Equatable {
+    let userId: String?
+    let publicUsername: String?
+    let favoriteTeamSlug: String?
+
+    init(user: User?) {
+        userId = user?.id
+        publicUsername = user?.publicUsername
+        favoriteTeamSlug = user?.favoriteTeamSlug
     }
 }
