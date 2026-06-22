@@ -11,3 +11,10 @@ test("PickHero preserves unauthenticated picks across sign-in", () => {
   assert.match(source, /submitPickPayload\(pendingPick\)/)
   assert.match(source, /window\.localStorage\.removeItem\(storageKey\)/)
 })
+
+test("PickHero hides saved feedback after local selections change", () => {
+  assert.match(source, /const \[savedPayloadKey, setSavedPayloadKey\]/)
+  assert.match(source, /const showSavedStatus =\s*saveStatus === 'success' &&\s*currentPayloadKey !== null &&\s*currentPayloadKey === savedPayloadKey/)
+  assert.match(source, /setSaveStatus\(\(status\) => \(status === 'loading' \? status : 'idle'\)\)/)
+  assert.match(source, /onSelect=\{\(id\) => updateSelectedSlot\(activeSlot!, id\)\}/)
+})
