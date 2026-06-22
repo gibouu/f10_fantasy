@@ -2,6 +2,21 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 
 ## Getting Started
 
+Install dependencies:
+
+```bash
+npm install
+```
+
+Use Vercel CLI 54.14.2 or newer for deployment-related local commands:
+
+```bash
+npm i -g vercel@latest
+vercel --version
+```
+
+This was last verified with Vercel CLI 54.14.5.
+
 First, run the development server:
 
 ```bash
@@ -32,5 +47,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Scheduled jobs are not Vercel Cron jobs. See `ai/docs/cron-operations.md` for the AWS Lambda/EventBridge runbook.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
