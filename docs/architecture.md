@@ -11,7 +11,7 @@
 | ORM            | Prisma                        | Type-safe queries, migration tooling, good DX                          |
 | Auth           | Auth.js v5 (NextAuth)         | Google OAuth + Apple-ready; session management via JWT or DB           |
 | API style      | Route handlers (Next.js)      | Co-located with app; no separate API service needed for MVP            |
-| Background     | Vercel Cron (or pg-boss)      | Race schedule sync, result ingestion triggers                          |
+| Background     | AWS Lambda + EventBridge Scheduler | Race schedule sync, result ingestion triggers                     |
 | Deployment     | Vercel                        | Zero-config Next.js deployment; preview environments                   |
 | F1 Data        | Jolpica API (Ergast-compatible)| Free, well-documented, historical + current season data               |
 
@@ -428,7 +428,7 @@ Webhook/Cron: post   → syncFinalResults(raceId) → computeAndStoreScoresForRa
 | syncFinalResults        | Post-race       | Fetch official results, ingest, trigger scoring |
 | computeScores           | Post-ingestion  | Run scoring engine for all picks in a race      |
 
-For MVP: Vercel Cron handles these as route-handler endpoints with a secret header for authorization.
+Current runtime: AWS Lambda/EventBridge Scheduler POSTs these route-handler endpoints with `Authorization: Bearer CRON_SECRET`. The canonical runbook lives in `ai/docs/cron-operations.md`.
 
 ---
 

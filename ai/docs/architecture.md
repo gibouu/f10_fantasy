@@ -21,7 +21,7 @@ F10 Fantasy is a Formula 1 fantasy pick'em web app (Next.js 14, App Router).
 - Users pick: race Winner, P10 finisher, DNF driver — scored per formula below.
 - Stack: Next.js 14 App Router + TypeScript, PostgreSQL + Prisma ORM, Auth.js v5 (JWT), Tailwind CSS + Radix UI
 - External data: OpenF1 API (race schedule, entrants, results)
-- Deployment: Vercel. Cron jobs: AWS Lambda → POST to `/api/cron/*` routes.
+- Deployment: Vercel. Cron jobs: AWS Lambda/EventBridge -> POST to `/api/cron/*` routes.
 
 ---
 
@@ -103,10 +103,11 @@ Client Components / RSC Pages
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
 - `POST /api/friends` — send friend request (auth required)
-- `POST /api/cron/sync-schedule` — weekly full F1 season sync
-- `POST /api/cron/sync-entries` — hourly race entry refresh
-- `POST /api/cron/lock-picks` — daily pick lock
-- `POST /api/cron/ingest-results` — daily result ingestion + scoring
+- `POST /api/cron/sync-schedule` — full F1 season sync; external cadence in `ai/docs/cron-operations.md`
+- `POST /api/cron/sync-entries` — race entry refresh; external cadence in `ai/docs/cron-operations.md`
+- `POST /api/cron/lock-picks` — pick locking; external cadence in `ai/docs/cron-operations.md`
+- `POST /api/cron/ingest-results` — result ingestion + scoring; external cadence in `ai/docs/cron-operations.md`
+- `POST /api/cron/compute-scores` — targeted score recompute; protected by `CRON_SECRET`
 - `GET  /api/diag/health` — Bearer CRON_SECRET; race-weekend snapshot (next 3 upcoming + last 3 completed, with pipeline issues flagged)
 - `GET  /api/diag/race/[id]` — Bearer CRON_SECRET; per-race pipeline diagnostic (entry/result/pick/score counts + auto-detected issues)
 
@@ -120,7 +121,7 @@ Client Components / RSC Pages
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT
 - **Two lock levels** — `race.lockCutoffUtc` (race-wide) + `pickSet.lockedAt` (individual)
 - **Three-layer post-lock pick protection** — (1) `pick.service.ts` atomic write guard rejects post-lock writes; (2) `lockPicksForRace` snapshots driver/seat into `PickSet.locked*` cols and `scoring.service.ts` reads from those, so scoring uses the pre-lock state regardless of any later live-field drift; (3) Postgres trigger `pickset_post_lock_guard` refuses any UPDATE mutating driver/seat fields on a locked row. Trigger lives in `prisma/triggers/` and must be re-installed via `scripts/install-pickset-triggers.ts` after DB resets.
-- **Cron jobs are NOT Vercel crons** — they are AWS Lambda functions; no cron config lives in this repo
+- **Cron jobs are NOT Vercel crons** — they are AWS Lambda/EventBridge schedules; canonical runbook: `ai/docs/cron-operations.md`
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` never touch them
 - **No test framework** — verify via type checking, linting, and build
 
