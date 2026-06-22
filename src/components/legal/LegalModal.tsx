@@ -151,6 +151,9 @@ export function LegalModal() {
               <Dialog.Title className="text-sm font-bold text-text-primary">
                 Legal &amp; Support
               </Dialog.Title>
+              <Dialog.Description className="sr-only">
+                Privacy, terms, intellectual property, cookies, and support information for FX Racing.
+              </Dialog.Description>
               <Dialog.Close
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated hover:bg-surface-elevated/80 transition-colors"
                 aria-label="Close"
