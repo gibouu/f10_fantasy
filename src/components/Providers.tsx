@@ -3,6 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
+import { shouldRefreshForSessionStatus } from "./session-sync"
 
 /**
  * Calls router.refresh() whenever the session transitions to authenticated.
@@ -16,7 +17,7 @@ function SessionSync() {
   const prevStatus = useRef(status)
 
   useEffect(() => {
-    if (prevStatus.current !== "authenticated" && status === "authenticated") {
+    if (shouldRefreshForSessionStatus(prevStatus.current, status)) {
       router.refresh()
     }
     prevStatus.current = status
