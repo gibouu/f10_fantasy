@@ -15,7 +15,7 @@
     "test:pages": "node --test 'src/app/(main)/races/race-detail-page.test.mjs' 'src/app/(auth)/onboarding/username/page.test.mjs' 'src/app/(main)/leaderboard/search-params.test.mjs'",
     "test:scoring": "node --test src/lib/scoring/formula.test.mjs",
     "test:scripts": "node --test scripts/find-cheated-picks.test.mjs",
-    "test:services": "node --test src/lib/services/race.service.test.mjs",
+    "test:services": "node --test src/lib/services/race.service.test.mjs src/lib/services/leaderboard-rank.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
