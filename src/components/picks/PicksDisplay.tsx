@@ -4,7 +4,6 @@ import { ArrowRight, Trophy, Target, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SerializedPickSetWithScore, SerializedRaceSummary, DriverSummary } from '@/types/domain'
 import { RaceStatus } from '@/types/domain'
-import { getScoringCaps } from '@/lib/scoring/formula'
 
 // ─────────────────────────────────────────────
 // Types
@@ -34,7 +33,6 @@ interface CategoryRowProps {
   pickDriverId: string
   actualResult: ResultRow | null | undefined
   score: number
-  maxScore: number
 }
 
 function CategoryRow({
@@ -43,7 +41,6 @@ function CategoryRow({
   pickDriverId,
   actualResult,
   score,
-  maxScore,
 }: CategoryRowProps) {
   const scored = score > 0
 
@@ -122,7 +119,6 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
   }
 
   const breakdown = pick.scoreBreakdown
-  const caps = getScoringCaps(race.type)
 
   // Find actual results for each pick
   const tenthResult = results.find((r) => r.driverId === pick.tenthPlaceDriverId)
@@ -143,7 +139,6 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
           pickDriverId={resolveCode(pick.tenthPlaceDriverId)}
           actualResult={tenthResult}
           score={breakdown?.tenthPlaceScore ?? 0}
-          maxScore={caps.p10}
         />
         <CategoryRow
           icon={<Trophy className="h-3.5 w-3.5" />}
@@ -151,7 +146,6 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
           pickDriverId={resolveCode(pick.winnerDriverId)}
           actualResult={winnerResult}
           score={breakdown?.winnerBonus ?? 0}
-          maxScore={caps.winner}
         />
         <CategoryRow
           icon={<AlertCircle className="h-3.5 w-3.5" />}
@@ -159,7 +153,6 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
           pickDriverId={resolveCode(pick.dnfDriverId)}
           actualResult={dnfResult}
           score={breakdown?.dnfBonus ?? 0}
-          maxScore={caps.dnf}
         />
       </div>
 
