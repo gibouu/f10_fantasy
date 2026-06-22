@@ -16,7 +16,7 @@
     "test:utils": "node --test src/lib/utils.test.mjs src/lib/observability/client-errors.test.mjs",
     "test:scoring": "node --test src/lib/scoring/formula.test.mjs",
     "test:scripts": "node --test scripts/find-cheated-picks.test.mjs scripts/tsconfig-prisma-coverage.test.mjs scripts/vercel-cli-doc.test.mjs",
-    "test:services": "node --test src/lib/services/race.service.test.mjs src/lib/services/leaderboard-rank.test.mjs src/lib/services/friendship.service.test.mjs",
+    "test:services": "node --test src/lib/services/race.service.test.mjs src/lib/services/leaderboard-rank.test.mjs src/lib/services/friendship.service.test.mjs src/lib/f1/providers/openf1.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
