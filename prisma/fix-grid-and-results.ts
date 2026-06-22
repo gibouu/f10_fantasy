@@ -183,7 +183,7 @@ async function main() {
     console.log(`\n   📊 ${race.name} (session ${sessionKey})`)
 
     // Ensure race entries exist for all 22 drivers
-    for (const [code, driverId] of byCode.entries()) {
+    for (const [code, driverId] of Array.from(byCode.entries())) {
       const exists = await db.$queryRaw<Array<{id: string}>>`
         SELECT id FROM "RaceEntry" WHERE "raceId" = ${race.id} AND "driverId" = ${driverId}
       `

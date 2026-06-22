@@ -14,7 +14,7 @@
     "test:ios-config": "node --test ios/project-signing.test.mjs",
     "test:pages": "node --test 'src/app/(main)/races/race-detail-page.test.mjs' 'src/app/(auth)/onboarding/username/page.test.mjs' 'src/app/(main)/leaderboard/search-params.test.mjs'",
     "test:scoring": "node --test src/lib/scoring/formula.test.mjs",
-    "test:scripts": "node --test scripts/find-cheated-picks.test.mjs",
+    "test:scripts": "node --test scripts/find-cheated-picks.test.mjs scripts/tsconfig-prisma-coverage.test.mjs",
     "test:services": "node --test src/lib/services/race.service.test.mjs src/lib/services/leaderboard-rank.test.mjs src/lib/services/friendship.service.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
