@@ -22,3 +22,10 @@ test("team picker ignores stale async save responses", async () => {
   assert.match(text, /saveRequestRef\.current !== requestId/)
   assert.doesNotMatch(text, /setSelected\(selected\) \/\/ revert/)
 })
+
+test("friend profile API key encodes dynamic user ids", async () => {
+  const text = await source("./[userId]/page.tsx")
+
+  assert.match(text, /`\/api\/users\/\$\{encodeURIComponent\(userId\)\}`/)
+  assert.doesNotMatch(text, /`\/api\/users\/\$\{userId\}`/)
+})
