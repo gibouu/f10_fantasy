@@ -168,6 +168,7 @@ npm run build        # production build
 npm run lint         # ESLint
 npm run db:push      # sync Prisma schema (no migrations)
 npm run db:studio    # Prisma Studio GUI
+vercel --version     # local Vercel CLI should be 54.14.2 or newer
 ```
 
 ---
