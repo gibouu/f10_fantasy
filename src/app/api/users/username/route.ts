@@ -50,6 +50,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json(
+      { error: "username must be a non-empty string" },
+      { status: 400 },
+    )
+  }
+
   const { username } = body as { username?: unknown }
 
   if (typeof username !== "string" || !username) {
