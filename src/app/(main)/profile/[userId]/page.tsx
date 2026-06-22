@@ -287,7 +287,7 @@ function Section({
 export default function FriendProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const { data, isLoading, error } = useSWR<ProfileData>(
-    userId ? `/api/users/${userId}` : null,
+    userId ? `/api/users/${encodeURIComponent(userId)}` : null,
     fetcher,
   )
   const [selectedDetail, setSelectedDetail] = React.useState<DetailState>(null)
