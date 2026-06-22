@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Lock } from 'lucide-react'
 
 import { cn, msToCountdown } from '@/lib/utils'
+import { createLockCountdownTimer } from './lock-countdown-timer'
 
 export interface LockCountdownProps {
   /** ISO 8601 timestamp string — must be parseable by `new Date()` */
@@ -27,20 +28,11 @@ export function LockCountdown({
   onLockedRef.current = onLocked
 
   React.useEffect(() => {
-    const tick = () => {
-      const remaining = cutoff - Date.now()
-      setMsLeft(remaining)
-
-      // Fire callback once when we cross the threshold
-      if (remaining <= 0) {
-        clearInterval(id)
-        onLockedRef.current?.()
-      }
-    }
-
-    const id = setInterval(tick, 1_000)
-    tick() // run immediately to avoid 1-second blank
-    return () => clearInterval(id)
+    return createLockCountdownTimer({
+      cutoff,
+      onTick: setMsLeft,
+      onLocked: () => onLockedRef.current?.(),
+    })
   }, [cutoff])
 
   // Locked state
