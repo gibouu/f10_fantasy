@@ -77,6 +77,20 @@ struct SettingsView: View {
                     }
                 }
 
+                #if DEBUG
+                Section("Developer") {
+                    NavigationLink {
+                        DiagnosticsView()
+                    } label: {
+                        Label {
+                            Text("Diagnostics")
+                        } icon: {
+                            Image(systemName: "stethoscope")
+                        }
+                    }
+                }
+                #endif
+
                 Section {
                     Button("Sign Out", role: .destructive) {
                         showSignOutConfirm = true
