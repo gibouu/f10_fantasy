@@ -16,7 +16,7 @@ final class RacesListViewModel {
     var past: [Race] {
         races
             .filter { $0.status == .completed }
-            .sorted { $0.round > $1.round }
+            .sorted { $0.scheduledStartUtc > $1.scheduledStartUtc }
     }
 
     /// True when at least one race is currently live — used by the view to
