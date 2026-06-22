@@ -9,6 +9,7 @@ import {
 } from '@/lib/services/friendship.service'
 import { TEAMS } from '@/lib/f1/teams'
 import type { TeamSlug } from '@/lib/f1/teams'
+import { handleFriendRequestPost } from './post-handler'
 
 // ─────────────────────────────────────────────
 // GET /api/friends
@@ -84,29 +85,9 @@ export async function GET(request: NextRequest) {
 // ─────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const session = (await auth()) ?? (await mobileAuth(request))
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  const userId = session.user.id
-
-  let body: { addresseeId?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
-  const addresseeId = body.addresseeId
-  if (typeof addresseeId !== 'string' || !addresseeId) {
-    return NextResponse.json({ error: 'addresseeId is required' }, { status: 400 })
-  }
-
-  try {
-    const friendRequest = await sendFriendRequest(userId, addresseeId)
-    return NextResponse.json(friendRequest, { status: 201 })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to send friend request'
-    return NextResponse.json({ error: message }, { status: 422 })
-  }
+  return handleFriendRequestPost(request, {
+    auth,
+    mobileAuth,
+    sendFriendRequest,
+  })
 }
