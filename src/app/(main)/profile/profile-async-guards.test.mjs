@@ -29,3 +29,13 @@ test("friend profile API key encodes dynamic user ids", async () => {
   assert.match(text, /`\/api\/users\/\$\{encodeURIComponent\(userId\)\}`/)
   assert.doesNotMatch(text, /`\/api\/users\/\$\{userId\}`/)
 })
+
+test("friend profile header passes API avatar URLs to Avatar", async () => {
+  const text = await source("./[userId]/page.tsx")
+
+  assert.match(
+    text,
+    /<Avatar[\s\S]*src=\{user\.avatarUrl\}/,
+    "profile header should render the avatar URL returned by the API",
+  )
+})
