@@ -10,10 +10,11 @@
  */
 
 import { db } from '@/lib/db/client'
-import type { LeaderboardRow } from '@/types/domain'
 import { getScoringCaps } from '@/lib/scoring/formula'
 import { TEAMS } from '@/lib/f1/teams'
 import type { TeamSlug } from '@/lib/f1/teams'
+import type { LeaderboardRow } from '@/types/domain'
+import { rankRows } from './leaderboard-rank'
 
 // ─────────────────────────────────────────────
 // Internal types
@@ -158,26 +159,6 @@ async function buildZeroedRows(userIds: string[]): Promise<AggregatedRow[]> {
       dnfHits: 0,
     }
   })
-}
-
-/**
- * Sort rows by tie-break rules and assign sequential ranks.
- * Equal scores receive the same rank (dense ranking not used — standard ranking).
- */
-function rankRows(rows: AggregatedRow[]): LeaderboardRow[] {
-  const sorted = [...rows].sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
-    if (b.exactTenthHits !== a.exactTenthHits) return b.exactTenthHits - a.exactTenthHits
-    if (b.winnerHits !== a.winnerHits) return b.winnerHits - a.winnerHits
-    if (b.dnfHits !== a.dnfHits) return b.dnfHits - a.dnfHits
-    // Stable alphabetical fallback
-    return a.userId.localeCompare(b.userId)
-  })
-
-  return sorted.map((row, index) => ({
-    rank: index + 1,
-    ...row,
-  }))
 }
 
 // ─────────────────────────────────────────────
