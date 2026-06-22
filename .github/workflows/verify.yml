@@ -1,0 +1,64 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web checks
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/f10_fantasy_ci?schema=public"
+      DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/f10_fantasy_ci?schema=public"
+      AUTH_SECRET: "ci-only-auth-secret-replace-in-real-envs"
+      CRON_SECRET: "ci-only-cron-secret"
+      GOOGLE_CLIENT_ID: "ci-google-client-id"
+      GOOGLE_CLIENT_SECRET: "ci-google-client-secret"
+      GOOGLE_IOS_CLIENT_ID: "ci-google-ios-client-id"
+      APPLE_ID: "ci.apple.service.id"
+      APPLE_SECRET: "ci-apple-client-secret"
+      APPLE_BUNDLE_ID: "com.fxracing.app"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: |
+          npm run test:auth
+          npm run test:db
+          npm run test:routes
+          npm run test:services
+          npm run test:components
+          npm run test:ios
+          npm run test:pages
+          npm run test:utils
+          npm run test:scoring
+          npm run test:scripts
+          npx tsx scripts/test-mobile-provider-email.ts
+          npx tsx scripts/test-mobile-exchange-race-guards.ts
+
+      - name: Build
+        run: npm run build
