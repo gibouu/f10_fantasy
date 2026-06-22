@@ -1,11 +1,9 @@
 /**
  * Cron: lock picks for races that have passed their cutoff time.
  *
- * Add to vercel.json:
- * {
- *   "crons": [{ "path": "/api/cron/lock-picks", "schedule": "* * * * *" }]
- * }
- * (Run every minute to keep lock timing accurate. Adjust based on cost tolerance.)
+ * Scheduled by the external AWS Lambda cron orchestrator.
+ * Keep this route as the authenticated HTTP target for that Lambda and update
+ * the AWS schedule there when lock cadence changes.
  *
  * Protected by the CRON_SECRET environment variable.
  */
