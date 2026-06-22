@@ -99,6 +99,20 @@ struct GuestProfileView: View {
                 }
             }
 
+            #if DEBUG
+            Section("Developer") {
+                NavigationLink {
+                    DiagnosticsView()
+                } label: {
+                    Label {
+                        Text("Diagnostics")
+                    } icon: {
+                        Image(systemName: "stethoscope")
+                    }
+                }
+            }
+            #endif
+
             // Sign-in CTA
             Section {
                 Button {
