@@ -56,6 +56,15 @@ function parsePendingPick(raw: string | null, raceId: string): PickPayload | nul
   }
 }
 
+function serializePickPayload(payload: PickPayload): string {
+  return JSON.stringify([
+    payload.raceId,
+    payload.tenthPlaceDriverId,
+    payload.winnerDriverId,
+    payload.dnfDriverId,
+  ])
+}
+
 // ─── Pick bubble ─────────────────────────────────────────────────────────────
 
 function PickBubble({
@@ -320,6 +329,7 @@ export function PickHero({
   const [activeSlot, setActiveSlot] = useState<Slot | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [savedPayloadKey, setSavedPayloadKey] = useState<string | null>(null)
 
   const driverById = Object.fromEntries(entrants.map((d) => [d.id, d]))
 
@@ -350,6 +360,12 @@ export function PickHero({
       dnfDriverId: pickState.dnf,
     }
   }, [race.id])
+  const currentPayload = buildPickPayload(selected)
+  const currentPayloadKey = currentPayload ? serializePickPayload(currentPayload) : null
+  const showSavedStatus =
+    saveStatus === 'success' &&
+    currentPayloadKey !== null &&
+    currentPayloadKey === savedPayloadKey
 
   const submitPickPayload = useCallback(async (payload: PickPayload) => {
     const res = await fetch('/api/picks', {
@@ -387,9 +403,12 @@ export function PickHero({
     setErrorMsg(null)
 
     let cancelled = false
+    const pendingPayloadKey = serializePickPayload(pendingPick)
     submitPickPayload(pendingPick)
       .then(() => {
-        if (!cancelled) setSaveStatus('success')
+        if (cancelled) return
+        setSavedPayloadKey(pendingPayloadKey)
+        setSaveStatus('success')
       })
       .catch((err) => {
         if (cancelled) return
@@ -402,9 +421,18 @@ export function PickHero({
     }
   }, [existingPick, isLocked, race.id, requiresSignIn, submitPickPayload])
 
+  const updateSelectedSlot = useCallback((slot: Slot, id: string | null) => {
+    setSelected((prev) => {
+      if (prev[slot] === id) return prev
+      return { ...prev, [slot]: id }
+    })
+    setSaveStatus((status) => (status === 'loading' ? status : 'idle'))
+    setErrorMsg(null)
+  }, [])
+
   const handleSave = async () => {
     if (!canSave) return
-    const payload = buildPickPayload(selected)
+    const payload = currentPayload
     if (!payload) return
 
     if (requiresSignIn) {
@@ -421,6 +449,7 @@ export function PickHero({
 
     try {
       await submitPickPayload(payload)
+      setSavedPayloadKey(serializePickPayload(payload))
       setSaveStatus('success')
     } catch (err) {
       setSaveStatus('error')
@@ -549,7 +578,7 @@ export function PickHero({
           {saveStatus === 'error' && errorMsg && (
             <p className="text-sm text-accent text-center">{errorMsg}</p>
           )}
-          {saveStatus === 'success' && (
+          {showSavedStatus && (
             <div className="flex items-center justify-center gap-1.5 text-success text-sm font-medium">
               <CheckCircle2 className="w-4 h-4" />
               Picks saved!
@@ -586,7 +615,7 @@ export function PickHero({
           entrants={entrants}
           disabledIds={disabledForSlot(activeSlot)}
           selectedId={selected[activeSlot]}
-          onSelect={(id) => setSelected((prev) => ({ ...prev, [activeSlot!]: id }))}
+          onSelect={(id) => updateSelectedSlot(activeSlot!, id)}
           onClose={() => setActiveSlot(null)}
         />
       )}
