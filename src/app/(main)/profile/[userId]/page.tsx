@@ -331,7 +331,7 @@ export default function FriendProfilePage() {
 
         <div className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-surface px-4 py-4">
           <Avatar
-            src={null}
+            src={user.avatarUrl}
             name={user.publicUsername ?? user.id}
             size="lg"
             teamLogoUrl={user.favoriteTeamSlug ? (TEAMS[user.favoriteTeamSlug as TeamSlug]?.logoUrl ?? null) : null}
