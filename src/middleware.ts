@@ -30,6 +30,10 @@ const API_PREFIX = "/api";
 type NextAuthRequest = NextRequest & { auth: Session | null };
 
 function isPublicApiRoute(pathname: string, method: string): boolean {
+  if (pathname === "/api/client-errors") {
+    return method === "POST";
+  }
+
   if (pathname === "/api/races" || pathname.startsWith("/api/races/")) {
     return method === "GET";
   }
