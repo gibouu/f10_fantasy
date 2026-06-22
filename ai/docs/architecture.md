@@ -143,6 +143,7 @@ Only CLASSIFIED drivers count for position scoring.
 - Service layer owns all business logic — API routes are thin wrappers
 - API routes that parse JSON object bodies use `src/lib/api/request-body.js` before destructuring request data
 - API routes map thrown errors with `src/lib/api/errors.js`: allowlist domain messages, log unexpected errors, return generic 500 bodies
+- API route regressions use the handler-injection pattern documented in `ai/docs/route-testing.md`
 - `resolveTeam()` + `DRIVER_PHOTOS` are injected in `getRaceEntrants()` — never at the component level
 - Guest access: middleware allows public routes; pages handle `userId = null` gracefully
 - Client components that need data use SWR; server components use direct service calls
