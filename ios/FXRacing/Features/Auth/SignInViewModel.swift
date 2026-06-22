@@ -11,6 +11,10 @@ final class SignInViewModel {
         _ result: Result<ASAuthorization, Error>,
         authManager: AuthManager
     ) async {
+        guard !isLoading else {
+            return
+        }
+
         switch result {
         case .success(let authorization):
             guard
