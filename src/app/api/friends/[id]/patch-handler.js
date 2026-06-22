@@ -1,3 +1,5 @@
+import { readJsonObjectBody } from "../../../../lib/api/request-body.js"
+
 const DOMAIN_ERROR_STATUSES = [
   [/^Friend request not found:/, 404],
   [/^Only the addressee can accept a friend request$/, 403],
@@ -30,12 +32,14 @@ export async function handleFriendRequestPatch(
   const userId = session.user.id
   const requestId = params.id
 
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    return Response.json({ error: "Invalid request body" }, { status: 400 })
+  const parsedBody = await readJsonObjectBody(request, {
+    invalidJsonMessage: "Invalid request body",
+    nonObjectMessage: 'action must be "accept" or "reject"',
+  })
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
+  const body = parsedBody.body
 
   if (body.action !== "accept" && body.action !== "reject") {
     return Response.json(

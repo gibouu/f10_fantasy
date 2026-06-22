@@ -10,6 +10,7 @@ import {
   isUsernameAvailable,
   changeUsername,
 } from "@/lib/services/user.service"
+import { readJsonObjectBody } from "@/lib/api/request-body"
 import { getClientIp, rateLimit } from "@/lib/security/rate-limit"
 
 export const dynamic = "force-dynamic"
@@ -43,21 +44,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+  const parsedBody = await readJsonObjectBody(req, {
+    nonObjectMessage: "username must be a non-empty string",
+  })
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
 
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return NextResponse.json(
-      { error: "username must be a non-empty string" },
-      { status: 400 },
-    )
-  }
-
-  const { username } = body as { username?: unknown }
+  const { username } = parsedBody.body
 
   if (typeof username !== "string" || !username) {
     return NextResponse.json(

@@ -10,6 +10,13 @@ function jsonRequest(body) {
   })
 }
 
+function rawRequest(body) {
+  return new Request("http://localhost/api/friends", {
+    method: "POST",
+    body,
+  })
+}
+
 function authedDeps(overrides = {}) {
   return {
     auth: async () => ({ user: { id: "user-1" } }),
@@ -32,6 +39,34 @@ test("POST maps nonexistent friend targets to a sanitized 404", async () => {
 
   assert.equal(response.status, 404)
   assert.deepEqual(await response.json(), { error: "Friend request recipient not found" })
+})
+
+test("POST rejects non-object friend request bodies before service calls", async () => {
+  const response = await handleFriendRequestPost(
+    jsonRequest(null),
+    authedDeps({
+      sendFriendRequest: async () => {
+        throw new Error("sendFriendRequest should not run")
+      },
+    }),
+  )
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: "addresseeId is required" })
+})
+
+test("POST rejects malformed friend request JSON before service calls", async () => {
+  const response = await handleFriendRequestPost(
+    rawRequest("{"),
+    authedDeps({
+      sendFriendRequest: async () => {
+        throw new Error("sendFriendRequest should not run")
+      },
+    }),
+  )
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(await response.json(), { error: "Invalid JSON body" })
 })
 
 test("POST returns a generic 500 for unexpected friendship failures", async () => {

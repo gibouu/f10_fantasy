@@ -1,3 +1,5 @@
+import { readJsonObjectBody } from "../../../../lib/api/request-body.js"
+
 export async function handleUsernamePost(
   req,
   {
@@ -13,21 +15,14 @@ export async function handleUsernamePost(
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  let body
-  try {
-    body = await req.json()
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 })
+  const parsedBody = await readJsonObjectBody(req, {
+    nonObjectMessage: "username must be a non-empty string",
+  })
+  if (!parsedBody.ok) {
+    return parsedBody.response
   }
 
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return Response.json(
-      { error: "username must be a non-empty string" },
-      { status: 400 },
-    )
-  }
-
-  const { username } = body
+  const { username } = parsedBody.body
 
   if (typeof username !== "string" || !username) {
     return Response.json(
