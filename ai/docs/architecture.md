@@ -53,7 +53,7 @@ Client Components / RSC Pages
 ### Key Pages
 | Route | File | Notes |
 |---|---|---|
-| `/races` | `src/app/(main)/races/page.tsx` | Race list, guest-accessible |
+| `/races` | `src/app/(main)/races/page.tsx` | Race list, guest-accessible; ordered by `scheduledStartUtc`, not round |
 | `/races/[raceId]` | `src/app/(main)/races/[raceId]/page.tsx` | Active: picks UI. Completed: results + scores |
 | `/leaderboard` | `src/app/(main)/leaderboard/page.tsx` | Global + Friends tabs |
 | `/profile` | `src/app/(main)/profile/page.tsx` | Auth-required, team picker |
@@ -66,8 +66,9 @@ Client Components / RSC Pages
 | Path | Purpose |
 |---|---|
 | `src/lib/services/race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRaceResults`, `getRacesForSeason`, `getActiveSeason` |
-| `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick` |
+| `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick`; profile history hides `CANCELLED` races |
 | `src/lib/services/ingestion.service.ts` | `ingestResultsForRace` → fetches OpenF1 → upserts `RaceResult` |
+| `src/lib/services/qualifying.service.ts` | `ingestQualifyingForRace`, `getQualifyingResults`, partial-row qualifying backfill |
 | `src/lib/services/scoring.service.ts` | `computeAndStoreScoresForRace` — requires results in DB first |
 | `src/lib/services/leaderboard.service.ts` | `getGlobalLeaderboard`, `getFriendsLeaderboard`, `getUserSeasonRank` |
 | `src/lib/services/user.service.ts` | Username, favorite team |
@@ -94,12 +95,19 @@ Client Components / RSC Pages
 3. Page server-fetches `getRaceResults` → builds `heroResults` (structured) + `displayResults` (flat)
 4. Renders `<HeroVisualization>` + `<PicksDisplay>` + `<RaceResultsCard>`
 
+### Qualifying + Early-Bird Bonus
+1. `sync-schedule` pairs each race with the latest qualifying session before race start and stores `openf1QualifyingSessionKey` + `qualifyingStartUtc`
+2. `ingest-results` also runs qualifying ingestion from OpenF1 `/session_result`
+3. `lock-picks` snapshots whether each pick was last edited before `Race.qualifyingStartUtc`
+4. Scoring adds `ScoreBreakdown.earlyBirdBonus = baseScore` when that snapshot is true
+
 ---
 
 ## API Surface
 
 - `POST /api/picks` — submit pick (auth required)
 - `GET /api/races` — public race list
+- `GET /api/races/[id]` — public race detail, including qualifying results when present
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
 - `POST /api/friends` — send friend request (auth required)
@@ -119,8 +127,10 @@ Client Components / RSC Pages
 - **Serialization pattern** — `Date` fields cannot cross RSC/client boundary. Client components receive `Serialized*` variants with dates as ISO strings.
 - **PickSet** unique on `[userId, raceId]` — one pick set per user per race
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT
+- **Race ordering is chronological** — service lists/current-race queries sort by `scheduledStartUtc`, not round number. Round labels may be manually renumbered after calendar reconciliation; cancelled rows may be parked at high round values to avoid unique-key collisions.
 - **Two lock levels** — `race.lockCutoffUtc` (race-wide) + `pickSet.lockedAt` (individual)
 - **Three-layer post-lock pick protection** — (1) `pick.service.ts` atomic write guard rejects post-lock writes; (2) `lockPicksForRace` snapshots driver/seat into `PickSet.locked*` cols and `scoring.service.ts` reads from those, so scoring uses the pre-lock state regardless of any later live-field drift; (3) Postgres trigger `pickset_post_lock_guard` refuses any UPDATE mutating driver/seat fields on a locked row. Trigger lives in `prisma/triggers/` and must be re-installed via `scripts/install-pickset-triggers.ts` after DB resets.
+- **Early-bird scoring is snapshot-based** — `PickSet.lockedSubmittedBeforeQualifying` is set during `lock-picks`; scoring never recomputes that flag from mutable timestamps later.
 - **Cron jobs are NOT Vercel crons** — they are AWS Lambda/EventBridge schedules; canonical runbook: `ai/docs/cron-operations.md`
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` never touch them
 - **Regression tests use Node's built-in test runner** — package scripts group route, auth, service, component, page, scoring, iOS-source, and script checks. Use targeted `node --test ...` suites first, then `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
@@ -136,6 +146,7 @@ Client Components / RSC Pages
 | DNF bonus | +3 | +1 |
 
 Only CLASSIFIED drivers count for position scoring.
+If `lockedSubmittedBeforeQualifying` is true, `earlyBirdBonus` duplicates the base score, making the stored total effectively 2x.
 
 ---
 
@@ -145,7 +156,8 @@ Only CLASSIFIED drivers count for position scoring.
 - API routes that parse JSON object bodies use `src/lib/api/request-body.js` before destructuring request data
 - API routes map thrown errors with `src/lib/api/errors.js`: allowlist domain messages, log unexpected errors, return generic 500 bodies
 - API route regressions use the handler-injection pattern documented in `ai/docs/route-testing.md`
-- `resolveTeam()` + `DRIVER_PHOTOS` are injected in `getRaceEntrants()` — never at the component level
+- `getRaceEntrants()` returns the union of `RaceEntry`, `RaceResult`, and `QualifyingResult` drivers so substitute drivers who actually drove render correctly. `resolveTeam()` + `DRIVER_PHOTOS` are injected there, never at the component level.
+- Public profile pick history excludes picks attached to `CANCELLED` races. Rows remain in the DB for audit, but hidden races do not appear as dead picks.
 - Guest access: middleware allows public routes; pages handle `userId = null` gracefully
 - Client components that need data use SWR; server components use direct service calls
 - Zod is the validation standard at API boundaries
