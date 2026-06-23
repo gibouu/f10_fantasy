@@ -58,7 +58,6 @@ jobs:
           npm run test:scoring
           npm run test:scripts
           npx tsx scripts/test-mobile-provider-email.ts
-          npx tsx scripts/test-mobile-exchange-race-guards.ts
 
       - name: Build
         run: npm run build

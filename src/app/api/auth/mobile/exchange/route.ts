@@ -29,6 +29,7 @@ import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import { mobileSigningKey } from '@/lib/auth/mobileAuth'
 import { verifiedProviderEmail } from '@/lib/auth/providerEmail'
+import { findOrCreateMobileUser } from './find-or-create-user'
 
 // 60 days. Native iOS users expect to stay signed in across launches; the 8h
 // expiry forced re-sign-in every day. Server-side revocation is still
@@ -65,10 +66,6 @@ const mobileUserSelect = {
 } as const
 
 type MobileExchangeUser = Prisma.UserGetPayload<{ select: typeof mobileUserSelect }>
-
-function isUniqueConstraintError(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
-}
 
 async function verifyAppleToken(idToken: string): Promise<ProviderClaims | null> {
   const validAudiences = [
@@ -131,116 +128,14 @@ async function findOrCreateUser(
   provider: 'apple' | 'google',
   claims: ProviderClaims,
 ): Promise<MobileExchangeUser> {
-  const providerAccountId = claims.sub
-  const email = verifiedProviderEmail(claims)
-
-  // 1. Look up existing Account link
-  const existingAccount = await db.account.findUnique({
-    where: { provider_providerAccountId: { provider, providerAccountId } },
-    include: {
-      user: {
-        select: mobileUserSelect,
-      },
-    },
-  })
-
-  if (existingAccount) {
-    return existingAccount.user
-  }
-
-  // 2. No Account found — check if a User with this verified email already exists
-  const existingUser = email
-    ? await db.user.findUnique({
-        where: { email },
-        select: mobileUserSelect,
-      })
-    : null
-
-  if (existingUser) {
-    // Link the new provider account to the existing user. Upsert makes a
-    // concurrent first exchange for the same provider identity idempotent.
-    const linkedAccount = await db.account.upsert({
-      where: { provider_providerAccountId: { provider, providerAccountId } },
-      update: {},
-      create: {
-        userId: existingUser.id,
-        type: 'oauth',
-        provider,
-        providerAccountId,
-      },
-      include: {
-        user: {
-          select: mobileUserSelect,
-        },
-      },
-    })
-    return linkedAccount.user
-  }
-
-  // 3. Brand new user — create User + Account atomically
-  try {
-    const newUser = await db.user.create({
-      data: {
-        email: email || `${provider}.${providerAccountId}@placeholder.fxracing`,
-        name: claims.name ?? null,
-        image: claims.picture ?? null,
-        emailVerified: email ? new Date() : null,
-        accounts: {
-          create: {
-            type: 'oauth',
-            provider,
-            providerAccountId,
-          },
-        },
-      },
-      select: mobileUserSelect,
-    })
-
-    return newUser
-  } catch (err) {
-    if (!isUniqueConstraintError(err)) {
-      throw err
-    }
-
-    const racedAccount = await db.account.findUnique({
-      where: { provider_providerAccountId: { provider, providerAccountId } },
-      include: {
-        user: {
-          select: mobileUserSelect,
-        },
-      },
-    })
-    if (racedAccount) {
-      return racedAccount.user
-    }
-
-    const racedUser = email
-      ? await db.user.findUnique({
-          where: { email },
-          select: mobileUserSelect,
-        })
-      : null
-    if (racedUser) {
-      const linkedAccount = await db.account.upsert({
-        where: { provider_providerAccountId: { provider, providerAccountId } },
-        update: {},
-        create: {
-          userId: racedUser.id,
-          type: 'oauth',
-          provider,
-          providerAccountId,
-        },
-        include: {
-          user: {
-            select: mobileUserSelect,
-          },
-        },
-      })
-      return linkedAccount.user
-    }
-
-    throw err
-  }
+  return findOrCreateMobileUser({
+    provider,
+    claims,
+    db,
+    Prisma,
+    userSelect: mobileUserSelect,
+    verifiedProviderEmail,
+  }) as Promise<MobileExchangeUser>
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────
