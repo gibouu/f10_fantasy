@@ -1,6 +1,11 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# F10 Fantasy
 
-## Getting Started
+F10 Fantasy is the Next.js web/API repository for F10 Racing, a Formula 1
+pick'em app where users predict the race winner, P10 finisher, and a DNF
+driver. The app serves the web experience, Auth.js sessions, Prisma-backed
+business logic, and cron endpoints called by AWS Lambda/EventBridge.
+
+## Setup
 
 Install dependencies:
 
@@ -16,6 +21,38 @@ cp .env.example .env.local
 
 Fill `.env.local` with development credentials. Do not commit real secrets.
 
+## Development
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+Useful checks:
+
+```bash
+npm run test:services
+npm run test:routes
+npm run test:scripts
+npx tsc --noEmit
+npm run lint
+npm run build
+```
+
+See [AGENTS.md](AGENTS.md) and
+[ai/docs/architecture.md](ai/docs/architecture.md) before making non-trivial
+changes. The architecture doc is the codebase map and the shared source of
+truth for service boundaries, API routes, data flow, and verification order.
+
+## Operations
+
+Scheduled jobs are not Vercel Cron jobs. They are AWS Lambda/EventBridge jobs
+that POST to the cron API routes with `CRON_SECRET`. See
+[ai/docs/cron-operations.md](ai/docs/cron-operations.md) for the runbook.
+
 Use Vercel CLI 54.15.0 or newer for deployment-related local commands:
 
 ```bash
@@ -23,39 +60,5 @@ npm i -g vercel@latest
 vercel --version
 ```
 
-Install the latest CLI before deployment work; this repo expects 54.15.0 or newer.
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying files under `src/app`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Scheduled jobs are not Vercel Cron jobs. See `ai/docs/cron-operations.md` for the AWS Lambda/EventBridge runbook.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Install the latest CLI before deployment work; this repo expects 54.15.0 or
+newer.
