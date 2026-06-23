@@ -36,9 +36,7 @@ export async function GET(
         }))
       : []
 
-  // Defensive: qualifying ingestion may not have run, or the table may be
-  // missing in older deploys. Empty array → iOS hides the section.
-  const qualifyingResults = await getQualifyingResults(params.id).catch(() => [])
+  const qualifyingResults = await getQualifyingResults(params.id)
 
   return NextResponse.json({
     race: {

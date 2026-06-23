@@ -33,19 +33,10 @@ Do NOT turn this into a giant diary.
 
 ### 2026-06-23 — Gate 2 cleanup queue
 - by: Codex
-- summary: Gate 2 cleanup is being handled as separate GitHub issues and PRs. Completed and merged so far: #275/#282 RaceSummary mapper centralization, #276/#283 strict maintenance unused-vars cleanup, #280/#284 legacy F1 type removal, #285/#286 README onboarding refresh, #278/#287 mobile exchange race guard replacement, #277/#288 static script test-scope clarification, and #272/#289 DB-backed page dynamic markers for clean builds.
+- summary: Gate 2 cleanup is being handled as separate GitHub issues and PRs. Completed and merged so far: #275/#282 RaceSummary mapper centralization, #276/#283 strict maintenance unused-vars cleanup, #280/#284 legacy F1 type removal, #285/#286 README onboarding refresh, #278/#287 mobile exchange race guard replacement, #277/#288 static script test-scope clarification, #272/#289 DB-backed page dynamic markers for clean builds, #281/#290 worklog pruning, and #291/#292 database entrypoint bootstrap.
 - files touched: multiple focused PRs; this entry is status only.
 - verification: Each merged PR had targeted local checks plus GitHub Web checks. Vercel deployment checks are currently failing externally with a build-rate-limit message.
-- open questions: #279 remains blocked on confirming local/prod DB rollout before removing broad qualifying fallbacks. #274 remains open as the umbrella until scoped cleanup findings are exhausted or deferred.
-- should update architecture?: no
-- should update decisions?: no
-
-### 2026-06-23 — Qualifying fallback cleanup caveat
-- by: Codex
-- summary: The broad `.catch(() => [])` fallbacks around qualifying-result reads are intentional compatibility debt from the qualifying schema rollout. Issue #279 tracks removing or narrowing them.
-- files touched: none
-- verification: Current code sites are `src/lib/services/race.service.ts` and `src/app/api/races/[id]/route.ts`.
-- open questions: Do not remove these fallbacks until the production and local DB schemas are confirmed to include `QualifyingResult`, `Race.openf1QualifyingSessionKey`, and related fields.
+- open questions: #279 is in progress after schema rollout confirmation. #274 remains open as the umbrella until scoped cleanup findings are exhausted or deferred.
 - should update architecture?: no
 - should update decisions?: no
 
