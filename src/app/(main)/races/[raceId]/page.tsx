@@ -99,7 +99,7 @@ export default async function RacePickPage({
 
           if (!winnerDriver) return undefined
           return {
-            tenthPlace: tenthDriver ? { driver: tenthDriver, position: 10 } : null!,
+            tenthPlace: tenthDriver ? { driver: tenthDriver, position: 10 } : null,
             winner: { driver: winnerDriver },
             dnf: dnfDriver ? { driver: dnfDriver } : null,
           }
