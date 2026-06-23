@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-06-23 13:55 — iOS 401 responses normalized
+- by: Codex
+- summary: Updated iOS API 401 handling so JSON-bodied unauthorized responses still throw `APIError.unauthorized`, preserving `AuthManager.restoreSession()` stale-token cleanup.
+- files touched: `ios/FXRacing/Core/Networking/APIClient.swift`, `ios/api-client-unauthorized.test.mjs`, `package.json`
+- verification: `node --test ios/api-client-unauthorized.test.mjs`; `npm run test:ios`
+- open questions: none
+- should update architecture?: no
+- should update decisions?: no
+
 ### 2026-06-23 13:36 — iOS privacy manifest deduplicated
 - by: Codex
 - summary: Removed the unused root `ios/PrivacyInfo.xcprivacy`, kept `ios/FXRacing/PrivacyInfo.xcprivacy` as the XcodeGen-sourced manifest, and added User ID / Gameplay Content collected-data declarations for username, friend identifier, favorite-team, and pick API payloads.
