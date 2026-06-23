@@ -8,7 +8,7 @@
  *
  *   npx tsx scripts/backfill-locked-snapshots.ts
  *
- * Idempotent: WHERE clause skips rows whose snapshot is already populated.
+ * Idempotent: WHERE clause skips rows whose driver snapshot is already populated.
  */
 import { db } from '@/lib/db/client'
 
@@ -17,10 +17,12 @@ async function main() {
     SELECT COUNT(*)::bigint AS count
     FROM "PickSet"
     WHERE "lockedAt" IS NOT NULL
-      AND "lockedTenthPlaceDriverId" IS NULL
+      AND ("lockedTenthPlaceDriverId" IS NULL
+        OR "lockedWinnerDriverId" IS NULL
+        OR "lockedDnfDriverId" IS NULL)
   `
   const targetCount = Number(before[0]?.count ?? 0)
-  console.log(`Locked PickSets needing snapshot backfill: ${targetCount}`)
+  console.log(`Locked PickSets needing driver snapshot backfill: ${targetCount}`)
 
   if (targetCount === 0) {
     console.log('Nothing to do.')
@@ -36,7 +38,9 @@ async function main() {
         "lockedDnfDriverId"        = "dnfDriverId",
         "lockedDnfSeatKey"         = "dnfSeatKey"
     WHERE "lockedAt" IS NOT NULL
-      AND "lockedTenthPlaceDriverId" IS NULL
+      AND ("lockedTenthPlaceDriverId" IS NULL
+        OR "lockedWinnerDriverId" IS NULL
+        OR "lockedDnfDriverId" IS NULL)
   `
 
   console.log(`Backfilled ${Number(updated)} row(s).`)
