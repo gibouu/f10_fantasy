@@ -78,7 +78,22 @@ type DetailState = {
   driver: SlotDriver
 } | null
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+class ProfileApiError extends Error {
+  constructor(readonly status: number) {
+    super(status === 404 ? 'Profile not found' : 'Profile request failed')
+    this.name = 'ProfileApiError'
+  }
+}
+
+const fetcher = async (url: string): Promise<ProfileData> => {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new ProfileApiError(response.status)
+  }
+
+  return response.json()
+}
 
 function totalScore(picks: PickEntry[]): number {
   return picks.reduce((sum, p) => sum + (p.scoreBreakdown?.totalScore ?? 0), 0)
@@ -286,11 +301,12 @@ function Section({
 
 export default function FriendProfilePage() {
   const { userId } = useParams<{ userId: string }>()
-  const { data, isLoading, error } = useSWR<ProfileData>(
+  const { data, isLoading, error } = useSWR<ProfileData, Error>(
     userId ? `/api/users/${encodeURIComponent(userId)}` : null,
     fetcher,
   )
   const [selectedDetail, setSelectedDetail] = React.useState<DetailState>(null)
+  const notFound = error instanceof ProfileApiError && error.status === 404
 
   if (isLoading) {
     return (
@@ -304,10 +320,21 @@ export default function FriendProfilePage() {
     )
   }
 
-  if (error || !data?.user) {
+  if (notFound) {
     return (
       <div className="px-4 pb-6 pt-4">
         <p className="py-12 text-center text-sm text-text-secondary">Player not found.</p>
+      </div>
+    )
+  }
+
+  if (error || !data?.user) {
+    return (
+      <div className="px-4 pb-6 pt-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-surface p-6 text-center">
+          <p className="text-sm font-semibold text-text-primary">Unable to load profile.</p>
+          <p className="mt-1 text-xs text-text-secondary">Please try again shortly.</p>
+        </div>
       </div>
     )
   }

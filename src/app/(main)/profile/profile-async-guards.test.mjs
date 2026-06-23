@@ -49,3 +49,19 @@ test("friend profile header passes API avatar URLs to Avatar", async () => {
     "profile header should render the avatar URL returned by the API",
   )
 })
+
+test("friend profile fetcher preserves non-OK HTTP status", async () => {
+  const text = await source("./[userId]/page.tsx")
+
+  assert.match(text, /class ProfileApiError extends Error/)
+  assert.match(text, /if \(!response\.ok\) {[\s\S]*throw new ProfileApiError\(response\.status/)
+  assert.doesNotMatch(text, /fetch\(url\)\.then\(\(r\) => r\.json\(\)\)/)
+})
+
+test("friend profile renders not-found separately from API failures", async () => {
+  const text = await source("./[userId]/page.tsx")
+
+  assert.match(text, /const notFound = error instanceof ProfileApiError && error\.status === 404/)
+  assert.match(text, /if \(notFound\) {[\s\S]*Player not found\./)
+  assert.match(text, /if \(error \|\| !data\?\.user\) {[\s\S]*Unable to load profile\./)
+})
