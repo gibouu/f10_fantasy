@@ -16,8 +16,8 @@ The cleanup should reduce stale code, redundant files, outdated docs, and avoida
 - Domain, Prisma, and F1 provider types must remain separate.
 - Date serialization boundaries must stay intact for RSC/client props.
 - Cron jobs are AWS Lambda/EventBridge driven, not Vercel Crons.
-- The repo currently has pre-existing local dirty state in `AGENTS.md` and `.clawpatch/`; cleanup work must avoid committing those unless explicitly requested.
-- Clawpatch currently reports zero open findings.
+- Cleanup work must avoid committing unrelated local-only artifacts, including copied Clawpatch state, caches, or user edits from another checkout.
+- Use GitHub issues and fresh Clawpatch runs for current finding status; this design doc is not a live findings ledger.
 
 ## Cleanup Gates
 
@@ -93,7 +93,7 @@ For documentation-only cleanup, verify by reviewing the diff and ensuring no cod
 
 ## Git Hygiene
 
-- Do not commit pre-existing `AGENTS.md` or `.clawpatch/` changes unless the user explicitly asks.
+- Do not commit unrelated local-only artifacts, caches, or user edits from another checkout unless the user explicitly asks.
 - Each commit and PR body must be signed with `— gib`, matching the project instructions for authored GitHub text.
 - Avoid broad formatting churn.
 - Every changed line should map to the cleanup issue being addressed.
