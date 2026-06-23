@@ -260,6 +260,13 @@ export class OpenF1Provider implements F1ProviderAdapter {
     try {
       const stintRaw = await openF1Fetch<OpenF1Stint>(`/stints?session_key=${sessionKey}`)
 
+      // A successful empty stints response means OpenF1 has not published the
+      // settled race-lap evidence yet. Positions alone are not enough to infer
+      // final classifications, so let callers defer ingestion.
+      if (stintRaw.length === 0 && latestByDriver.size > 0) {
+        return []
+      }
+
       const lastLap = new Map<number, number>()
       for (const stint of stintRaw) {
         const cur = lastLap.get(stint.driver_number) ?? 0

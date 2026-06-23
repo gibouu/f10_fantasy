@@ -99,6 +99,45 @@ test("getFinalResults distinguishes DNS drivers from DNF retirements", async () 
   }
 })
 
+test("getFinalResults defers final classification when stints are empty", async () => {
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url)
+
+    if (requestUrl.endsWith("/position?session_key=234")) {
+      return jsonResponse([
+        {
+          session_key: 234,
+          driver_number: 1,
+          position: 1,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+        {
+          session_key: 234,
+          driver_number: 2,
+          position: 2,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+      ])
+    }
+
+    if (requestUrl.endsWith("/stints?session_key=234")) {
+      return jsonResponse([])
+    }
+
+    return new Response("not found", { status: 404, statusText: "Not Found" })
+  }
+
+  try {
+    const provider = new OpenF1Provider()
+    const results = await provider.getFinalResults(234)
+
+    assert.deepEqual(results, [])
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
 test("getLiveClassification returns null when OpenF1 has no position rows", async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async (url) => {
