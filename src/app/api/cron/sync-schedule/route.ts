@@ -8,20 +8,10 @@
 
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { validateCronSecret } from "@/lib/api/cron-auth"
 import { db } from "@/lib/db/client"
 import { createF1Provider } from "@/lib/f1/adapter"
 import { fetchDriversForSessions } from "./driver-fetch"
-
-// ─── Auth helper ──────────────────────────────────────────────────────────────
-
-function validateCronSecret(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return false
-
-  const auth = req.headers.get("authorization")
-  const provided = auth?.startsWith("Bearer ") ? auth.slice(7) : null
-  return provided === secret
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cron/sync-schedule

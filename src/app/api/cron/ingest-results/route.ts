@@ -16,6 +16,7 @@
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { validateCronSecret } from '@/lib/api/cron-auth'
 import { db } from '@/lib/db/client'
 import { ingestResultsForRace, findRacesNeedingIngestion } from '@/lib/services/ingestion.service'
 import { computeAndStoreScoresForRace } from '@/lib/services/scoring.service'
@@ -24,14 +25,6 @@ import {
   findRacesNeedingQualifyingIngestion,
 } from '@/lib/services/qualifying.service'
 import { shouldIngestRaceResults } from './result-targets'
-
-function validateCronSecret(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return false
-  const auth = req.headers.get('authorization')
-  const provided = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  return provided === secret
-}
 
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
