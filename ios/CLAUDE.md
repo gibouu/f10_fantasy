@@ -119,6 +119,7 @@ struct LocalPick: Codable {
   raceId, winnerId, p10Id, dnfId: String
   savedAt: Date
   synced: Bool   // true once successfully POSTed to server
+  migrationStatus: LocalPickMigrationStatus? // .expired when migration missed the lock
 }
 // Stored as [raceId: LocalPick] JSON
 ```
@@ -142,7 +143,7 @@ struct LocalPick: Codable {
   2. **LocalPickStore**: refuses to save a pick when race is locked
   3. **Server**: returns 423 on POST /api/picks if locked (catches clock drift)
 - Clock drift: client-side lock is informational; server is authoritative. A user with a behind clock gets 423 on upload, sees "This race is now locked."
-- Migration skips picks for locked races
+- Migration records locked/expired picks and surfaces a post-sign-in notice
 
 ## Migration flow (guest → authenticated)
 
@@ -151,10 +152,10 @@ struct LocalPick: Codable {
 3. `SyncManager.migrateGuestPicks(token:, localPickStore:)` runs:
    - Gets all `localPickStore.unsyncedPicks()`
    - For each: checks `race.isLocked` from cached races list
-   - If locked → mark synced (skip, too late)
+   - If locked → mark migration expired, exclude from retry queue, show notice
    - GET /api/picks?raceId= → if 200, server pick exists → skip (mark synced, server wins)
    - If 404 → POST local pick to server
-   - On 423 → mark synced (server also says locked)
+   - On 423 → mark migration expired (server also says locked), exclude from retry queue, show notice
    - Any other error → leave unsynced (retry on next launch)
 4. After migration, `LocalPickStore` retains all picks (synced/unsynced) for display continuity
 
@@ -170,7 +171,7 @@ struct LocalPick: Codable {
 
 ## Known edge cases / unresolved
 
-- **Offline picks**: LocalPick saved while offline will upload on next launch after auth. If race locks before the device comes online, the pick is lost silently (user not notified).
+- **Offline picks**: LocalPick saved while offline will upload on next launch after auth. If race locks before upload, migration records `.expired`, stops retrying that pick, keeps it locally for display continuity, and shows a post-sign-in notice.
 - **Reinstall**: LocalPickStore and GuestStore use UserDefaults → cleared on reinstall. Guest picks are lost. Acceptable, but could be mitigated with Keychain storage if needed.
 - **Multiple guest picks for same race**: LocalPickStore keeps one pick per raceId (last write wins).
 - **Server pick conflict during migration**: Server wins. If user made picks on web and then also on iOS as guest, web picks are preserved.
