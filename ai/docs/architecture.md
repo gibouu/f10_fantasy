@@ -123,7 +123,7 @@ Client Components / RSC Pages
 - **Three-layer post-lock pick protection** — (1) `pick.service.ts` atomic write guard rejects post-lock writes; (2) `lockPicksForRace` snapshots driver/seat into `PickSet.locked*` cols and `scoring.service.ts` reads from those, so scoring uses the pre-lock state regardless of any later live-field drift; (3) Postgres trigger `pickset_post_lock_guard` refuses any UPDATE mutating driver/seat fields on a locked row. Trigger lives in `prisma/triggers/` and must be re-installed via `scripts/install-pickset-triggers.ts` after DB resets.
 - **Cron jobs are NOT Vercel crons** — they are AWS Lambda/EventBridge schedules; canonical runbook: `ai/docs/cron-operations.md`
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` never touch them
-- **No test framework** — verify via type checking, linting, and build
+- **Regression tests use Node's built-in test runner** — package scripts group route, auth, service, component, page, scoring, iOS-source, and script checks. Use targeted `node --test ...` suites first, then `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
 
 ---
 
@@ -168,7 +168,7 @@ npm run build        # production build
 npm run lint         # ESLint
 npm run db:push      # sync Prisma schema (no migrations)
 npm run db:studio    # Prisma Studio GUI
-vercel --version     # local Vercel CLI should be 54.14.2 or newer
+vercel --version     # local Vercel CLI should be 54.15.0 or newer
 ```
 
 ---

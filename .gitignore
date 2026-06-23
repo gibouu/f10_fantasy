@@ -20,6 +20,9 @@
 # claude code session state
 /.claude/
 
+# local git worktrees
+/.worktrees/
+
 # misc
 .DS_Store
 *.pem

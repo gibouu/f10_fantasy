@@ -16,14 +16,14 @@ cp .env.example .env.local
 
 Fill `.env.local` with development credentials. Do not commit real secrets.
 
-Use Vercel CLI 54.14.2 or newer for deployment-related local commands:
+Use Vercel CLI 54.15.0 or newer for deployment-related local commands:
 
 ```bash
 npm i -g vercel@latest
 vercel --version
 ```
 
-This was last verified with Vercel CLI 54.14.5.
+Install the latest CLI before deployment work; this repo expects 54.15.0 or newer.
 
 First, run the development server:
 

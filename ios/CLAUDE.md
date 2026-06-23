@@ -5,7 +5,7 @@
 - `xcodegen generate` rebuilds the `.xcodeproj` from `project.yml` after every new file
 - Backend: Next.js 14 App Router at `Config.apiBaseURL` (localhost:3000 in DEBUG, prod URL in Release)
 - Auth: Sign In with Apple → `POST /api/auth/mobile/exchange` → Bearer JWT stored in Keychain
-- No test framework
+- No native XCTest suite; iOS regression coverage currently uses Node source tests under `ios/*.test.mjs`, grouped by `npm run test:ios`
 
 ## Folder map (relevant files)
 

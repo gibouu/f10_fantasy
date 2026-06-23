@@ -18,11 +18,12 @@
 - architecture-first beats repo-wide scanning
 - shared docs are the cross-model memory layer
 
-## Verification Order (no test framework)
-1. TypeScript type checking (`tsc --noEmit`)
-2. Linting (`npm run lint`)
-3. Build (`npm run build`)
-4. Manual spot-check in dev server if UI changed
+## Verification Order
+1. Targeted `node --test ...` suite for changed code when one exists
+2. TypeScript type checking (`npx tsc --noEmit`)
+3. Linting (`npm run lint`)
+4. Build (`npm run build`)
+5. Manual spot-check in dev server if UI changed
 
 ## When to update shared docs
 - `architecture.md` — new entry point, module, API route, or constraint discovered
