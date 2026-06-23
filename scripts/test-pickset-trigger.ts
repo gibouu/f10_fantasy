@@ -6,7 +6,11 @@
  *
  *   npx tsx scripts/test-pickset-trigger.ts
  */
+import { config as loadDotenv } from 'dotenv'
 import { PrismaClient, Prisma } from '@prisma/client'
+
+loadDotenv({ path: '.env.local' })
+loadDotenv({ path: '.env' })
 
 const directUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL
 if (!directUrl) {
