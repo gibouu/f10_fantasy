@@ -44,6 +44,7 @@
 		9F4CB010F34803172181F256 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14BE2DAC50E1A3F315CC644F /* SyncManager.swift */; };
 		A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E706759022F3FFAC680CFAB /* Config.swift */; };
 		A5232EDCA0F08EC91B7878C3 /* Driver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494452DD6B3E19BC8F850FF2 /* Driver.swift */; };
+		AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */; };
 		B539AE28DBF60E6E6BD3B539 /* FriendProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89D6F2921C74496E154358E /* FriendProfile.swift */; };
 		B7287621224A9D77F438B14B /* RacesListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */; };
 		B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411961C10248D3714B7E98 /* UsernamePickerView.swift */; };
@@ -86,6 +87,7 @@
 		77E7BA543FEF70B178E45B2E /* LeaderboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardViewModel.swift; sourceTree = "<group>"; };
 		79ED2E04D9D0A55566BB0D71 /* LeaderboardRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardRowView.swift; sourceTree = "<group>"; };
 		7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendSearchView.swift; sourceTree = "<group>"; };
+		7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTeamOption.swift; sourceTree = "<group>"; };
 		883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialCard.swift; sourceTree = "<group>"; };
 		88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 		8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				C4D9ED40A530B447C0BD977D /* FriendProfileView.swift */,
 				9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */,
 				32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */,
+				7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */,
 				DB930FED2C9918990560892D /* ProfileView.swift */,
 				347020C4691D77E3D65C73AD /* SettingsView.swift */,
 			);
@@ -406,6 +409,7 @@
 				7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */,
 				BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */,
 				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
+				AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */,
 				13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */,
 				C9BDAEED60343EF79CFCD65D /* Race.swift in Sources */,
 				2025CA7B03FD1CA4E7AFC81F /* RaceCardView.swift in Sources */,
