@@ -13,10 +13,10 @@ import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db/client'
 import { isRaceLocked, isPickSetLocked } from './lock.service'
 import { z } from 'zod'
-import type { PickSetData, PickSetWithScore, RaceSummary } from '@/types/domain'
-import { RaceStatus, RaceType } from '@/types/domain'
+import type { PickSetData, PickSetWithScore } from '@/types/domain'
 import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
 import { resolveTeam } from '@/lib/f1/teams'
+import { mapRaceToSummary } from './race-summary.mapper'
 
 /**
  * Thrown when a pick cannot be created/updated because either the race-level
@@ -92,34 +92,6 @@ function mapPickSetToData(
     updatedAt: ps.updatedAt,
     lockedAt: ps.lockedAt,
     lockedSubmittedBeforeQualifying: ps.lockedSubmittedBeforeQualifying ?? null,
-  }
-}
-
-function mapRaceToSummary(race: {
-  id: string
-  seasonId: string
-  round: number
-  name: string
-  circuitName: string
-  country: string
-  type: string
-  scheduledStartUtc: Date
-  lockCutoffUtc: Date
-  status: string
-  qualifyingStartUtc?: Date | null
-}): RaceSummary {
-  return {
-    id: race.id,
-    seasonId: race.seasonId,
-    round: race.round,
-    name: race.name,
-    circuitName: race.circuitName,
-    country: race.country,
-    type: race.type as RaceType,
-    scheduledStartUtc: race.scheduledStartUtc,
-    lockCutoffUtc: race.lockCutoffUtc,
-    status: race.status as RaceStatus,
-    qualifyingStartUtc: race.qualifyingStartUtc ?? null,
   }
 }
 
