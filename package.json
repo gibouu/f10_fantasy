@@ -16,7 +16,7 @@
     "test:utils": "node --test src/lib/utils.test.mjs src/lib/observability/client-errors.test.mjs",
     "test:scoring": "node --test src/lib/scoring/formula.test.mjs",
     "test:scripts:static": "node --test scripts/backfill-locked-snapshots.test.mjs scripts/cleanup-orphaned-races.test.mjs scripts/db-entrypoint.test.mjs scripts/find-cheated-picks.test.mjs scripts/install-pickset-triggers.test.mjs scripts/maintenance-season-guards.test.mjs scripts/tsconfig-prisma-coverage.test.mjs scripts/vercel-cli-doc.test.mjs",
-    "test:services": "node --test src/lib/services/pick.service.test.mjs src/lib/services/race.service.test.mjs src/lib/services/race-summary.mapper.test.mjs src/lib/services/user.service.test.mjs src/lib/services/leaderboard-rank.test.mjs src/lib/services/friendship.service.test.mjs src/lib/services/qualifying.service.test.mjs src/lib/f1/providers/openf1.test.mjs",
+    "test:services": "node --test src/lib/services/pick.service.test.mjs src/lib/services/race.service.test.mjs src/lib/services/race-summary.mapper.test.mjs src/lib/services/user.service.test.mjs src/lib/services/leaderboard-rank.test.mjs src/lib/services/friendship.service.test.mjs src/lib/services/qualifying.service.test.mjs src/lib/services/scoring-pick-resolution.test.mjs src/lib/services/scoring.service.test.mjs src/lib/f1/providers/openf1.test.mjs",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
