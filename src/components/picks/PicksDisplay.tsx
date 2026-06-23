@@ -2,6 +2,12 @@ import * as React from 'react'
 import { ArrowRight, Trophy, Target, AlertCircle } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import {
+  actualResultLabel,
+  formatScoreChip,
+  scoreTone,
+  totalScoreFromBreakdown,
+} from '@/components/picks/picks-display-view.mjs'
 import type { SerializedPickSetWithScore, SerializedRaceSummary, DriverSummary } from '@/types/domain'
 import { RaceStatus } from '@/types/domain'
 
@@ -13,6 +19,10 @@ type ResultRow = {
   driverId: string
   position: number | null
   status: string
+}
+
+function scoreToneClass(score: number): string {
+  return scoreTone(score) === 'positive' ? 'text-[#30d158]' : 'text-text-tertiary'
 }
 
 interface PicksDisplayProps {
@@ -42,8 +52,6 @@ function CategoryRow({
   actualResult,
   score,
 }: CategoryRowProps) {
-  const scored = score > 0
-
   return (
     <div className="flex items-center gap-3 py-3 border-b border-[var(--border)] last:border-0">
       {/* Category icon + label */}
@@ -62,21 +70,17 @@ function CategoryRow({
 
       {/* Actual result */}
       <span className="text-sm text-text-secondary w-12 truncate text-center">
-        {actualResult
-          ? actualResult.position !== null
-            ? `P${actualResult.position}`
-            : actualResult.status
-          : '—'}
+        {actualResultLabel(actualResult)}
       </span>
 
       {/* Score chip */}
       <span
         className={cn(
           'text-sm font-bold w-10 text-right shrink-0',
-          scored ? 'text-[#30d158]' : 'text-text-tertiary',
+          scoreToneClass(score),
         )}
       >
-        +{score}
+        {formatScoreChip(score)}
       </span>
     </div>
   )
@@ -125,7 +129,7 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
   const winnerResult = results.find((r) => r.driverId === pick.winnerDriverId)
   const dnfResult = results.find((r) => r.driverId === pick.dnfDriverId)
 
-  const totalScore = breakdown?.totalScore ?? 0
+  const totalScore = totalScoreFromBreakdown(breakdown)
 
   return (
     <div className="rounded-2xl bg-surface border border-[var(--border)] p-4 flex flex-col gap-4">
@@ -162,7 +166,7 @@ export function PicksDisplay({ pick, race, results, entrants = [] }: PicksDispla
         <span
           className={cn(
             'text-3xl font-bold',
-            totalScore > 0 ? 'text-[#30d158]' : 'text-text-tertiary',
+            scoreToneClass(totalScore),
           )}
         >
           {totalScore}

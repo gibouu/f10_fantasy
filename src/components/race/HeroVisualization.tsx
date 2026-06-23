@@ -6,6 +6,10 @@ import { motion } from 'framer-motion'
 
 import { Badge } from '@/components/ui/badge'
 import { LockCountdown } from '@/components/race/LockCountdown'
+import {
+  isActualResultPending,
+  isPickResultMatched,
+} from '@/components/race/hero-visualization-view.mjs'
 import type { SerializedRaceSummary, SerializedPickSetWithScore, DriverSummary } from '@/types/domain'
 import { RaceType, RaceStatus } from '@/types/domain'
 
@@ -134,10 +138,7 @@ function SlotColumn({
   hasPick,
   matched,
 }: SlotColumnProps) {
-  const isLive = raceStatus === RaceStatus.LIVE
-  const isCompleted = raceStatus === RaceStatus.COMPLETED
-  const isPending = !isLive && !isCompleted
-  const isMissingCompletedResult = isCompleted && !resultDriver
+  const resultPending = isActualResultPending(raceStatus, resultDriver)
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -150,7 +151,7 @@ function SlotColumn({
       <DriverBubble
         driver={resultDriver}
         size={resultSize}
-        pending={isPending && !isMissingCompletedResult}
+        pending={resultPending}
         showCode={!!resultDriver}
       />
 
@@ -161,7 +162,7 @@ function SlotColumn({
       <DriverBubble
         driver={pickDriver ?? null}
         size={pickSize}
-        matched={matched && isCompleted}
+        matched={matched && raceStatus === RaceStatus.COMPLETED}
         empty={!hasPick}
         pending={!hasPick}
         showCode={!!pickDriver}
@@ -218,23 +219,25 @@ export function HeroVisualization({
 
   // Match checks
   const tenthMatched = Boolean(
-    isCompleted &&
-      pick &&
-      results &&
-      pick.tenthPlaceDriverId === results.tenthPlace?.driver?.id,
+    isPickResultMatched(
+      race.status,
+      pick?.tenthPlaceDriverId,
+      results?.tenthPlace?.driver?.id,
+    ),
   )
   const winnerMatched = Boolean(
-    isCompleted &&
-      pick &&
-      results &&
-      pick.winnerDriverId === results.winner?.driver?.id,
+    isPickResultMatched(
+      race.status,
+      pick?.winnerDriverId,
+      results?.winner?.driver?.id,
+    ),
   )
   const dnfMatched = Boolean(
-    isCompleted &&
-      pick &&
-      results &&
-      results.dnf &&
-      pick.dnfDriverId === results.dnf?.driver?.id,
+    isPickResultMatched(
+      race.status,
+      pick?.dnfDriverId,
+      results?.dnf?.driver?.id,
+    ),
   )
 
   return (
