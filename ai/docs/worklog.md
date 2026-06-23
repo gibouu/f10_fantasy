@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-06-23 14:06 — iOS decode logs redacted
+- by: Codex
+- summary: Removed raw response body previews from iOS API decode-failure logs while retaining endpoint, status, type, timing, byte-count, auth-marker, and decode-error diagnostics.
+- files touched: `ios/FXRacing/Core/Networking/APIClient.swift`, `ios/api-client-decode-logging.test.mjs`, `package.json`
+- verification: `node --test ios/api-client-decode-logging.test.mjs`; `npm run test:ios`
+- open questions: none
+- should update architecture?: no
+- should update decisions?: no
+
 ### 2026-06-23 13:55 — iOS 401 responses normalized
 - by: Codex
 - summary: Updated iOS API 401 handling so JSON-bodied unauthorized responses still throw `APIError.unauthorized`, preserving `AuthManager.restoreSession()` stale-token cleanup.

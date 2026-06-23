@@ -41,8 +41,7 @@ struct APIClient: Sendable {
             do {
                 return try JSONDecoder.api().decode(T.self, from: data)
             } catch {
-                let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
-                fxError(.network, "\(pathTag) — decode \(T.self) failed: \(error.localizedDescription); body[0..200]=\(preview)")
+                fxError(.network, "\(pathTag) → \(http.statusCode) decode \(T.self) failed (\(ms)ms, \(data.count)B, \(auth)): \(error.localizedDescription)")
                 throw APIError.decodingFailed(error)
             }
         case 401:
