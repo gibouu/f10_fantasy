@@ -13,6 +13,24 @@ test("sanitizedErrorResponse preserves allowlisted domain errors", async () => {
   assert.deepEqual(await response.json(), { error: "Race is locked" })
 })
 
+test("sanitizedErrorResponse treats reused global regex rules as stateless", async () => {
+  const domainErrors = [{ pattern: /locked/g, status: 423 }]
+
+  const firstResponse = sanitizedErrorResponse(new Error("Race is locked"), {
+    domainErrors,
+    fallbackMessage: "Failed to save pick",
+    logger: null,
+  })
+  const secondResponse = sanitizedErrorResponse(new Error("Race is locked"), {
+    domainErrors,
+    fallbackMessage: "Failed to save pick",
+    logger: null,
+  })
+
+  assert.equal(firstResponse.status, 423)
+  assert.equal(secondResponse.status, 423)
+})
+
 test("sanitizedErrorResponse logs unexpected errors and returns a generic body", async () => {
   const logs = []
   const response = sanitizedErrorResponse(

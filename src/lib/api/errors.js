@@ -31,8 +31,9 @@ function matchesDomainError(rule, error, message) {
     return true
   }
 
-  if (rule.pattern instanceof RegExp && rule.pattern.test(message)) {
-    return true
+  if (rule.pattern instanceof RegExp) {
+    rule.pattern.lastIndex = 0
+    return rule.pattern.test(message)
   }
 
   return false
