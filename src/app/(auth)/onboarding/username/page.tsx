@@ -78,6 +78,8 @@ export default function UsernameOnboardingPage() {
         const res = await fetch(
           `/api/users/username?username=${encodeURIComponent(value)}`,
         )
+        if (!res.ok) throw new Error("Couldn't verify username. Please try again.")
+
         const data: { available: boolean } = await res.json()
         if (availabilityRequestRef.current !== requestId) return
         setIsAvailable(data.available)

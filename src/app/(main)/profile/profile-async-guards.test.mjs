@@ -15,6 +15,16 @@ test("username availability checks ignore stale async responses", async () => {
   }
 })
 
+test("username availability checks treat HTTP failures as verification errors", async () => {
+  for (const path of ["./UsernameSetForm.tsx", "./UsernameChangeForm.tsx"]) {
+    const text = await source(path)
+    assert.match(
+      text,
+      /const res = await fetch\([\s\S]+?\)\s+if \(!res\.ok\) throw new Error\("Couldn't verify username\. Please try again\."\)\s+const data/,
+    )
+  }
+})
+
 test("team picker ignores stale async save responses", async () => {
   const text = await source("./TeamPicker.tsx")
   assert.match(text, /saveRequestRef = React\.useRef\(0\)/)
