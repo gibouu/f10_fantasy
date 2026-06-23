@@ -78,6 +78,19 @@ test("POST preserves locked race domain errors", async () => {
   assert.deepEqual(await responseJson(response), { error: "Race is locked" })
 })
 
+test("POST preserves cancelled race domain errors", async () => {
+  const response = await handlePickPost(pickRequest({ raceId: "race-1" }), dependencies({
+    createOrUpdatePick: async () => {
+      throw new Error("Race race-1 is cancelled — picks can no longer be submitted")
+    },
+  }))
+
+  assert.equal(response.status, 409)
+  assert.deepEqual(await responseJson(response), {
+    error: "Race race-1 is cancelled — picks can no longer be submitted",
+  })
+})
+
 test("POST preserves pick validation domain errors", async () => {
   const response = await handlePickPost(pickRequest({ raceId: "race-1" }), dependencies({
     createOrUpdatePick: async () => {
