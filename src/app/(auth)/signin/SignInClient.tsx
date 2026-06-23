@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
@@ -92,9 +93,19 @@ export default function SignInClient({ appleEnabled }: { appleEnabled: boolean }
         {/* Disclaimer */}
         <p className="text-text-tertiary text-xs text-center leading-relaxed px-4">
           By continuing you agree to our{" "}
-          <span className="underline underline-offset-2 cursor-pointer hover:text-text-secondary transition-colors">Terms</span>
+          <Link
+            href="/privacy#terms"
+            className="underline underline-offset-2 hover:text-text-secondary transition-colors"
+          >
+            Terms
+          </Link>
           {" "}&amp;{" "}
-          <span className="underline underline-offset-2 cursor-pointer hover:text-text-secondary transition-colors">Privacy Policy</span>
+          <Link
+            href="/privacy"
+            className="underline underline-offset-2 hover:text-text-secondary transition-colors"
+          >
+            Privacy Policy
+          </Link>
         </p>
       </motion.div>
 
