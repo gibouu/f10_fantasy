@@ -4,6 +4,7 @@ import { sanitizedErrorResponse } from "../../../lib/api/errors.js"
 const PICK_SAVE_DOMAIN_ERRORS = [
   { pattern: /locked/i, status: 423 },
   { pattern: /^Race not found:/, status: 404 },
+  { pattern: /^Race .+ is cancelled/, status: 409 },
   { pattern: /^The following driver IDs are not registered entrants for this race:/, status: 400 },
   { pattern: /^A pick set already exists for this race/, status: 409 },
 ]

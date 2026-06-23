@@ -2,7 +2,7 @@
  * Pick creation and retrieval service.
  *
  * Enforces:
- *   - Race must exist and not be locked before creating/updating picks
+ *   - Race must exist, not be cancelled, and not be locked before creating/updating picks
  *   - All three picked drivers must be different
  *   - All three picked drivers must be registered race entrants
  *   - Existing pick sets that have been explicitly locked cannot be mutated
@@ -30,6 +30,10 @@ export class PickLockedError extends Error {
     super(message)
     this.name = 'PickLockedError'
   }
+}
+
+function cancelledRacePickMessage(raceId: string): string {
+  return `Race ${raceId} is cancelled — picks can no longer be submitted`
 }
 
 // ─────────────────────────────────────────────
@@ -136,6 +140,33 @@ function resolveStoredSeatKey(
   return inferSeatKeyFromDriver(toSeatAwareDriver(driver))
 }
 
+async function lockRaceForPickWrite(
+  tx: Prisma.TransactionClient,
+  raceId: string,
+): Promise<{
+  id: string
+  lockCutoffUtc: Date
+  status: string
+} | null> {
+  const rows = await tx.$queryRaw<
+    {
+      id: string
+      lockCutoffUtc: Date
+      status: string
+    }[]
+  >(Prisma.sql`
+    SELECT
+      "id",
+      "lockCutoffUtc",
+      "status"
+    FROM "Race"
+    WHERE "id" = ${raceId}
+    FOR UPDATE
+  `)
+
+  return rows[0] ?? null
+}
+
 // ─────────────────────────────────────────────
 // Service functions
 // ─────────────────────────────────────────────
@@ -146,7 +177,7 @@ function resolveStoredSeatKey(
  * Guard order:
  *   1. Validate input shape with Zod (throws ZodError on failure)
  *   2. Race must exist
- *   3. Race must not be locked (lockCutoffUtc)
+ *   3. Race must not be cancelled or locked (lockCutoffUtc)
  *   4. All three drivers must be registered as race entrants
  *   5. Existing pick set must not have lockedAt set
  */
@@ -158,17 +189,19 @@ export async function createOrUpdatePick(
   const validated = CreatePickSchema.parse(input)
 
   return db.$transaction(async (tx) => {
-    // 2. Load race
-    const race = await tx.race.findUnique({
-      where: { id: validated.raceId },
-      select: { id: true, lockCutoffUtc: true, status: true },
-    })
+    // 2. Load and lock race. This serializes race status changes with both
+    // pick create and update writes for the duration of this transaction.
+    const race = await lockRaceForPickWrite(tx, validated.raceId)
 
     if (!race) {
       throw new Error(`Race not found: ${validated.raceId}`)
     }
 
-    // 3. Race-level lock check (best-effort — DB guard below is authoritative)
+    // 3. Race-level availability checks (best-effort — DB guard below is authoritative)
+    if (race.status === 'CANCELLED') {
+      throw new Error(cancelledRacePickMessage(validated.raceId))
+    }
+
     if (isRaceLocked(race)) {
       throw new PickLockedError(
         `Race ${validated.raceId} is locked — picks can no longer be submitted`,
@@ -213,14 +246,17 @@ export async function createOrUpdatePick(
 
     // 5. Atomic guarded update — re-asserts both invariants at the DB level.
     // Two concurrent submits at lockCutoff − Δ both pass the JS check above,
-    // but only the request whose write commits while lockCutoffUtc > now()
-    // and lockedAt IS NULL succeeds.
+    // but only the request whose write commits while lockCutoffUtc > now(),
+    // status is not CANCELLED, and lockedAt IS NULL succeeds.
     const updated = await tx.pickSet.updateMany({
       where: {
         userId,
         raceId: validated.raceId,
         lockedAt: null,
-        race: { lockCutoffUtc: { gt: new Date() } },
+        race: {
+          lockCutoffUtc: { gt: new Date() },
+          status: { not: 'CANCELLED' },
+        },
       },
       data,
     })
@@ -238,19 +274,33 @@ export async function createOrUpdatePick(
             'This pick set has been locked and can no longer be edited',
           )
         }
-        // Row exists but the relation guard didn't match — race must be locked.
+
+        const currentRace = await tx.race.findUnique({
+          where: { id: validated.raceId },
+          select: { lockCutoffUtc: true, status: true },
+        })
+        if (!currentRace) {
+          throw new Error(`Race not found: ${validated.raceId}`)
+        }
+        if (currentRace.status === 'CANCELLED') {
+          throw new Error(cancelledRacePickMessage(validated.raceId))
+        }
+        if (isRaceLocked(currentRace)) {
+          throw new PickLockedError(
+            `Race ${validated.raceId} is locked — picks can no longer be submitted`,
+          )
+        }
+
+        // Row exists but the relation guard did not match.
         throw new PickLockedError(
           `Race ${validated.raceId} is locked — picks can no longer be submitted`,
         )
       }
 
-      // No existing row — create one. Re-check race lock first inside the tx
-      // so we don't insert a fresh pick after the cutoff.
-      const fresh = await tx.race.findUnique({
-        where: { id: validated.raceId },
-        select: { lockCutoffUtc: true },
-      })
-      if (!fresh || isRaceLocked(fresh)) {
+      if (race.status === 'CANCELLED') {
+        throw new Error(cancelledRacePickMessage(validated.raceId))
+      }
+      if (isRaceLocked(race)) {
         throw new PickLockedError(
           `Race ${validated.raceId} is locked — picks can no longer be submitted`,
         )
