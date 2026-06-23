@@ -31,7 +31,7 @@ final class SyncManager {
             // Client-side lock check — skip if we know the race is locked
             if let race = raceMap[localPick.raceId], race.isLocked {
                 fxLog(.sync, "skip raceId=\(localPick.raceId) (locked)")
-                localPickStore.markSynced(raceId: localPick.raceId)
+                localPickStore.markMigrationExpired(raceId: localPick.raceId)
                 continue
             }
 
@@ -51,10 +51,14 @@ final class SyncManager {
             }
 
             // Upload
-            if await uploadPick(localPick, token: token) {
+            switch await uploadPick(localPick, token: token) {
+            case .uploaded:
                 fxLog(.sync, "uploaded raceId=\(localPick.raceId)")
                 localPickStore.markSynced(raceId: localPick.raceId)
-            } else {
+            case .locked:
+                fxWarn(.sync, "upload locked raceId=\(localPick.raceId) — marking migration expired")
+                localPickStore.markMigrationExpired(raceId: localPick.raceId)
+            case .failed:
                 fxWarn(.sync, "upload failed raceId=\(localPick.raceId) — will retry on next sign-in")
             }
             // On network error → leave unsynced; will retry on next sign-in
@@ -69,6 +73,12 @@ final class SyncManager {
         case failed
     }
 
+    private enum UploadPickResult {
+        case uploaded
+        case locked
+        case failed
+    }
+
     private func checkServerPick(raceId: String, token: String) async -> ServerPickStatus {
         do {
             let _: PickWrapper = try await api.request(.pickForRace(raceId: raceId), token: token)
@@ -80,7 +90,7 @@ final class SyncManager {
         }
     }
 
-    private func uploadPick(_ pick: LocalPick, token: String) async -> Bool {
+    private func uploadPick(_ pick: LocalPick, token: String) async -> UploadPickResult {
         do {
             let _: PickWrapper = try await api.request(
                 .submitPick(
@@ -91,11 +101,11 @@ final class SyncManager {
                 ),
                 token: token
             )
-            return true
+            return .uploaded
         } catch APIError.serverError(let code, _) where code == 423 {
-            return true  // race locked → no retry needed
+            return .locked
         } catch {
-            return false
+            return .failed
         }
     }
 }

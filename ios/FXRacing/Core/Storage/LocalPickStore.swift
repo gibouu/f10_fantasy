@@ -1,5 +1,9 @@
 import Foundation
 
+enum LocalPickMigrationStatus: String, Codable, Sendable {
+    case expired
+}
+
 /// A pick stored locally on-device before (or instead of) server upload.
 struct LocalPick: Codable, Sendable {
     let raceId: String
@@ -8,6 +12,7 @@ struct LocalPick: Codable, Sendable {
     let dnfId: String
     let savedAt: Date
     var synced: Bool
+    var migrationStatus: LocalPickMigrationStatus?
 }
 
 /// Persists picks to UserDefaults as a [raceId: LocalPick] dictionary.
@@ -19,6 +24,7 @@ final class LocalPickStore {
     private static let key = "localPicks_v1"
     private static let legacyKey = "localPicks"
     private(set) var picks: [String: LocalPick] = [:]
+    private(set) var expiredMigrationNoticeCount = 0
 
     init() {
         load()
@@ -31,7 +37,7 @@ final class LocalPickStore {
     }
 
     func unsyncedPicks() -> [LocalPick] {
-        picks.values.filter { !$0.synced }
+        picks.values.filter { !$0.synced && $0.migrationStatus == nil }
     }
 
     // MARK: - Write
@@ -48,7 +54,20 @@ final class LocalPickStore {
     func markSynced(raceId: String) {
         guard picks[raceId] != nil else { return }
         picks[raceId]?.synced = true
+        picks[raceId]?.migrationStatus = nil
         persist()
+    }
+
+    func markMigrationExpired(raceId: String) {
+        guard picks[raceId] != nil else { return }
+        picks[raceId]?.synced = false
+        picks[raceId]?.migrationStatus = .expired
+        expiredMigrationNoticeCount += 1
+        persist()
+    }
+
+    func clearExpiredMigrationNotice() {
+        expiredMigrationNoticeCount = 0
     }
 
     /// Clear a pick (e.g., after confirmed server deletion or conflict resolution).
