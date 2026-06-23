@@ -8,41 +8,10 @@
 
 import { db } from '@/lib/db/client'
 import type { RaceSummary, DriverSummary, RaceResultRecord } from '@/types/domain'
-import { RaceType, RaceStatus, ResultStatus } from '@/types/domain'
+import { ResultStatus } from '@/types/domain'
 import { resolveTeam, DRIVER_PHOTOS } from '@/lib/f1/teams'
 import { buildSeatLookup } from '@/lib/f1/seats'
-
-// ─────────────────────────────────────────────
-// Internal mappers
-// ─────────────────────────────────────────────
-
-function mapRace(race: {
-  id: string
-  seasonId: string
-  round: number
-  name: string
-  circuitName: string
-  country: string
-  type: string
-  scheduledStartUtc: Date
-  lockCutoffUtc: Date
-  status: string
-  qualifyingStartUtc?: Date | null
-}): RaceSummary {
-  return {
-    id: race.id,
-    seasonId: race.seasonId,
-    round: race.round,
-    name: race.name,
-    circuitName: race.circuitName,
-    country: race.country,
-    type: race.type as RaceType,
-    scheduledStartUtc: race.scheduledStartUtc,
-    lockCutoffUtc: race.lockCutoffUtc,
-    status: race.status as RaceStatus,
-    qualifyingStartUtc: race.qualifyingStartUtc ?? null,
-  }
-}
+import { mapRaceToSummary } from './race-summary.mapper'
 
 // ─────────────────────────────────────────────
 // Public API
@@ -93,7 +62,7 @@ export async function getRacesForSeason(
     },
   })
 
-  return races.map(mapRace)
+  return races.map(mapRaceToSummary)
 }
 
 /**
@@ -118,7 +87,7 @@ export async function getCurrentRace(
     orderBy: { scheduledStartUtc: 'asc' },
   })
 
-  if (live) return mapRace(live)
+  if (live) return mapRaceToSummary(live)
 
   // Next upcoming race
   const upcoming = await db.race.findFirst({
@@ -126,7 +95,7 @@ export async function getCurrentRace(
     orderBy: { scheduledStartUtc: 'asc' },
   })
 
-  if (upcoming) return mapRace(upcoming)
+  if (upcoming) return mapRaceToSummary(upcoming)
 
   // Fallback: most recently completed
   const completed = await db.race.findFirst({
@@ -134,7 +103,7 @@ export async function getCurrentRace(
     orderBy: { scheduledStartUtc: 'desc' },
   })
 
-  return completed ? mapRace(completed) : null
+  return completed ? mapRaceToSummary(completed) : null
 }
 
 /**
@@ -160,7 +129,7 @@ export async function getRaceById(
     },
   })
 
-  return race ? mapRace(race) : null
+  return race ? mapRaceToSummary(race) : null
 }
 
 /**
@@ -271,7 +240,7 @@ export async function getRaceResults(
 
   if (!race) return []
 
-  const raceSummary = mapRace(race)
+  const raceSummary = mapRaceToSummary(race)
 
   const results: RaceResultRecord[] = race.results.map((r) => ({
     driverId: r.driverId,
