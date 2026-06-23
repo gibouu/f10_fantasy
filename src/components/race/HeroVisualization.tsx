@@ -18,7 +18,7 @@ type HeroVisualizationProps = {
   pick: SerializedPickSetWithScore | null
   /** Populated once race is completed */
   results?: {
-    tenthPlace: { driver: DriverSummary; position: number }
+    tenthPlace: { driver: DriverSummary; position: number } | null
     winner: { driver: DriverSummary }
     dnf: { driver: DriverSummary } | null
   }
@@ -137,6 +137,7 @@ function SlotColumn({
   const isLive = raceStatus === RaceStatus.LIVE
   const isCompleted = raceStatus === RaceStatus.COMPLETED
   const isPending = !isLive && !isCompleted
+  const isMissingCompletedResult = isCompleted && !resultDriver
 
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -149,7 +150,7 @@ function SlotColumn({
       <DriverBubble
         driver={resultDriver}
         size={resultSize}
-        pending={isPending}
+        pending={isPending && !isMissingCompletedResult}
         showCode={!!resultDriver}
       />
 
