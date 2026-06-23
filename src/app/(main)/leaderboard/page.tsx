@@ -12,6 +12,8 @@ import {
   normalizeLeaderboardSort,
 } from "./search-params"
 
+export const dynamic = "force-dynamic"
+
 type LeaderboardSearchParamValue = string | string[] | undefined
 
 interface LeaderboardSearchParams {

@@ -6,6 +6,8 @@ import { OnboardingCarousel } from "@/components/onboarding/OnboardingCarousel"
 import { RacesListClient } from "./RacesListClient"
 import type { SerializedRaceSummary } from "@/types/domain"
 
+export const dynamic = "force-dynamic"
+
 export default async function RacesPage() {
   // Run auth + season fetch in parallel — they're independent.
   const [session, season] = await Promise.all([auth(), getActiveSeason()])
