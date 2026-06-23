@@ -69,3 +69,16 @@ test("rejectFriendRequest conditionally rejects only pending requests for either
     /if \(updated\.count !== 1\) \{\s*throw new Error\('Friend request is no longer pending'\)\s*\}/,
   )
 })
+
+test("getSentRequests owns pending-sent mapping in the service layer", () => {
+  const sentBlock = serviceBlock(
+    "export async function getSentRequests",
+    "export async function getFriends",
+  )
+
+  assert.match(sentBlock, /db\.friendRequest\.findMany\(\{[\s\S]*requesterId: userId[\s\S]*status: 'PENDING'/)
+  assert.match(sentBlock, /addressee:\s*\{ select: \{ publicUsername: true, image: true, favoriteTeamSlug: true \} \}/)
+  assert.match(sentBlock, /const teamInfo = r\.addressee\.favoriteTeamSlug/)
+  assert.match(sentBlock, /teamLogoUrl: teamInfo\?\.logoUrl \?\? null/)
+  assert.match(sentBlock, /teamColor: teamInfo\?\.color \?\? null/)
+})

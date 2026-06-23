@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
   sendFriendRequest,
   getFriends,
   getPendingRequests,
+  getSentRequests,
   searchUsers,
 } from '@/lib/services/friendship.service'
-import { TEAMS } from '@/lib/f1/teams'
-import type { TeamSlug } from '@/lib/f1/teams'
+import { handleFriendsGet } from './get-handler'
 import { handleFriendRequestPost } from './post-handler'
 
 // ─────────────────────────────────────────────
@@ -18,65 +18,14 @@ import { handleFriendRequestPost } from './post-handler'
 // ─────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const session = (await auth()) ?? (await mobileAuth(request))
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-  const userId = session.user.id
-
-  const { searchParams } = request.nextUrl
-  const searchQuery = searchParams.get('search') ?? searchParams.get('q')
-
-  // Delegate to search if ?search= or legacy ?q= param is present
-  if (searchQuery !== null) {
-    const results = await searchUsers(searchQuery, userId)
-    return NextResponse.json(results)
-  }
-
-  // Full friends + pending data
-  const [friends, pendingReceived] = await Promise.all([
-    getFriends(userId),
-    getPendingRequests(userId),
-  ])
-
-  // Pending sent — we need to query the DB directly since friendship.service
-  // only exposes received. Use a lightweight query via the same service pattern.
-  // For now we derive it from the DB client used in the service.
-  const { db } = await import('@/lib/db/client')
-  const sentRaw = await db.friendRequest.findMany({
-    where: { requesterId: userId, status: 'PENDING' },
-    select: {
-      id: true,
-      requesterId: true,
-      addresseeId: true,
-      status: true,
-      createdAt: true,
-      requester: { select: { publicUsername: true, image: true } },
-      addressee: { select: { publicUsername: true, image: true, favoriteTeamSlug: true } },
-    },
-    orderBy: { createdAt: 'desc' },
+  return handleFriendsGet(request, {
+    auth,
+    mobileAuth,
+    searchUsers,
+    getFriends,
+    getPendingRequests,
+    getSentRequests,
   })
-
-  const pendingSent = sentRaw.map((r) => {
-    const teamInfo = r.addressee.favoriteTeamSlug
-      ? TEAMS[r.addressee.favoriteTeamSlug as TeamSlug]
-      : null
-    return {
-      id: r.id,
-      requesterId: r.requesterId,
-      requesterUsername: r.requester.publicUsername,
-      requesterAvatar: r.requester.image,
-      addresseeId: r.addresseeId,
-      addresseeUsername: r.addressee.publicUsername,
-      addresseeAvatar: r.addressee.image,
-      teamLogoUrl: teamInfo?.logoUrl ?? null,
-      teamColor: teamInfo?.color ?? null,
-      status: r.status as 'PENDING',
-      createdAt: r.createdAt,
-    }
-  })
-
-  return NextResponse.json({ friends, pendingReceived, pendingSent })
 }
 
 // ─────────────────────────────────────────────
