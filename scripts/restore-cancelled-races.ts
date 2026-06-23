@@ -13,13 +13,8 @@
  */
 import { db } from '@/lib/db/client'
 
-const NAMES_TO_RESTORE = [
-  // Race id, name, type — match by all three to avoid touching anything else
-  { id: 'cmnlzx0xz002m5tcq3otjqv43', name: 'Saudi Arabian Grand Prix', type: 'MAIN' },
-] as const
-
 async function main() {
-  // Look up by name+type+round to be defensive about id drift
+  // Look up by status + name/type to be defensive about id drift.
   const targets = await db.race.findMany({
     where: {
       AND: [
