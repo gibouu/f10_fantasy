@@ -129,10 +129,11 @@ export async function ingestQualifyingForRace(
  * the prior bug where `getFinalResults` mis-classified eliminated drivers as
  * DNF and wrote only 7-8 rows.
  *
+ * Zero-row races are not retried until their paired qualifying session start
+ * has passed, because a provider empty response leaves no persisted marker.
  * A 15-minute throttle on partial races prevents the 5-minute cron from
  * churning OpenF1 for sessions that legitimately have a small grid (testing,
- * sprint formats, etc.) — once a re-ingest attempt completes (success or
- * provider returning 0 rows), we don't retry until the throttle clears.
+ * sprint formats, etc.).
  */
 export async function findRacesNeedingQualifyingIngestion(): Promise<string[]> {
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
@@ -147,6 +148,7 @@ export async function findRacesNeedingQualifyingIngestion(): Promise<string[]> {
       GROUP BY "raceId"
     ) q ON q."raceId" = r.id
     WHERE r."openf1QualifyingSessionKey" IS NOT NULL
+      AND r."qualifyingStartUtc" <= NOW()
       AND r."scheduledStartUtc" > ${fourteenDaysAgo}
       AND (
         q.cnt IS NULL
