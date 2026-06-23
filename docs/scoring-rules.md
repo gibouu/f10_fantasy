@@ -9,7 +9,7 @@ Each pick set has three slots:
 - race winner
 - DNF driver
 
-Only locked picks are scored. Scoring uses locked pick snapshots when available so post-lock field drift cannot affect results.
+Scoring normally runs after race lock. When locked pick snapshots exist, scoring uses them so post-lock field drift cannot affect results; legacy or otherwise unsnapshotted rows fall back to the live pick fields.
 
 ## Main Race Scoring
 
