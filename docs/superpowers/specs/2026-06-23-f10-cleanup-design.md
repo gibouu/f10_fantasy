@@ -83,10 +83,10 @@ Constraints:
 
 Use the repo's verification order unless a touched area requires extra checks:
 
-1. `npx tsc --noEmit`
-2. `npm run lint`
-3. `npm run build`
-4. Targeted `node --test ...` suites for changed testable modules
+1. Targeted `node --test ...` suites for changed testable modules
+2. `npx tsc --noEmit`
+3. `npm run lint`
+4. `npm run build`
 5. `npm run test:ios` and `xcodebuild` when iOS files are touched
 
 For documentation-only cleanup, verify by reviewing the diff and ensuring no code paths were changed.

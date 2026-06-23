@@ -265,12 +265,13 @@ The default workflow is:
 7. Update shared docs if needed
 8. Report clearly
 
-### 16. No Test Framework — Verification Fallback (Project-Specific)
-This project has no test framework. Verify in this strict order:
-1. `npx tsc --noEmit` — type checking
-2. `npm run lint` — ESLint
-3. `npm run build` — full build
-4. Manual spot-check in dev server if UI was changed
+### 16. Node Test Suites — Verification Order (Project-Specific)
+This project has Node built-in test suites. Verify in this strict order:
+1. Targeted `node --test ...` suites and relevant `npm run test:*` package scripts for the changed area
+2. `npx tsc --noEmit` — type checking
+3. `npm run lint` — ESLint
+4. `npm run build` — full build
+5. Manual spot-check in dev server if UI was changed
 
 If a step fails, fix it before proceeding. Explicitly state when a change is unverified.
 
