@@ -26,6 +26,18 @@ test("repo documents and wires the canonical database entrypoint", async () => {
   assert.match(pkg.scripts["test:scripts:static"], /scripts\/db-entrypoint\.test\.mjs/)
 })
 
+test("unsafe one-shot Prisma grid repair path stays retired", async () => {
+  const pkgRaw = await readFile(new URL("../package.json", import.meta.url), "utf8")
+  const pkg = JSON.parse(pkgRaw)
+
+  assert.equal(pkg.scripts["db:fix-grid"], undefined)
+  assert.doesNotMatch(JSON.stringify(pkg.scripts), /prisma\/fix-grid-and-results\.ts/)
+  await assert.rejects(
+    () => stat(new URL("../prisma/fix-grid-and-results.ts", import.meta.url)),
+    { code: "ENOENT" },
+  )
+})
+
 test("database entrypoint classifies SQL safety gates", () => {
   const cases = [
     ["select 1", "read"],
