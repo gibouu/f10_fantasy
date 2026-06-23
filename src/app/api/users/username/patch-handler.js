@@ -1,17 +1,16 @@
 import { readJsonObjectBody } from "../../../../lib/api/request-body.js"
 import { sanitizedErrorResponse } from "../../../../lib/api/errors.js"
 import {
-  USERNAME_SET_DOMAIN_ERRORS,
+  USERNAME_CHANGE_DOMAIN_ERRORS,
   uniqueUsernameConflictRule,
 } from "./username-errors.js"
 
-export async function handleUsernamePost(
+export async function handleUsernamePatch(
   req,
   {
     auth,
     mobileAuth,
-    setUsername,
-    validateUsernameFormat,
+    changeUsername,
     isUniqueConstraintError = (_err) => false,
     logger = console,
   },
@@ -37,23 +36,18 @@ export async function handleUsernamePost(
     )
   }
 
-  const formatCheck = validateUsernameFormat(username)
-  if (!formatCheck.valid) {
-    return Response.json({ error: formatCheck.error }, { status: 400 })
-  }
-
   let stored
   try {
-    stored = await setUsername(session.user.id, username)
+    stored = await changeUsername(session.user.id, username)
   } catch (err) {
     return sanitizedErrorResponse(err, {
       domainErrors: [
         uniqueUsernameConflictRule(isUniqueConstraintError),
-        ...USERNAME_SET_DOMAIN_ERRORS,
+        ...USERNAME_CHANGE_DOMAIN_ERRORS,
       ],
-      fallbackMessage: "Failed to set username",
+      fallbackMessage: "Failed to change username",
       logger,
-      logMessage: "[users/username] Failed to set username",
+      logMessage: "[users/username] Failed to change username",
     })
   }
 

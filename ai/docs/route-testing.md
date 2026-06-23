@@ -20,7 +20,7 @@ Document the lightweight API route regression pattern used by `npm run test:rout
 - Auth profile: `src/app/api/users/me/get-handler.test.mjs`
 - Diagnostics: `src/app/api/diag/health/get-handler.test.mjs`, `src/app/api/diag/race/route.test.mjs`
 - Lock transition: `src/app/api/cron/lock-picks/route.test.mjs`
-- Username validation: `src/app/api/users/username/post-handler.test.mjs`, `src/app/api/users/username/route.test.mjs`
+- Username validation: `src/app/api/users/username/post-handler.test.mjs`, `src/app/api/users/username/patch-handler.test.mjs`
 - Scoring rules: `src/lib/scoring/formula.test.mjs` via `npm run test:scoring`
 
 ## Commands
