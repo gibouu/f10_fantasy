@@ -48,9 +48,6 @@ struct APIClient: Sendable {
         case 401:
             let message = (try? JSONDecoder.api().decode(APIErrorBody.self, from: data))?.error
             fxWarn(.network, "\(pathTag) → 401 (\(ms)ms, \(auth)) \(message ?? "")")
-            if let message {
-                throw APIError.serverError(401, message)
-            }
             throw APIError.unauthorized
         case 404:
             fxWarn(.network, "\(pathTag) → 404 (\(ms)ms, \(auth))")
