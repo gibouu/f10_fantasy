@@ -16,6 +16,7 @@ import type { ScoreBreakdownData } from '@/types/domain'
 import type { NormalizedFinalResult } from '@/lib/f1/types'
 import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
 import { resolveTeam } from '@/lib/f1/teams'
+import { resolveSeatKeyForScoring } from './scoring-pick-resolution'
 
 /**
  * A Prisma client capable of running our queries — either the global `db`
@@ -49,6 +50,7 @@ function toSeatAwareDriver(driver: {
 
 function resolveSeatKey(
   storedSeatKey: string | null,
+  lockedDriverId: string | null,
   driver: {
     id: string
     code: string
@@ -60,8 +62,12 @@ function resolveSeatKey(
     }
   },
 ): string | null {
-  if (storedSeatKey) return storedSeatKey
-  return inferSeatKeyFromDriver(toSeatAwareDriver(driver))
+  return resolveSeatKeyForScoring({
+    storedSeatKey,
+    lockedDriverId,
+    inferSeatKeyFromLiveDriver: () =>
+      inferSeatKeyFromDriver(toSeatAwareDriver(driver)),
+  })
 }
 
 function resolveEffectiveDriverId(
@@ -165,17 +171,20 @@ export async function computeAndStoreScoresForRace(
   // This guarantees scoring uses the pre-lock state even if a post-lock write
   // somehow lands on the live fields.
   const pickFields = (ps: (typeof pickSets)[number]) => ({
+    lockedTenthPlaceDriverId: ps.lockedTenthPlaceDriverId,
     tenthPlaceDriverId:
       ps.lockedTenthPlaceDriverId ?? ps.tenthPlaceDriverId,
     tenthPlaceSeatKey:
       ps.lockedTenthPlaceDriverId !== null
         ? ps.lockedTenthPlaceSeatKey
         : ps.tenthPlaceSeatKey,
+    lockedWinnerDriverId: ps.lockedWinnerDriverId,
     winnerDriverId: ps.lockedWinnerDriverId ?? ps.winnerDriverId,
     winnerSeatKey:
       ps.lockedWinnerDriverId !== null
         ? ps.lockedWinnerSeatKey
         : ps.winnerSeatKey,
+    lockedDnfDriverId: ps.lockedDnfDriverId,
     dnfDriverId: ps.lockedDnfDriverId ?? ps.dnfDriverId,
     dnfSeatKey:
       ps.lockedDnfDriverId !== null ? ps.lockedDnfSeatKey : ps.dnfSeatKey,
@@ -188,19 +197,31 @@ export async function computeAndStoreScoresForRace(
       tenthPlaceDriverId: resolveEffectiveDriverId(
         entrantLookup.seatKeyToDriverId,
         entrantIds,
-        resolveSeatKey(f.tenthPlaceSeatKey, pickSet.tenthPlaceDriver),
+        resolveSeatKey(
+          f.tenthPlaceSeatKey,
+          f.lockedTenthPlaceDriverId,
+          pickSet.tenthPlaceDriver,
+        ),
         f.tenthPlaceDriverId,
       ),
       winnerDriverId: resolveEffectiveDriverId(
         entrantLookup.seatKeyToDriverId,
         entrantIds,
-        resolveSeatKey(f.winnerSeatKey, pickSet.winnerDriver),
+        resolveSeatKey(
+          f.winnerSeatKey,
+          f.lockedWinnerDriverId,
+          pickSet.winnerDriver,
+        ),
         f.winnerDriverId,
       ),
       dnfDriverId: resolveEffectiveDriverId(
         entrantLookup.seatKeyToDriverId,
         entrantIds,
-        resolveSeatKey(f.dnfSeatKey, pickSet.dnfDriver),
+        resolveSeatKey(
+          f.dnfSeatKey,
+          f.lockedDnfDriverId,
+          pickSet.dnfDriver,
+        ),
         f.dnfDriverId,
       ),
       // Early-bird snapshot — null on legacy rows is treated as false.
@@ -385,19 +406,31 @@ export async function recomputeScoreForPickSet(
     tenthPlaceDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(tenthSeatKey, ps.tenthPlaceDriver),
+      resolveSeatKey(
+        tenthSeatKey,
+        ps.lockedTenthPlaceDriverId,
+        ps.tenthPlaceDriver,
+      ),
       tenthDriverId,
     ),
     winnerDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(winnerSeatKey, ps.winnerDriver),
+      resolveSeatKey(
+        winnerSeatKey,
+        ps.lockedWinnerDriverId,
+        ps.winnerDriver,
+      ),
       winnerDriverId,
     ),
     dnfDriverId: resolveEffectiveDriverId(
       entrantLookup.seatKeyToDriverId,
       entrantIds,
-      resolveSeatKey(dnfSeatKey, ps.dnfDriver),
+      resolveSeatKey(
+        dnfSeatKey,
+        ps.lockedDnfDriverId,
+        ps.dnfDriver,
+      ),
       dnfDriverId,
     ),
   }
