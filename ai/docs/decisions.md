@@ -64,6 +64,42 @@ Do not log temporary debugging notes here.
 - Affected areas: `src/lib/scoring/formula.ts`.
 - Follow-up: —
 
+### 2026-05-13 — Early-bird bonus is snapshotted at lock
+- Status: accepted
+- Context: Users get a 2x bonus when their final pick edit happens before the paired qualifying session starts.
+- Decision: `lockPicksForRace` sets `PickSet.lockedSubmittedBeforeQualifying` by comparing the pick row's pre-lock `updatedAt` with `Race.qualifyingStartUtc`. Scoring treats true as `earlyBirdBonus = baseScore`; legacy/null rows receive no bonus.
+- Reason: The user's last-edit timestamp is mutable and `lock-picks` itself updates the row, so the qualification must be captured before the lock write changes `updatedAt`.
+- Tradeoffs: Legacy locked rows cannot be backfilled reliably because the original last-edit timestamp is gone.
+- Affected areas: `Race.qualifyingStartUtc`, `PickSet.lockedSubmittedBeforeQualifying`, `ScoreBreakdown.earlyBirdBonus`, `lock.service.ts`, `scoring.service.ts`.
+- Follow-up: Ensure `sync-schedule` has populated `qualifyingStartUtc` before race lock windows.
+
+### 2026-05-03 — Qualifying classifications use OpenF1 session_result
+- Status: accepted
+- Context: Race-classification ingestion via stint-derived final results misclassified qualifying eliminations as DNFs and produced partial qualifying rows.
+- Decision: Qualifying ingestion uses OpenF1 `/session_result` through `getQualifyingClassification`, while race results keep using the race-result path.
+- Reason: `/session_result` returns explicit qualifying positions and status flags for the full field.
+- Tradeoffs: Qualifying and race-result provider paths stay separate.
+- Affected areas: `src/lib/f1/providers/openf1.ts`, `src/lib/services/qualifying.service.ts`, `src/app/api/cron/ingest-results/route.ts`.
+- Follow-up: Broad qualifying-read fallbacks are tracked separately in #279 and should only be removed after DB rollout is confirmed.
+
+### 2026-05-03 — Mobile auth tokens are long-lived JWTs with revocation cutoff
+- Status: accepted
+- Context: The iOS app should keep users signed in without refresh-token rotation, while still allowing server-side revocation.
+- Decision: Mobile exchange issues long-lived JWTs with a 60-day max age. Revocation-aware comparisons use integer-second JWT `iat` semantics by truncating `User.sessionValidAfter` to seconds before comparison.
+- Reason: JWT `iat` is second-precision; comparing it to millisecond-precision database timestamps caused fresh tokens to fail their own revocation check.
+- Tradeoffs: Existing tokens only pick up max-age changes after users sign in again.
+- Affected areas: `src/app/api/auth/mobile/exchange/route.ts`, `src/lib/auth/mobileAuth.ts`, `src/auth.ts`, iOS auth restore flows.
+- Follow-up: Keep future revocation-style timestamp checks in the same second-precision unit.
+
+### 2026-05-11 — Calendar reconciliation source split
+- Status: accepted
+- Context: OpenF1 can retain or omit provisional 2026 events differently from the official F1 calendar.
+- Decision: Manual calendar reconciliation treats the official F1 calendar as the source of truth for which races exist, and OpenF1 as the source of truth for meeting/session keys and start times for races that do exist.
+- Reason: This lets the app remove phantoms while preserving OpenF1 identifiers needed by ingestion.
+- Tradeoffs: Some calendar corrections remain manual when OpenF1 still reports an event that F1 has removed.
+- Affected areas: `scripts/cleanup-orphaned-races.ts`, `scripts/reconcile-2026-calendar.ts`, `scripts/renumber-2026-rounds.ts`, `sync-schedule` reconciliation safeguards.
+- Follow-up: Completed races remain immutable; do not use reconciliation scripts to rewrite completed race results or entries.
+
 ### 2026-05-04 — Three-layer post-lock pick protection (snapshot + trigger)
 - Status: accepted
 - Context: Picks must be immutable after `lockCutoffUtc`. The pre-existing app-layer atomic guard in `pick.service.ts` (`updateMany` WHERE re-asserts `lockedAt IS NULL AND lockCutoffUtc > now()`) was the only defense. A misfire (wrong `lockCutoffUtc`, lock-cron lag, direct DB write) could let a post-lock edit land and silently change the score.
