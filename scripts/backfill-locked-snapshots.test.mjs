@@ -9,12 +9,16 @@ const targetQuery = source.match(
 const updateQuery = source.match(
   /const updated = await db\.\$executeRaw`([\s\S]*?)`/,
 )?.[1]
+const verificationQuery = source.match(
+  /const drift = await db\.\$queryRaw<Array<\{ count: bigint \}>>`([\s\S]*?)`/,
+)?.[1]
 
 assert.ok(targetQuery, "expected to find the target count query")
 assert.ok(updateQuery, "expected to find the snapshot update query")
+assert.ok(verificationQuery, "expected to find the post-state verification query")
 
-test("backfill targets any locked row missing a driver snapshot", () => {
-  for (const query of [targetQuery, updateQuery]) {
+test("backfill targets any locked row missing a driver or seat snapshot", () => {
+  for (const query of [targetQuery, updateQuery, verificationQuery]) {
     assert.match(query, /"lockedAt" IS NOT NULL/)
 
     for (const field of [
@@ -27,5 +31,17 @@ test("backfill targets any locked row missing a driver snapshot", () => {
 
     assert.match(query, /OR\s+"lockedWinnerDriverId" IS NULL/)
     assert.match(query, /OR\s+"lockedDnfDriverId" IS NULL/)
+
+    for (const [liveField, lockedField] of [
+      ["tenthPlaceSeatKey", "lockedTenthPlaceSeatKey"],
+      ["winnerSeatKey", "lockedWinnerSeatKey"],
+      ["dnfSeatKey", "lockedDnfSeatKey"],
+    ]) {
+      assert.match(
+        query,
+        new RegExp(`"${liveField}" IS NOT NULL[\\s\\S]*"${lockedField}" IS NULL`),
+        `${lockedField} should be checked when ${liveField} exists`,
+      )
+    }
   }
 })
