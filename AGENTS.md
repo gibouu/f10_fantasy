@@ -302,6 +302,7 @@ npm run db:studio    # Open Prisma Studio GUI
 See `ai/docs/architecture.md` for full architecture, entry points, data flow, and API surface.
 
 Key behavioral constraints not derivable from reading code:
+- **Database access** — every DB touch must go through `scripts/db`; credentials are in `~/.config/supabase-cli/accounts.ini` section `[fxracing]` with `project_ref` + `access_token`. See `docs/DATABASE_ACCESS.md`.
 - **Cron jobs are AWS Lambda, not Vercel Crons** — never add vercel.json cron config; new crons require external AWS trigger setup
 - **No migrations** — `db:push` only; be deliberate about destructive schema changes
 - **Three type systems must stay separate** — Domain types, Prisma types, F1 types — never mix layers

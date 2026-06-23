@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""scripts/db - the single entrypoint for f10_fantasy database access.
+
+Every database touch goes through here. It runs SQL on the project's Supabase
+Postgres via the Supabase Management API, authenticating with the access token
+from the central credential store - never a committed secret or printed token.
+
+Credentials: ~/.config/supabase-cli/accounts.ini, section [fxracing] by default.
+Required keys: project_ref and access_token. See docs/DATABASE_ACCESS.md.
+
+Safe by default:
+  read   (SELECT / WITH...SELECT / EXPLAIN / SHOW / TABLE / VALUES) -> no flag
+  write  (INSERT / CREATE / GRANT / REFRESH / scoped UPDATE|DELETE) -> --write
+  force  (DROP / TRUNCATE / ALTER / DO / CALL, or UPDATE|DELETE without WHERE) -> --write --force
+
+Usage:
+  scripts/db "select count(*) from \"Race\""
+  scripts/db -f tmp/query.sql --json
+  echo "select 1" | scripts/db
+  scripts/db --section fxracing --json "select 1"
+"""
+
+import argparse
+import configparser
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+
+ACCOUNTS = os.path.expanduser("~/.config/supabase-cli/accounts.ini")
+API = "https://api.supabase.com/v1/projects/{ref}/database/query"
+
+_FORCE_RE = re.compile(r"\b(DROP|TRUNCATE|ALTER|DO|CALL)\b", re.I)
+_WRITE_RE = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|CREATE|GRANT|REVOKE|COMMENT|REFRESH|"
+    r"COPY|MERGE|VACUUM|REINDEX|CALL|DO)\b",
+    re.I,
+)
+
+
+def _sanitize_and_split(sql: str) -> list[str]:
+    """Split statements and blank comments/literals without executing a parser.
+
+    Comment markers inside string literals must stay literal, and keywords inside
+    comments/literals must not affect safety classification.
+    """
+    statements: list[str] = []
+    current: list[str] = []
+    i = 0
+    length = len(sql)
+
+    while i < length:
+        ch = sql[i]
+        nxt = sql[i + 1] if i + 1 < length else ""
+
+        if ch == "'":
+            current.append(" ")
+            i += 1
+            while i < length:
+                if sql[i] == "'" and i + 1 < length and sql[i + 1] == "'":
+                    i += 2
+                    continue
+                if sql[i] == "'":
+                    i += 1
+                    break
+                i += 1
+            current.append(" ")
+            continue
+
+        if ch == '"':
+            current.append(" ")
+            i += 1
+            while i < length:
+                if sql[i] == '"' and i + 1 < length and sql[i + 1] == '"':
+                    i += 2
+                    continue
+                if sql[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            current.append(" ")
+            continue
+
+        if ch == "$":
+            match = re.match(r"\$[A-Za-z0-9_]*\$", sql[i:])
+            if match:
+                tag = match.group(0)
+                end = sql.find(tag, i + len(tag))
+                if end != -1:
+                    current.append(" ")
+                    i = end + len(tag)
+                    current.append(" ")
+                    continue
+
+        if ch == "-" and nxt == "-":
+            current.append(" ")
+            i += 2
+            while i < length and sql[i] != "\n":
+                i += 1
+            continue
+
+        if ch == "/" and nxt == "*":
+            current.append(" ")
+            i += 2
+            while i + 1 < length and not (sql[i] == "*" and sql[i + 1] == "/"):
+                i += 1
+            i = min(i + 2, length)
+            current.append(" ")
+            continue
+
+        if ch == ";":
+            statement = "".join(current).strip()
+            if statement:
+                statements.append(statement)
+            current = []
+            i += 1
+            continue
+
+        current.append(ch)
+        i += 1
+
+    statement = "".join(current).strip()
+    if statement:
+        statements.append(statement)
+    return statements
+
+
+def _tokens(statement: str) -> list[tuple[str, int]]:
+    tokens: list[tuple[str, int]] = []
+    depth = 0
+    i = 0
+    while i < len(statement):
+        ch = statement[i]
+        if ch == "(":
+            depth += 1
+            i += 1
+            continue
+        if ch == ")":
+            depth = max(0, depth - 1)
+            i += 1
+            continue
+        if (ch.isalpha() or ch == "_") and depth == 0:
+            start = i
+            i += 1
+            while i < len(statement) and (statement[i].isalnum() or statement[i] == "_"):
+                i += 1
+            tokens.append((statement[start:i].upper(), depth))
+            continue
+        if (ch.isalpha() or ch == "_") and depth > 0:
+            start = i
+            i += 1
+            while i < len(statement) and (statement[i].isalnum() or statement[i] == "_"):
+                i += 1
+            tokens.append((statement[start:i].upper(), depth))
+            continue
+        i += 1
+    return tokens
+
+
+def _has_unscoped_mutation(statement: str) -> bool:
+    tokens = _tokens(statement)
+    for index, (token, depth) in enumerate(tokens):
+        if token not in {"UPDATE", "DELETE"}:
+            continue
+        scoped = False
+        for later, later_depth in tokens[index + 1 :]:
+            if later_depth < depth:
+                break
+            if later_depth == depth and later in {"SELECT", "INSERT", "UPDATE", "DELETE", "CREATE"}:
+                break
+            if later_depth == depth and later == "WHERE":
+                scoped = True
+                break
+        if not scoped:
+            return True
+    return False
+
+
+def classify(sql: str) -> str:
+    statements = _sanitize_and_split(sql)
+    if not statements:
+        return "read"
+
+    if any(_FORCE_RE.search(statement) for statement in statements):
+        return "force"
+
+    for statement in statements:
+        if _has_unscoped_mutation(statement):
+            return "force"
+
+    if any(_WRITE_RE.search(statement) for statement in statements):
+        return "write"
+    return "read"
+
+
+def load_creds(section: str) -> tuple[str, str]:
+    if not os.path.exists(ACCOUNTS):
+        sys.exit(f"db: credential file not found: {ACCOUNTS}")
+    if os.stat(ACCOUNTS).st_mode & 0o077:
+        sys.exit(f"db: {ACCOUNTS} must be chmod 600")
+
+    cfg = configparser.ConfigParser()
+    cfg.read(ACCOUNTS)
+    match = next((s for s in cfg.sections() if s.lower() == section.lower()), None)
+    if match is None:
+        sys.exit(f"db: no [{section}] section in {ACCOUNTS}")
+
+    sec = cfg[match]
+    ref = sec.get("project_ref")
+    token = sec.get("access_token")
+    if not ref or not token:
+        sys.exit(f"db: [{section}] needs both project_ref and access_token")
+    return ref, token
+
+
+def run_sql(ref: str, token: str, sql: str):
+    req = urllib.request.Request(
+        API.format(ref=ref),
+        data=json.dumps({"query": sql}).encode(),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": "f10-fantasy-scripts-db/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read() or "[]")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        try:
+            body = json.loads(body).get("message", body)
+        except ValueError:
+            pass
+        sys.exit(f"db: query failed (HTTP {exc.code}): {body}")
+    except urllib.error.URLError as exc:
+        sys.exit(f"db: network error: {exc.reason}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Safe Supabase SQL runner.")
+    parser.add_argument("sql", nargs="?", help="SQL string, or use -f / stdin")
+    parser.add_argument("-f", "--file", help="read SQL from a file")
+    parser.add_argument(
+        "--section",
+        default=os.environ.get("DB_SECTION", "fxracing"),
+        help="accounts.ini section, default: fxracing",
+    )
+    parser.add_argument("--write", action="store_true", help="allow mutations")
+    parser.add_argument("--force", action="store_true", help="allow destructive statements")
+    parser.add_argument("--json", action="store_true", help="raw JSON output")
+    args = parser.parse_args()
+
+    if args.file:
+        with open(args.file, encoding="utf8") as handle:
+            sql = handle.read()
+    elif args.sql:
+        sql = args.sql
+    elif not sys.stdin.isatty():
+        sql = sys.stdin.read()
+    else:
+        parser.error("provide SQL as an argument, with -f FILE, or on stdin")
+
+    if not sql.strip():
+        parser.error("empty SQL")
+
+    tier = classify(sql)
+    if tier == "force" and not (args.write and args.force):
+        sys.exit(
+            "db: destructive statement (DROP/TRUNCATE/ALTER/DO/CALL or unscoped "
+            "DELETE/UPDATE) requires --write --force"
+        )
+    if tier == "write" and not args.write:
+        sys.exit("db: mutating statement requires --write")
+
+    rows = run_sql(*load_creds(args.section), sql)
+    if args.json or not isinstance(rows, list):
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return
+
+    if not rows:
+        print(f"OK ({tier}) - 0 rows returned")
+        return
+
+    columns = list(rows[0].keys())
+    widths = {
+        column: max(len(column), *(len(str(row.get(column, ""))) for row in rows))
+        for column in columns
+    }
+    print("  ".join(column.ljust(widths[column]) for column in columns))
+    print("  ".join("-" * widths[column] for column in columns))
+    for row in rows[:200]:
+        print("  ".join(str(row.get(column, "")).ljust(widths[column]) for column in columns))
+    if len(rows) > 200:
+        print(f"... {len(rows) - 200} more rows ({len(rows)} total)")
+
+
+if __name__ == "__main__":
+    main()
