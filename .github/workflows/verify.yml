@@ -56,7 +56,7 @@ jobs:
           npm run test:pages
           npm run test:utils
           npm run test:scoring
-          npm run test:scripts
+          npm run test:scripts:static
           npx tsx scripts/test-mobile-provider-email.ts
 
       - name: Build

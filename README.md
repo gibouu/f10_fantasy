@@ -36,7 +36,7 @@ Useful checks:
 ```bash
 npm run test:services
 npm run test:routes
-npm run test:scripts
+npm run test:scripts:static
 npx tsc --noEmit
 npm run lint
 npm run build
@@ -46,6 +46,8 @@ See [AGENTS.md](AGENTS.md) and
 [ai/docs/architecture.md](ai/docs/architecture.md) before making non-trivial
 changes. The architecture doc is the codebase map and the shared source of
 truth for service boundaries, API routes, data flow, and verification order.
+`npm run test:scripts:static` covers static script guards only; DB-backed
+operational scripts still require their documented manual dry-run/apply flow.
 
 ## Operations
 
