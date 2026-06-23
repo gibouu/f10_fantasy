@@ -19,6 +19,7 @@ async function main() {
     where: {
       AND: [
         { status: 'LIVE' },
+        { season: { year: 2026 } },
         {
           OR: [
             { name: 'Saudi Arabian Grand Prix', type: 'MAIN' },

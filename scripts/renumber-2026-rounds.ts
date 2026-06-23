@@ -111,6 +111,12 @@ async function main() {
     console.error('No active season found. Aborting.')
     process.exit(1)
   }
+  if (season.year !== 2026) {
+    console.error(
+      `Active season is ${season.year}; this 2026 round renumbering script must not run for another season.`,
+    )
+    process.exit(1)
+  }
   console.log(`Active season: id=${season.id} year=${season.year}`)
 
   const rows = (await db.race.findMany({
