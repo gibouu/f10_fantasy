@@ -45,7 +45,7 @@ export async function getRacesForSeason(
   seasonId: string,
 ): Promise<RaceSummary[]> {
   const races = await db.race.findMany({
-    where: { seasonId },
+    where: { seasonId, status: { not: 'CANCELLED' } },
     orderBy: { scheduledStartUtc: 'asc' },
     select: {
       id: true,
