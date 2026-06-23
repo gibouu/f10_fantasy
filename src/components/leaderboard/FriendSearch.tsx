@@ -22,10 +22,15 @@ type SearchResult = {
   teamColor?: string | null
 }
 
+type PendingSentRequestData = FriendRequestData & {
+  teamLogoUrl: string | null
+  teamColor: string | null
+}
+
 type FriendsData = {
   friends: SearchResult[]
   pendingReceived: FriendRequestData[]
-  pendingSent: FriendRequestData[]
+  pendingSent: PendingSentRequestData[]
 }
 
 // ─────────────────────────────────────────────
@@ -301,8 +306,8 @@ export function FriendSearch() {
                   src={null}
                   name={req.addresseeUsername ?? req.addresseeId}
                   size="md"
-                  teamLogoUrl={(req as any).teamLogoUrl}
-                  teamColor={(req as any).teamColor}
+                  teamLogoUrl={req.teamLogoUrl}
+                  teamColor={req.teamColor}
                 />
                 <span className="flex-1 text-sm text-text-primary truncate">
                   {req.addresseeUsername ?? 'Anonymous'}
