@@ -8,6 +8,8 @@
 
 **Tech Stack:** Markdown docs, Node's built-in `node --test`, Next.js 14 App Router, TypeScript, GitHub CLI.
 
+**Execution note:** This plan preserves some stale phrases inside replacement examples so agents can see exactly what text was removed. Those quoted examples are not current repo guidance; the live guidance is the post-replacement text and the final branch diff.
+
 ## Global Constraints
 
 - Track this work under GitHub issue #271.
