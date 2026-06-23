@@ -16,3 +16,10 @@ test("onboarding username suggestions ignore non-success and malformed payloads"
   assert.match(page, /Array\.isArray\(suggestions\)/)
   assert.doesNotMatch(page, /setSuggestions\(data\.suggestions\)/)
 })
+
+test("onboarding username availability treats HTTP failures as verification errors", () => {
+  assert.match(
+    page,
+    /const res = await fetch\([\s\S]+?\)\s+if \(!res\.ok\) throw new Error\("Couldn't verify username\. Please try again\."\)\s+const data/,
+  )
+})
