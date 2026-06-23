@@ -1,19 +1,5 @@
 import SwiftUI
 
-private let allTeams: [(slug: String, name: String)] = [
-    ("ferrari",       "Ferrari"),
-    ("mclaren",       "McLaren"),
-    ("red-bull",      "Red Bull"),
-    ("mercedes",      "Mercedes"),
-    ("aston-martin",  "Aston Martin"),
-    ("alpine",        "Alpine"),
-    ("williams",      "Williams"),
-    ("racing-bulls",  "Racing Bulls"),
-    ("haas",          "Haas"),
-    ("audi",          "Audi"),
-    ("cadillac",      "Cadillac"),
-]
-
 struct SettingsView: View {
     @Environment(AuthManager.self) private var authManager
     @Environment(\.dismiss) private var dismiss
@@ -51,8 +37,19 @@ struct SettingsView: View {
                 Section("Favourite Team") {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
-                            ForEach(allTeams, id: \.slug) { team in
-                                teamChip(team: team)
+                            ForEach(ProfileTeamOption.all) { team in
+                                let currentSlug = authManager.authenticatedUser?.favoriteTeamSlug
+                                let isSelected = currentSlug == team.slug
+                                ProfileTeamChip(team: team, isSelected: isSelected) {
+                                    Task {
+                                        teamError = nil
+                                        do {
+                                            try await authManager.setFavoriteTeam(isSelected ? nil : team.slug)
+                                        } catch {
+                                            teamError = error.localizedDescription
+                                        }
+                                    }
+                                }
                             }
                         }
                         .padding(.vertical, 4)
@@ -137,39 +134,6 @@ struct SettingsView: View {
         }
     }
 
-    private func teamChip(team: (slug: String, name: String)) -> some View {
-        let currentSlug = authManager.authenticatedUser?.favoriteTeamSlug
-        let isSelected = currentSlug == team.slug
-        return Button {
-            Task {
-                teamError = nil
-                do {
-                    try await authManager.setFavoriteTeam(isSelected ? nil : team.slug)
-                } catch {
-                    teamError = error.localizedDescription
-                }
-            }
-        } label: {
-            VStack(spacing: 4) {
-                AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(team.slug).webp")) { img in
-                    img.resizable().scaledToFit().padding(5)
-                } placeholder: {
-                    Color.clear
-                }
-                .frame(width: 36, height: 36)
-                .background(.quaternary)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(isSelected ? FXTheme.Colors.accent : Color.clear, lineWidth: 2))
-
-                Text(team.name)
-                    .font(.system(size: 9, weight: isSelected ? .bold : .regular))
-                    .foregroundStyle(isSelected ? FXTheme.Colors.accent : .secondary)
-                    .lineLimit(1)
-            }
-            .frame(width: 58)
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 struct UsernameChangeView: View {
