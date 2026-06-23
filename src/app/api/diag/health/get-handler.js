@@ -1,10 +1,4 @@
-function validateCronSecret(req, getCronSecret) {
-  const secret = getCronSecret()
-  if (!secret) return false
-  const authHeader = req.headers.get("authorization")
-  const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
-  return provided === secret
-}
+import { validateCronSecret } from "../../../../lib/api/cron-auth.js"
 
 async function snapshot(raceId, now, db) {
   const race = await db.race.findUnique({
