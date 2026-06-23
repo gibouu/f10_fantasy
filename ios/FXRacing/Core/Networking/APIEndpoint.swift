@@ -25,8 +25,7 @@ extension APIEndpoint {
 
     // Auth
     static func mobileExchange(provider: String, idToken: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["provider": provider, "idToken": idToken])
-        return APIEndpoint(method: "POST", path: "/api/auth/mobile/exchange", bodyData: body)
+        APIEndpoint(method: "POST", path: "/api/auth/mobile/exchange", bodyData: jsonBody(["provider": provider, "idToken": idToken]))
     }
 
     // Account
@@ -46,18 +45,15 @@ extension APIEndpoint {
     }
 
     static func setUsername(_ username: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["username": username])
-        return APIEndpoint(method: "POST", path: "/api/users/username", bodyData: body)
+        APIEndpoint(method: "POST", path: "/api/users/username", bodyData: jsonBody(["username": username]))
     }
 
     static func changeUsername(_ username: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["username": username])
-        return APIEndpoint(method: "PATCH", path: "/api/users/username", bodyData: body)
+        APIEndpoint(method: "PATCH", path: "/api/users/username", bodyData: jsonBody(["username": username]))
     }
 
     static func setFavoriteTeam(_ slug: String?) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["slug": slug])
-        return APIEndpoint(method: "PATCH", path: "/api/users/team", bodyData: body)
+        APIEndpoint(method: "PATCH", path: "/api/users/team", bodyData: jsonBody(["slug": slug]))
     }
 
     // Races (Phase 2)
@@ -76,13 +72,16 @@ extension APIEndpoint {
     }
 
     static func submitPick(raceId: String, tenthPlaceDriverId: String, winnerDriverId: String, dnfDriverId: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode([
-            "raceId": raceId,
-            "tenthPlaceDriverId": tenthPlaceDriverId,
-            "winnerDriverId": winnerDriverId,
-            "dnfDriverId": dnfDriverId,
-        ])
-        return APIEndpoint(method: "POST", path: "/api/picks", bodyData: body)
+        APIEndpoint(
+            method: "POST",
+            path: "/api/picks",
+            bodyData: jsonBody([
+                "raceId": raceId,
+                "tenthPlaceDriverId": tenthPlaceDriverId,
+                "winnerDriverId": winnerDriverId,
+                "dnfDriverId": dnfDriverId,
+            ])
+        )
     }
 
     // Leaderboard (Phase 3)
@@ -109,16 +108,18 @@ extension APIEndpoint {
     }
 
     static func sendFriendRequest(addresseeId: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["addresseeId": addresseeId])
-        return APIEndpoint(method: "POST", path: "/api/friends", bodyData: body)
+        APIEndpoint(method: "POST", path: "/api/friends", bodyData: jsonBody(["addresseeId": addresseeId]))
     }
 
     static func respondToFriendRequest(id: String, action: String) -> APIEndpoint {
-        let body = try? JSONEncoder().encode(["action": action])
-        return APIEndpoint(method: "PATCH", path: "/api/friends/\(id)", bodyData: body)
+        APIEndpoint(method: "PATCH", path: "/api/friends/\(id)", bodyData: jsonBody(["action": action]))
     }
 
     static func userProfile(userId: String) -> APIEndpoint {
         APIEndpoint(method: "GET", path: "/api/users/\(userId)")
+    }
+
+    private static func jsonBody<T: Encodable>(_ value: T) -> Data? {
+        try? JSONEncoder().encode(value)
     }
 }
