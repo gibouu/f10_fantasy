@@ -8,7 +8,7 @@
  *
  *   npx tsx scripts/backfill-locked-snapshots.ts
  *
- * Idempotent: WHERE clause skips rows whose driver snapshot is already populated.
+ * Idempotent: WHERE clause skips rows whose driver/seat snapshot is already populated.
  */
 import { db } from '@/lib/db/client'
 
@@ -19,10 +19,13 @@ async function main() {
     WHERE "lockedAt" IS NOT NULL
       AND ("lockedTenthPlaceDriverId" IS NULL
         OR "lockedWinnerDriverId" IS NULL
-        OR "lockedDnfDriverId" IS NULL)
+        OR "lockedDnfDriverId" IS NULL
+        OR ("tenthPlaceSeatKey" IS NOT NULL AND "lockedTenthPlaceSeatKey" IS NULL)
+        OR ("winnerSeatKey" IS NOT NULL AND "lockedWinnerSeatKey" IS NULL)
+        OR ("dnfSeatKey" IS NOT NULL AND "lockedDnfSeatKey" IS NULL))
   `
   const targetCount = Number(before[0]?.count ?? 0)
-  console.log(`Locked PickSets needing driver snapshot backfill: ${targetCount}`)
+  console.log(`Locked PickSets needing snapshot backfill: ${targetCount}`)
 
   if (targetCount === 0) {
     console.log('Nothing to do.')
@@ -40,7 +43,10 @@ async function main() {
     WHERE "lockedAt" IS NOT NULL
       AND ("lockedTenthPlaceDriverId" IS NULL
         OR "lockedWinnerDriverId" IS NULL
-        OR "lockedDnfDriverId" IS NULL)
+        OR "lockedDnfDriverId" IS NULL
+        OR ("tenthPlaceSeatKey" IS NOT NULL AND "lockedTenthPlaceSeatKey" IS NULL)
+        OR ("winnerSeatKey" IS NOT NULL AND "lockedWinnerSeatKey" IS NULL)
+        OR ("dnfSeatKey" IS NOT NULL AND "lockedDnfSeatKey" IS NULL))
   `
 
   console.log(`Backfilled ${Number(updated)} row(s).`)
@@ -52,7 +58,10 @@ async function main() {
     WHERE "lockedAt" IS NOT NULL
       AND ("lockedTenthPlaceDriverId" IS NULL
         OR "lockedWinnerDriverId" IS NULL
-        OR "lockedDnfDriverId" IS NULL)
+        OR "lockedDnfDriverId" IS NULL
+        OR ("tenthPlaceSeatKey" IS NOT NULL AND "lockedTenthPlaceSeatKey" IS NULL)
+        OR ("winnerSeatKey" IS NOT NULL AND "lockedWinnerSeatKey" IS NULL)
+        OR ("dnfSeatKey" IS NOT NULL AND "lockedDnfSeatKey" IS NULL))
   `
   const remaining = Number(drift[0]?.count ?? 0)
   if (remaining > 0) {
