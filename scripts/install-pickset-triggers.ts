@@ -15,7 +15,11 @@
  * inlines the same SQL because Prisma's `$executeRawUnsafe` can only run one
  * statement per call.
  */
+import { config as loadDotenv } from 'dotenv'
 import { PrismaClient } from '@prisma/client'
+
+loadDotenv({ path: '.env.local' })
+loadDotenv({ path: '.env' })
 
 // Triggers and functions are DDL — Supabase's pooled connection user does
 // not have CREATE FUNCTION privilege on schema public. Use DIRECT_URL (the
