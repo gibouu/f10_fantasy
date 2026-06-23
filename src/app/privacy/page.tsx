@@ -39,7 +39,7 @@ export default function PrivacyPage() {
           </p>
         </div>
 
-        <div>
+        <div id="terms">
           <h2 className="font-semibold text-base mb-3">Terms of Use</h2>
           <p className="text-muted-foreground">
             FX Racing is a fan-made motorsport prediction game intended for entertainment purposes

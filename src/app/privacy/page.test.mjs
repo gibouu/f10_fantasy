@@ -10,3 +10,8 @@ test("privacy page keeps required support and unaffiliated notices", () => {
   assert.match(page, /not affiliated with/)
   assert.match(page, /Formula 1/)
 })
+
+test("privacy page exposes a terms anchor for sign-in legal links", () => {
+  assert.match(page, /<div id="terms">/)
+  assert.match(page, /<h2 className="font-semibold text-base mb-3">Terms of Use<\/h2>/)
+})
