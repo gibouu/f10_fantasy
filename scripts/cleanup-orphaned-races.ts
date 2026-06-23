@@ -23,6 +23,9 @@
  *
  * Refuses to act when OpenF1 returns fewer than 10 meetings (probable
  * upstream outage / partial response).
+ * Skips destructive SPRINT orphaning when OpenF1 returns zero Sprint
+ * sessions, because that is more likely partial session data than proof
+ * that every sprint weekend disappeared.
  *
  * Status is flipped, not deleted, because PickSet → Race cascades.
  * CANCELLED rows are silently hidden by both web RacesListClient and iOS
@@ -114,6 +117,12 @@ async function main() {
   console.log(
     `OpenF1 reports ${sprintSessions.length} Sprint session(s) across ${sprintMeetingKeys.size} meeting(s).`,
   )
+  const canReconcileSprints = sprintSessions.length > 0
+  if (!canReconcileSprints) {
+    console.warn(
+      'OpenF1 returned zero Sprint sessions; sprint orphan reconciliation disabled for this run.',
+    )
+  }
 
   // For Pass 1 we don't need /sessions wholesale — only sprint sessions above
   // — but Pass 2 wants the full session set to verify openf1SessionKey.
@@ -161,6 +170,9 @@ async function main() {
         })
       }
     } else if (r.type === 'SPRINT') {
+      if (!canReconcileSprints) {
+        continue
+      }
       const root = r.name.replace(/\s*Sprint\s*$/i, '').trim()
       if (!root) continue
       // Match DB sprint root against OpenF1 meeting name; e.g. "Canadian" vs
