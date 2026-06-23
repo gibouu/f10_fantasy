@@ -254,6 +254,50 @@ export async function getPendingRequests(
 }
 
 /**
+ * Get all pending friend requests sent by a user.
+ */
+export async function getSentRequests(
+  userId: string,
+): Promise<Array<FriendRequestData & { teamLogoUrl: string | null; teamColor: string | null }>> {
+  const requests = await db.friendRequest.findMany({
+    where: {
+      requesterId: userId,
+      status: 'PENDING',
+    },
+    select: {
+      id: true,
+      requesterId: true,
+      addresseeId: true,
+      status: true,
+      createdAt: true,
+      requester: { select: { publicUsername: true, image: true } },
+      addressee: { select: { publicUsername: true, image: true, favoriteTeamSlug: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return requests.map((r) => {
+    const teamInfo = r.addressee.favoriteTeamSlug
+      ? (TEAMS[r.addressee.favoriteTeamSlug as TeamSlug] ?? null)
+      : null
+
+    return {
+      id: r.id,
+      requesterId: r.requesterId,
+      requesterUsername: r.requester.publicUsername,
+      requesterAvatar: r.requester.image,
+      addresseeId: r.addresseeId,
+      addresseeUsername: r.addressee.publicUsername,
+      addresseeAvatar: r.addressee.image,
+      teamLogoUrl: teamInfo?.logoUrl ?? null,
+      teamColor: teamInfo?.color ?? null,
+      status: r.status as FriendRequestStatus,
+      createdAt: r.createdAt,
+    }
+  })
+}
+
+/**
  * Get the accepted friends list for a user.
  * Returns the friend's profile (the "other party" in the relationship).
  */
