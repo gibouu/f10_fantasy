@@ -154,9 +154,7 @@ export async function getRaceEntrants(
   const [entries, resultRows, qualifyingRows] = await Promise.all([
     db.raceEntry.findMany({ where: { raceId }, select: { driverId: true } }),
     db.raceResult.findMany({ where: { raceId }, select: { driverId: true } }),
-    db.qualifyingResult
-      .findMany({ where: { raceId }, select: { driverId: true } })
-      .catch(() => []),
+    db.qualifyingResult.findMany({ where: { raceId }, select: { driverId: true } }),
   ])
 
   const driverIds = new Set<string>([
