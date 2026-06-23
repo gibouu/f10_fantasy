@@ -6,8 +6,8 @@
  *      and we don't have those results yet. Runs even when the race is
  *      still UPCOMING — the qualifying session finishes hours/days before
  *      lights-out and the result feeds the race detail page leaderboard.
- *   2. If the race is COMPLETED (or the caller forced/targeted it), fetch
- *      final race results → write RaceResult, then compute pick scores.
+ *   2. If the race needs result ingestion (or the caller forced/targeted it),
+ *      fetch final race results → write RaceResult, then compute pick scores.
  *
  * Backfills up to 10 races per invocation.
  *
@@ -23,6 +23,7 @@ import {
   ingestQualifyingForRace,
   findRacesNeedingQualifyingIngestion,
 } from '@/lib/services/qualifying.service'
+import { shouldIngestRaceResults } from './result-targets'
 
 function validateCronSecret(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
 
   const startedAt = Date.now()
   let targetRaceIds: string[]
+  let resultRaceIds = new Set<string>()
   let mode: 'force' | 'targeted' | 'auto' = 'auto'
 
   try {
@@ -52,14 +54,17 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       })
       targetRaceIds = all.map((r) => r.id)
+      resultRaceIds = new Set(targetRaceIds)
     } else if (typeof body?.raceId === 'string') {
       mode = 'targeted'
       targetRaceIds = [body.raceId]
+      resultRaceIds = new Set(targetRaceIds)
     } else {
       const [needResults, needQuali] = await Promise.all([
         findRacesNeedingIngestion(),
         findRacesNeedingQualifyingIngestion(),
       ])
+      resultRaceIds = new Set(needResults)
       targetRaceIds = Array.from(new Set([...needResults, ...needQuali]))
     }
   } catch {
@@ -67,6 +72,7 @@ export async function POST(req: NextRequest) {
       findRacesNeedingIngestion(),
       findRacesNeedingQualifyingIngestion(),
     ])
+    resultRaceIds = new Set(needResults)
     targetRaceIds = Array.from(new Set([...needResults, ...needQuali]))
   }
 
@@ -133,16 +139,15 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Race results + scoring when the race itself is over (COMPLETED, or
-          // LIVE with start time well in the past), or when the caller
-          // explicitly forced/targeted this race. ingestResultsForRace flips
-          // status from LIVE → COMPLETED once results land in the DB.
-          const allowRaceResults =
-            race.openf1SessionKey !== null &&
-            (race.status === 'COMPLETED' ||
-              race.status === 'LIVE' ||
-              mode === 'force' ||
-              mode === 'targeted')
+          // Race results + scoring only for races selected by
+          // findRacesNeedingIngestion() in auto mode. That service owns the
+          // stale-LIVE cutoff. force/targeted calls remain explicit.
+          const allowRaceResults = shouldIngestRaceResults({
+            mode,
+            raceId,
+            openf1SessionKey: race.openf1SessionKey,
+            resultRaceIds,
+          })
 
           if (allowRaceResults) {
             ingested = await ingestResultsForRace(raceId, tx)
