@@ -1,45 +1,12 @@
-import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
-import { sanitizedErrorResponse } from '@/lib/api/errors'
-import { readJsonObjectBody } from '@/lib/api/request-body'
 import { setFavoriteTeam } from '@/lib/services/user.service'
-import type { TeamSlug } from '@/lib/f1/teams'
+import { handleUsersTeamPatch } from './patch-handler'
 
 export async function PATCH(req: Request) {
-  const session = (await auth()) ?? (await mobileAuth(req))
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const parsedBody = await readJsonObjectBody(req, {
-    nonObjectMessage: 'slug is required',
+  return handleUsersTeamPatch(req, {
+    auth,
+    mobileAuth,
+    setFavoriteTeam,
   })
-  if (!parsedBody.ok) {
-    return parsedBody.response
-  }
-  const body = parsedBody.body
-
-  if (
-    !Object.prototype.hasOwnProperty.call(body, 'slug')
-  ) {
-    return NextResponse.json({ error: 'slug is required' }, { status: 400 })
-  }
-  // slug can be a valid TeamSlug string or null (to clear)
-  const slugValue = body.slug
-  if (slugValue !== null && typeof slugValue !== 'string') {
-    return NextResponse.json({ error: 'slug must be a string or null' }, { status: 400 })
-  }
-  const slug: TeamSlug | null = slugValue === null ? null : (slugValue as TeamSlug)
-
-  try {
-    await setFavoriteTeam(session.user.id, slug)
-    return NextResponse.json({ ok: true })
-  } catch (err) {
-    return sanitizedErrorResponse(err, {
-      domainErrors: [{ pattern: /^Unknown team slug:/, status: 400 }],
-      fallbackMessage: 'Failed to update team',
-      logMessage: '[users/team] Failed to update team',
-    })
-  }
 }
