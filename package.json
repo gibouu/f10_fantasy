@@ -10,7 +10,7 @@
     "test:auth": "node --test src/auth-callbacks.test.mjs src/lib/auth/session-cutoff.test.mjs src/lib/auth/cronPath.test.mjs src/lib/auth/mobileAuth.test.mjs src/lib/security/account-token-crypto.test.mjs",
     "test:db": "node --test src/lib/db/token-field-transform.test.mjs",
     "test:components": "node --test src/components/ui/segmented-control.test.mjs 'src/app/(main)/profile/profile-async-guards.test.mjs' 'src/app/(main)/UserAvatarMenu.test.mjs' src/components/picks/PickHero.test.mjs src/components/picks/PicksDisplay.test.mjs src/components/legal/LegalModal.test.mjs src/components/session-sync.test.mjs src/components/race/lock-countdown-timer.test.mjs src/components/race/HeroVisualization.test.mjs src/components/race/RaceResultsCard.test.mjs",
-    "test:ios": "node --test ios/project-signing.test.mjs ios/signin-view-model.test.mjs ios/diagnostics-entry.test.mjs ios/profile-refresh-key.test.mjs ios/races-list-ordering.test.mjs ios/race-detail-load-reset.test.mjs ios/leaderboard-guest-access.test.mjs",
+    "test:ios": "node --test ios/project-signing.test.mjs ios/signin-view-model.test.mjs ios/diagnostics-entry.test.mjs ios/profile-refresh-key.test.mjs ios/races-list-ordering.test.mjs ios/race-detail-load-reset.test.mjs ios/leaderboard-guest-access.test.mjs ios/leaderboard-stale-response.test.mjs",
     "test:ios-config": "node --test ios/project-signing.test.mjs",
     "test:pages": "node --test 'src/app/(main)/races/race-detail-page.test.mjs' 'src/app/(auth)/onboarding/username/page.test.mjs' 'src/app/(main)/leaderboard/search-params.test.mjs'",
     "test:utils": "node --test src/lib/utils.test.mjs src/lib/observability/client-errors.test.mjs",
