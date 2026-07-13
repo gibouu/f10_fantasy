@@ -74,6 +74,7 @@
 		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
 		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
 		E60D296D9ACA985C52D4FB27 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */; };
+		ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */; };
 		F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */; };
 		FBB3B3C9E8BAEDF5EE0D4303 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E895B67C753E0E25B5AFBCD8 /* RootView.swift */; };
 		FF43C9A1A5AE13D40A09CE15 /* SkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66A8C5469F03FB290BFFA5D /* SkeletonView.swift */; };
@@ -117,6 +118,7 @@
 		38466ACFC9DCC1DC84C22141 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		4388BC34BF03EE268C778DBA /* ReviewLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewLaunch.swift; sourceTree = "<group>"; };
+		46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepositoryRolloverTests.swift; sourceTree = "<group>"; };
 		494452DD6B3E19BC8F850FF2 /* Driver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Driver.swift; sourceTree = "<group>"; };
 		4FA07E9B11C4B68102004778 /* APIResponseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponseModels.swift; sourceTree = "<group>"; };
 		511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverBubbleView.swift; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 			isa = PBXGroup;
 			children = (
 				B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */,
+				46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */,
 				B93F2A851054E21570EFBF91 /* RaceSnapshotCacheTests.swift */,
 			);
 			path = Races;
@@ -571,6 +574,7 @@
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
+				ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */,
 				FF575F5EEC120390DD7D30AA /* RaceSnapshotCacheTests.swift in Sources */,
 				394C92F0F9D71CB1FF425EB9 /* TestClock.swift in Sources */,
 			);

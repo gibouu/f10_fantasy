@@ -14,6 +14,7 @@ actor GatedAPIClientSpy: APIRequesting {
     }
 
     struct Request: Sendable {
+        let id: Int
         let method: String
         let path: String
         let token: String?
@@ -26,7 +27,10 @@ actor GatedAPIClientSpy: APIRequesting {
 
     private var responses: [String: [Stub]]
     private var gatedKeys: Set<String>
-    private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private var nextRequestID = 0
+    private var requestWaiters: [Int: CheckedContinuation<Void, Never>] = [:]
+    private var requestKeys: [Int: String] = [:]
+    private var gatedRequestIDs: [String: Set<Int>] = [:]
     private var callWaiters: [String: [CallWaiter]] = [:]
     private var requests: [Request] = []
 
@@ -43,7 +47,12 @@ actor GatedAPIClientSpy: APIRequesting {
         token: String?
     ) async throws -> T {
         let key = "\(endpoint.method) \(endpoint.path)"
-        requests.append(Request(method: endpoint.method, path: endpoint.path, token: token))
+        nextRequestID += 1
+        let requestID = nextRequestID
+        requests.append(
+            Request(id: requestID, method: endpoint.method, path: endpoint.path, token: token)
+        )
+        requestKeys[requestID] = key
 
         guard var stubs = responses[key], !stubs.isEmpty else {
             resumeSatisfiedCallWaiters(for: key)
@@ -55,7 +64,8 @@ actor GatedAPIClientSpy: APIRequesting {
 
         if gatedKeys.contains(key) {
             await withCheckedContinuation { continuation in
-                requestWaiters[key, default: []].append(continuation)
+                requestWaiters[requestID] = continuation
+                gatedRequestIDs[key, default: []].insert(requestID)
             }
         }
 
@@ -77,11 +87,26 @@ actor GatedAPIClientSpy: APIRequesting {
         }
     }
 
+    func waitForRequest(to path: String, ordinal: Int) async -> Int {
+        await waitForCalls(to: path, count: ordinal)
+        return requests.filter { $0.method == "GET" && $0.path == path }[ordinal - 1].id
+    }
+
+    func releaseRequest(id: Int) {
+        guard let continuation = requestWaiters.removeValue(forKey: id) else { return }
+        if let key = requestKeys[id] {
+            gatedRequestIDs[key]?.remove(id)
+        }
+        continuation.resume()
+    }
+
     func releaseRequests(to path: String) {
         let key = "GET \(path)"
         gatedKeys.remove(key)
-        let waiters = requestWaiters.removeValue(forKey: key) ?? []
-        waiters.forEach { $0.resume() }
+        let ids = gatedRequestIDs.removeValue(forKey: key) ?? []
+        for id in ids {
+            requestWaiters.removeValue(forKey: id)?.resume()
+        }
     }
 
     func calls(to path: String) -> Int {

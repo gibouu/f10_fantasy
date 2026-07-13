@@ -671,6 +671,8 @@ private actor RepositoryEventProbe {
         case .joinedListFlight:
             listJoinCount += 1
             resumeSatisfiedListWaiters()
+        case .startedDetailFlight:
+            break
         case .joinedDetailFlight(let id):
             detailJoinCounts[id, default: 0] += 1
             resumeSatisfiedDetailWaiters(id: id)

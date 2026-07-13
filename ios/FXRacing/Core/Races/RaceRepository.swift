@@ -8,6 +8,7 @@ enum RaceFetchPolicy: Sendable {
 
 enum RaceRepositoryEvent: Equatable, Sendable {
     case joinedListFlight
+    case startedDetailFlight(String)
     case joinedDetailFlight(String)
 }
 
@@ -19,6 +20,12 @@ protocol RaceRepositoryProtocol: Sendable {
 }
 
 actor RaceRepository: RaceRepositoryProtocol {
+    private struct DetailFlight: Sendable {
+        let token: UInt64
+        let epoch: UInt64
+        let task: Task<RaceDetailSnapshot, Error>
+    }
+
     private let api: any APIRequesting
     private let cache: any RaceSnapshotCaching
     private let clock: any ClockProviding
@@ -27,7 +34,10 @@ actor RaceRepository: RaceRepositoryProtocol {
     private var list: RaceListSnapshot?
     private var listTask: Task<RaceListSnapshot, Error>?
     private var details: [String: RaceDetailSnapshot] = [:]
-    private var detailTasks: [String: Task<RaceDetailSnapshot, Error>] = [:]
+    private var detailTasks: [String: DetailFlight] = [:]
+    private var detailEpoch: UInt64 = 0
+    private var nextDetailToken: UInt64 = 0
+    private var allowedDetailIDsAfterRollover: Set<String>?
 
     init(
         api: any APIRequesting,
@@ -83,12 +93,19 @@ actor RaceRepository: RaceRepositoryProtocol {
     }
 
     func cachedDetail(id: String) async -> RaceDetailSnapshot? {
+        guard isDetailAllowed(id) else {
+            return nil
+        }
+
         if let detail = details[id] {
             return detail
         }
 
         do {
             let disk = try await cache.readDetail(id: id)
+            guard isDetailAllowed(id) else {
+                return nil
+            }
             if let detail = details[id] {
                 return detail
             }
@@ -105,24 +122,35 @@ actor RaceRepository: RaceRepositoryProtocol {
         id: String,
         policy: RaceFetchPolicy
     ) async throws -> RaceDetailSnapshot {
-        if let task = detailTasks[id] {
+        guard isDetailAllowed(id) else {
+            throw APIError.notFound
+        }
+
+        if let task = currentDetailFlight(id: id) {
             await onEvent?(.joinedDetailFlight(id))
-            return try await task.value
+            return try await task.task.value
         }
 
         var cached = await cachedDetail(id: id)
 
-        if let task = detailTasks[id] {
+        guard isDetailAllowed(id) else {
+            throw APIError.notFound
+        }
+
+        if let task = currentDetailFlight(id: id) {
             await onEvent?(.joinedDetailFlight(id))
-            return try await task.value
+            return try await task.task.value
         }
 
         if cached != nil {
             if policy != .force, list == nil {
                 _ = await cachedList()
-                if let task = detailTasks[id] {
+                guard isDetailAllowed(id) else {
+                    throw APIError.notFound
+                }
+                if let task = currentDetailFlight(id: id) {
                     await onEvent?(.joinedDetailFlight(id))
-                    return try await task.value
+                    return try await task.task.value
                 }
                 cached = details[id]
             }
@@ -132,8 +160,14 @@ actor RaceRepository: RaceRepositoryProtocol {
             }
         }
 
-        let task = Task { try await self.fetchAndPublishDetail(id: id) }
-        detailTasks[id] = task
+        nextDetailToken &+= 1
+        let token = nextDetailToken
+        let epoch = detailEpoch
+        let task = Task {
+            try await self.fetchAndPublishDetail(id: id, token: token, epoch: epoch)
+        }
+        detailTasks[id] = DetailFlight(token: token, epoch: epoch, task: task)
+        await onEvent?(.startedDetailFlight(id))
         return try await task.value
     }
 
@@ -141,6 +175,7 @@ actor RaceRepository: RaceRepositoryProtocol {
         defer { listTask = nil }
 
         let payload: RaceListPayload = try await api.request(.races, token: nil)
+        let previousSeasonID = list?.season?.id
         let snapshot = RaceListSnapshot(
             schemaVersion: RaceListSnapshot.currentSchemaVersion,
             savedAt: clock.now(),
@@ -149,14 +184,57 @@ actor RaceRepository: RaceRepositoryProtocol {
         )
 
         list = snapshot
-        try? await cache.writeList(snapshot)
+        let newRaceIDs = Set(snapshot.races.map(\.id))
+        let isSeasonRollover = previousSeasonID != nil
+            && snapshot.season?.id != nil
+            && previousSeasonID != snapshot.season?.id
+
+        if isSeasonRollover {
+            detailEpoch &+= 1
+            allowedDetailIDsAfterRollover = newRaceIDs
+
+            var racesByID: [String: Race] = [:]
+            for race in snapshot.races {
+                racesByID[race.id] = race
+            }
+            details = details.filter { id, detail in
+                guard let currentRace = racesByID[id] else { return false }
+                return currentRace.seasonId == detail.race.seasonId
+            }
+
+            let oldFlights = detailTasks.values.map(\.task)
+            detailTasks.removeAll()
+            oldFlights.forEach { $0.cancel() }
+        } else if allowedDetailIDsAfterRollover != nil {
+            allowedDetailIDsAfterRollover?.formUnion(newRaceIDs)
+        }
+
+        do {
+            try await cache.writeList(snapshot)
+            if isSeasonRollover {
+                await cache.pruneDetails(keeping: newRaceIDs)
+            }
+        } catch {
+            // Public network data is still usable when persistence fails.
+        }
         return snapshot
     }
 
-    private func fetchAndPublishDetail(id: String) async throws -> RaceDetailSnapshot {
-        defer { detailTasks[id] = nil }
+    private func fetchAndPublishDetail(
+        id: String,
+        token: UInt64,
+        epoch: UInt64
+    ) async throws -> RaceDetailSnapshot {
+        defer {
+            if detailTasks[id]?.token == token {
+                detailTasks[id] = nil
+            }
+        }
 
         let payload: RaceDetailPayload = try await api.request(.raceDetail(id: id), token: nil)
+        guard epoch == detailEpoch, isDetailAllowed(id) else {
+            throw CancellationError()
+        }
         let snapshot = RaceDetailSnapshot(
             schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
             savedAt: clock.now(),
@@ -168,7 +246,26 @@ actor RaceRepository: RaceRepositoryProtocol {
 
         details[id] = snapshot
         try? await cache.writeDetail(snapshot)
+        guard epoch == detailEpoch, isDetailAllowed(id) else {
+            throw CancellationError()
+        }
         return snapshot
+    }
+
+    private func currentDetailFlight(id: String) -> DetailFlight? {
+        guard let flight = detailTasks[id] else {
+            return nil
+        }
+        guard flight.epoch == detailEpoch else {
+            flight.task.cancel()
+            detailTasks[id] = nil
+            return nil
+        }
+        return flight
+    }
+
+    private func isDetailAllowed(_ id: String) -> Bool {
+        allowedDetailIDsAfterRollover?.contains(id) ?? true
     }
 
     private func isFresh(_ snapshot: RaceListSnapshot, for policy: RaceFetchPolicy) -> Bool {

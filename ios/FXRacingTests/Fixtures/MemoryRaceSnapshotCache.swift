@@ -14,6 +14,8 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     var details: [String: RaceDetailSnapshot]
     private(set) var listReadCount = 0
     private(set) var listWriteCount = 0
+    private(set) var pruneCount = 0
+    private(set) var prunedRaceIDSets: [Set<String>] = []
     private(set) var detailReadCounts: [String: Int] = [:]
     private(set) var detailWriteCounts: [String: Int] = [:]
 
@@ -22,10 +24,13 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     private var failedDetailReads: Set<String>
     private var failedDetailWrites: Set<String>
     private var gatesListReads: Bool
+    private var gatesListWrites: Bool
     private var gatedDetailReads: Set<String>
     private var listReadContinuations: [CheckedContinuation<Void, Never>] = []
+    private var listWriteContinuations: [CheckedContinuation<Void, Never>] = []
     private var detailReadContinuations: [String: [CheckedContinuation<Void, Never>]] = [:]
     private var listReadWaiters: [ReadWaiter] = []
+    private var listWriteWaiters: [ReadWaiter] = []
     private var detailReadWaiters: [String: [ReadWaiter]] = [:]
 
     init(
@@ -36,6 +41,7 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         failedDetailReads: Set<String> = [],
         failedDetailWrites: Set<String> = [],
         gatesListReads: Bool = false,
+        gatesListWrites: Bool = false,
         gatedDetailReads: Set<String> = []
     ) {
         self.list = list
@@ -45,6 +51,7 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         self.failedDetailReads = failedDetailReads
         self.failedDetailWrites = failedDetailWrites
         self.gatesListReads = gatesListReads
+        self.gatesListWrites = gatesListWrites
         self.gatedDetailReads = gatedDetailReads
     }
 
@@ -64,6 +71,12 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
 
     func writeList(_ snapshot: RaceListSnapshot) async throws {
         listWriteCount += 1
+        resumeListWriteWaiters()
+        if gatesListWrites {
+            await withCheckedContinuation { continuation in
+                listWriteContinuations.append(continuation)
+            }
+        }
         if failListWrites {
             throw Failure.requested
         }
@@ -97,6 +110,8 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     }
 
     func pruneDetails(keeping raceIDs: Set<String>) async {
+        pruneCount += 1
+        prunedRaceIDSets.append(raceIDs)
         details = details.filter { raceIDs.contains($0.key) }
     }
 
@@ -112,6 +127,13 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         guard listReadCount < count else { return }
         await withCheckedContinuation { continuation in
             listReadWaiters.append(ReadWaiter(count: count, continuation: continuation))
+        }
+    }
+
+    func waitForListWrites(count: Int) async {
+        guard listWriteCount < count else { return }
+        await withCheckedContinuation { continuation in
+            listWriteWaiters.append(ReadWaiter(count: count, continuation: continuation))
         }
     }
 
@@ -131,6 +153,13 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         continuations.forEach { $0.resume() }
     }
 
+    func releaseListWrites() {
+        gatesListWrites = false
+        let continuations = listWriteContinuations
+        listWriteContinuations = []
+        continuations.forEach { $0.resume() }
+    }
+
     func releaseDetailReads(id: String) {
         gatedDetailReads.remove(id)
         let continuations = detailReadContinuations.removeValue(forKey: id) ?? []
@@ -147,6 +176,18 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
             }
         }
         listReadWaiters = pending
+    }
+
+    private func resumeListWriteWaiters() {
+        var pending: [ReadWaiter] = []
+        for waiter in listWriteWaiters {
+            if listWriteCount >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                pending.append(waiter)
+            }
+        }
+        listWriteWaiters = pending
     }
 
     private func resumeDetailReadWaiters(id: String) {
