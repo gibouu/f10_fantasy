@@ -1,8 +1,8 @@
 # F10 iOS Race Deck and Client Performance Design
 
-Date: 2026-07-13  
-Issue: #360  
-Branch: `feat/360-ios-race-deck-performance`  
+Date: 2026-07-13
+Issue: #360
+Branch: `feat/360-ios-race-deck-performance`
 Status: Approved by user on 2026-07-13
 
 ## Goal
