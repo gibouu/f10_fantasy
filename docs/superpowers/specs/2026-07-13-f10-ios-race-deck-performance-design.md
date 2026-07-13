@@ -3,7 +3,7 @@
 Date: 2026-07-13  
 Issue: #360  
 Branch: `feat/360-ios-race-deck-performance`  
-Status: Ready for written-spec review
+Status: Approved by user on 2026-07-13
 
 ## Goal
 
