@@ -36,7 +36,7 @@ final class RacesListViewModel {
         defer { isLoading = false }
 
         do {
-            let response: RacesResponse = try await api.request(.races)
+            let response: RaceListPayload = try await api.request(.races)
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 races = response.races
             }
@@ -51,7 +51,7 @@ final class RacesListViewModel {
     /// error banner.
     func silentRefresh() async {
         do {
-            let response: RacesResponse = try await api.request(.races)
+            let response: RaceListPayload = try await api.request(.races)
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 races = response.races
             }
@@ -59,9 +59,4 @@ final class RacesListViewModel {
             // intentionally silent
         }
     }
-}
-
-private struct RacesResponse: Decodable, Sendable {
-    let races: [Race]
-    let season: Season?
 }

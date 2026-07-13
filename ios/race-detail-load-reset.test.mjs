@@ -21,7 +21,7 @@ test("RaceDetailViewModel leaves detail-load failures visible for retry", () => 
 test("RaceDetailViewModel clears stale pick state after a successful detail load", () => {
   assert.ok(loadBlock, "load(token:localPickStore:) should exist")
 
-  const successIndex = loadBlock.indexOf("let detail: DetailResponse = try await")
+  const successIndex = loadBlock.indexOf("let detail: RaceDetailPayload = try await")
   const resetIndex = loadBlock.indexOf("errorMessage = nil")
   const serverPickIndex = loadBlock.indexOf("// Populate selections: server pick takes precedence")
   const localFallbackIndex = loadBlock.indexOf("// Fall back to local pick")

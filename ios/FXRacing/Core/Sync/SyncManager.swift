@@ -81,7 +81,7 @@ final class SyncManager {
 
     private func checkServerPick(raceId: String, token: String) async -> ServerPickStatus {
         do {
-            let _: PickWrapper = try await api.request(.pickForRace(raceId: raceId), token: token)
+            let _: PickResponse = try await api.request(.pickForRace(raceId: raceId), token: token)
             return .exists
         } catch APIError.notFound {
             return .missing
@@ -92,7 +92,7 @@ final class SyncManager {
 
     private func uploadPick(_ pick: LocalPick, token: String) async -> UploadPickResult {
         do {
-            let _: PickWrapper = try await api.request(
+            let _: PickResponse = try await api.request(
                 .submitPick(
                     raceId: pick.raceId,
                     tenthPlaceDriverId: pick.p10Id,
@@ -108,8 +108,4 @@ final class SyncManager {
             return .failed
         }
     }
-}
-
-private struct PickWrapper: Decodable, Sendable {
-    let pick: Pick
 }

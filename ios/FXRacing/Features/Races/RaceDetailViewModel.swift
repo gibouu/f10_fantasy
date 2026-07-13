@@ -44,7 +44,7 @@ final class RaceDetailViewModel {
 
         fxLog(.race, "load raceId=\(raceId) token=\(token != nil)")
         do {
-            let detail: DetailResponse = try await api.request(.raceDetail(id: raceId))
+            let detail: RaceDetailPayload = try await api.request(.raceDetail(id: raceId))
             race    = detail.race
             entrants = detail.entrants
             results  = detail.results
@@ -69,7 +69,7 @@ final class RaceDetailViewModel {
         // Populate selections: server pick takes precedence over local pick
         if let token {
             do {
-                let response: PickWrapper = try await api.request(.pickForRace(raceId: raceId), token: token)
+                let response: PickResponse = try await api.request(.pickForRace(raceId: raceId), token: token)
                 serverPick = response.pick
                 isLocalOnly = false
                 selectedWinner = entrants.first { $0.id == response.pick.winnerDriverId }
@@ -169,7 +169,7 @@ final class RaceDetailViewModel {
         }
 
         do {
-            let response: PickWrapper = try await api.request(
+            let response: PickResponse = try await api.request(
                 .submitPick(
                     raceId: raceId,
                     tenthPlaceDriverId: p10.id,
@@ -197,17 +197,4 @@ final class RaceDetailViewModel {
             Haptics.success()
         }
     }
-}
-
-// MARK: - Private response shapes
-
-private struct DetailResponse: Decodable, Sendable {
-    let race: Race
-    let entrants: [Driver]
-    let results: [RaceResult]
-    let qualifyingResults: [QualifyingResultRow]?
-}
-
-private struct PickWrapper: Decodable, Sendable {
-    let pick: Pick
 }
