@@ -17,6 +17,7 @@
 		23E4413C716A3129EE421446 /* FriendProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D9ED40A530B447C0BD977D /* FriendProfileView.swift */; };
 		277EBDD4E9B0D0BA9121656F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347020C4691D77E3D65C73AD /* SettingsView.swift */; };
 		2AB55EB21797F2EDBBF7CA3C /* RacesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEE3B16ED8A558720015BBC /* RacesListView.swift */; };
+		2DEF125081A1D2B64CFBF985 /* PerformanceScenario.swift in Sources */ = {isa = PBXBuildFile; fileRef = F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */; };
 		41D0450A3F881B8BE8F4889E /* UsernamePickerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */; };
 		44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */; };
 		4910736C5D57D38F2CF3F583 /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD2B9A43E8C1180E3F9501CC /* APIEndpoint.swift */; };
@@ -25,6 +26,7 @@
 		530C91AB5B30FB9DA188B9A7 /* FriendsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */; };
 		5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC608F5043DC5E71554B62 /* Pick.swift */; };
 		63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729249B04B9379843CF60133 /* FXTheme.swift */; };
+		6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D2367A25C738D1170388BC /* DriverFixtures.swift */; };
 		6C5745BF80FDDB2A207E96CE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3E751E777A6941A1B94279 /* APIClient.swift */; };
 		6CDA97F174415BB802878078 /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */; };
 		6D4FB8B0E17AE0B635CC694A /* FriendSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */; };
@@ -40,6 +42,7 @@
 		8E17976ED088A9AFDB1D7282 /* GuestProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */; };
 		928081846B311B94C143DB60 /* DriverBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */; };
 		93AB6EEB22878BFAA5B2DC3D /* SignInPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27964BA90CCF80BCB440B253 /* SignInPromptView.swift */; };
+		97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF272627CBEFA6E4197F290B /* RaceFixtures.swift */; };
 		97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26E8B8213C775919164F61D6 /* TutorialStore.swift */; };
 		9F4CB010F34803172181F256 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14BE2DAC50E1A3F315CC644F /* SyncManager.swift */; };
 		A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E706759022F3FFAC680CFAB /* Config.swift */; };
@@ -51,6 +54,7 @@
 		BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE9A0A87BBC8A893D98DED /* Logger.swift */; };
 		C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */; };
 		C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E7BA543FEF70B178E45B2E /* LeaderboardViewModel.swift */; };
+		C60698807BADCE5651201B48 /* ReviewLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4388BC34BF03EE268C778DBA /* ReviewLaunch.swift */; };
 		C9BDAEED60343EF79CFCD65D /* Race.swift in Sources */ = {isa = PBXBuildFile; fileRef = 957CB0DDA5D11B3C6694D4CD /* Race.swift */; };
 		CB4129A9438B9E122A98345A /* DeleteAccountConfirmView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28497176EA2A592DD7964E51 /* DeleteAccountConfirmView.swift */; };
 		CED85355FAC48D6EF2BC8FC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */; };
@@ -63,7 +67,25 @@
 		FF43C9A1A5AE13D40A09CE15 /* SkeletonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66A8C5469F03FB290BFFA5D /* SkeletonView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CAC10EAFE02DA14A3823FC82 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 076FF39B4D45FE80F0EF35CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 91A9AFF1D4F94F457CF14F2D;
+			remoteInfo = FXRacing;
+		};
+		E5A99E536E8646D7E0916666 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 076FF39B4D45FE80F0EF35CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 91A9AFF1D4F94F457CF14F2D;
+			remoteInfo = FXRacing;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		092C369B26A52C1665C301C2 /* FXRacingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0D3E751E777A6941A1B94279 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		0E706759022F3FFAC680CFAB /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		0ED3FE402EF77A443F5B4130 /* FXRacingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRacingApp.swift; sourceTree = "<group>"; };
@@ -73,10 +95,12 @@
 		26E8B8213C775919164F61D6 /* TutorialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialStore.swift; sourceTree = "<group>"; };
 		27964BA90CCF80BCB440B253 /* SignInPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInPromptView.swift; sourceTree = "<group>"; };
 		28497176EA2A592DD7964E51 /* DeleteAccountConfirmView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountConfirmView.swift; sourceTree = "<group>"; };
+		2C22270C2E1F523796D2C2BE /* FXRacingUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		32D93B2B2E4F1E5CDE72B23F /* GuestProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestProfileView.swift; sourceTree = "<group>"; };
 		347020C4691D77E3D65C73AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		38466ACFC9DCC1DC84C22141 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		4388BC34BF03EE268C778DBA /* ReviewLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewLaunch.swift; sourceTree = "<group>"; };
 		494452DD6B3E19BC8F850FF2 /* Driver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Driver.swift; sourceTree = "<group>"; };
 		511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverBubbleView.swift; sourceTree = "<group>"; };
 		5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailView.swift; sourceTree = "<group>"; };
@@ -95,11 +119,13 @@
 		8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernamePickerViewModel.swift; sourceTree = "<group>"; };
 		957CB0DDA5D11B3C6694D4CD /* Race.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Race.swift; sourceTree = "<group>"; };
 		96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModel.swift; sourceTree = "<group>"; };
+		98D2367A25C738D1170388BC /* DriverFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFixtures.swift; sourceTree = "<group>"; };
 		99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsViewModel.swift; sourceTree = "<group>"; };
 		9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
 		9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacesListViewModel.swift; sourceTree = "<group>"; };
 		9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileViewModel.swift; sourceTree = "<group>"; };
+		AF272627CBEFA6E4197F290B /* RaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceFixtures.swift; sourceTree = "<group>"; };
 		B3038F28BDB417F657AC9E3F /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		B3F3F8E414C88D0CD0398908 /* FXRacing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FXRacing.entitlements; sourceTree = "<group>"; };
 		B4B7FEB54C964FBE6925BC26 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
@@ -113,14 +139,15 @@
 		CD2B9A43E8C1180E3F9501CC /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		D1A66EEF950DDE3B010020CD /* FriendRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendRequest.swift; sourceTree = "<group>"; };
 		D4720C738BF9514BC3A4EEF9 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
 		EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceCardView.swift; sourceTree = "<group>"; };
 		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
-		FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceScenario.swift; sourceTree = "<group>"; };
+		FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -145,6 +172,14 @@
 			path = Sync;
 			sourceTree = "<group>";
 		};
+		22C57AAB1B0AFD0442B9EC1F /* FXRacingTests */ = {
+			isa = PBXGroup;
+			children = (
+				680530EB18CF7D9156702629 /* Fixtures */,
+			);
+			path = FXRacingTests;
+			sourceTree = "<group>";
+		};
 		28BFB8ED4A7831B6E625B61A /* Storage */ = {
 			isa = PBXGroup;
 			children = (
@@ -159,6 +194,8 @@
 			isa = PBXGroup;
 			children = (
 				ABBA52FB5E86C53DA9270EDE /* FXRacing */,
+				22C57AAB1B0AFD0442B9EC1F /* FXRacingTests */,
+				E9DDB6548B59CA1F67A54C73 /* FXRacingUITests */,
 				934ABC9FB8C164612B3D6941 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -170,6 +207,15 @@
 				8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		680530EB18CF7D9156702629 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				98D2367A25C738D1170388BC /* DriverFixtures.swift */,
+				AF272627CBEFA6E4197F290B /* RaceFixtures.swift */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		70F999EB96023DB0DF08E34E /* Profile */ = {
@@ -222,6 +268,8 @@
 			isa = PBXGroup;
 			children = (
 				D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */,
+				092C369B26A52C1665C301C2 /* FXRacingTests.xctest */,
+				2C22270C2E1F523796D2C2BE /* FXRacingUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -248,6 +296,14 @@
 				B4B7FEB54C964FBE6925BC26 /* APIError.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		A831AAEA92CA0DAFC48DF489 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				4388BC34BF03EE268C778DBA /* ReviewLaunch.swift */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		ABBA52FB5E86C53DA9270EDE /* FXRacing */ = {
@@ -292,6 +348,15 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
+		E9DDB6548B59CA1F67A54C73 /* FXRacingUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A831AAEA92CA0DAFC48DF489 /* Fixtures */,
+				F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */,
+			);
+			path = FXRacingUITests;
+			sourceTree = "<group>";
+		};
 		FAE9B2EC426C7A5975FDCF4C /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
@@ -310,6 +375,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		551D53454F39FC1AC1B73D81 /* FXRacingTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 29B94ADE32AC8DED9FB1DD8D /* Build configuration list for PBXNativeTarget "FXRacingTests" */;
+			buildPhases = (
+				264776337720CDB013251903 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				278BB8D50BEBF32D257751B7 /* PBXTargetDependency */,
+			);
+			name = FXRacingTests;
+			packageProductDependencies = (
+			);
+			productName = FXRacingTests;
+			productReference = 092C369B26A52C1665C301C2 /* FXRacingTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		91A9AFF1D4F94F457CF14F2D /* FXRacing */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = ABF3E395D7FFDCA0B0B40A72 /* Build configuration list for PBXNativeTarget "FXRacing" */;
@@ -328,6 +411,24 @@
 			productReference = D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EB60030C0693E5C23116968E /* FXRacingUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 758FD70D77C488181F5B5B49 /* Build configuration list for PBXNativeTarget "FXRacingUITests" */;
+			buildPhases = (
+				6C5317EF54C08AE2B22C3C51 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0EA22C1658441C6CAFBE4018 /* PBXTargetDependency */,
+			);
+			name = FXRacingUITests;
+			packageProductDependencies = (
+			);
+			productName = FXRacingUITests;
+			productReference = 2C22270C2E1F523796D2C2BE /* FXRacingUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -338,7 +439,11 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					91A9AFF1D4F94F457CF14F2D = {
+						DevelopmentTeam = U6Z87CS4W3;
 						ProvisioningStyle = Automatic;
+					};
+					EB60030C0693E5C23116968E = {
+						TestTargetID = 91A9AFF1D4F94F457CF14F2D;
 					};
 				};
 			};
@@ -357,6 +462,8 @@
 			projectRoot = "";
 			targets = (
 				91A9AFF1D4F94F457CF14F2D /* FXRacing */,
+				551D53454F39FC1AC1B73D81 /* FXRacingTests */,
+				EB60030C0693E5C23116968E /* FXRacingUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -374,6 +481,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		264776337720CDB013251903 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */,
+				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6C5317EF54C08AE2B22C3C51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2DEF125081A1D2B64CFBF985 /* PerformanceScenario.swift in Sources */,
+				C60698807BADCE5651201B48 /* ReviewLaunch.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CE68E441E9002087D2F01246 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -435,7 +560,38 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		0EA22C1658441C6CAFBE4018 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 91A9AFF1D4F94F457CF14F2D /* FXRacing */;
+			targetProxy = E5A99E536E8646D7E0916666 /* PBXContainerItemProxy */;
+		};
+		278BB8D50BEBF32D257751B7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 91A9AFF1D4F94F457CF14F2D /* FXRacing */;
+			targetProxy = CAC10EAFE02DA14A3823FC82 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		07FD6D06E27114AD5B7DAE58 /* Performance */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FXRacing.app/FXRacing";
+			};
+			name = Performance;
+		};
 		102A4DEB5E7AF5C38474D0FA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -525,6 +681,88 @@
 			};
 			name = Debug;
 		};
+		442305FCE87AA9CAAFA86627 /* Performance */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FXRacing;
+			};
+			name = Performance;
+		};
+		6AB389B057957315AF3F8E01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FXRacing.app/FXRacing";
+			};
+			name = Debug;
+		};
+		9C205EECBD5C6FD1861245F7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FXRacing;
+			};
+			name = Release;
+		};
+		9CBAD04E4E8EE8C64D565F72 /* Performance */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = FXRacing/FXRacing.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = U6Z87CS4W3;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				INFOPLIST_FILE = FXRacing/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = FX_PERF_HARNESS;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Performance;
+		};
 		AE9CB9676DAAF82895268ED2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -608,13 +846,128 @@
 			};
 			name = Debug;
 		};
+		EE6A18515F7B1CBC30FE45D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = FXRacing;
+			};
+			name = Debug;
+		};
+		F010A20285E2A2E88CE7D9AD /* Performance */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 44;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.7.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Performance;
+		};
+		F12FF971824E701133D0BA95 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.fxracing.app.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FXRacing.app/FXRacing";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		29B94ADE32AC8DED9FB1DD8D /* Build configuration list for PBXNativeTarget "FXRacingTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6AB389B057957315AF3F8E01 /* Debug */,
+				07FD6D06E27114AD5B7DAE58 /* Performance */,
+				F12FF971824E701133D0BA95 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		758FD70D77C488181F5B5B49 /* Build configuration list for PBXNativeTarget "FXRacingUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EE6A18515F7B1CBC30FE45D0 /* Debug */,
+				442305FCE87AA9CAAFA86627 /* Performance */,
+				9C205EECBD5C6FD1861245F7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		ABF3E395D7FFDCA0B0B40A72 /* Build configuration list for PBXNativeTarget "FXRacing" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E17FF1391055F64897634107 /* Debug */,
+				9CBAD04E4E8EE8C64D565F72 /* Performance */,
 				102A4DEB5E7AF5C38474D0FA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -624,6 +977,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2F2A4A28F1B81CA829E3A4A4 /* Debug */,
+				F010A20285E2A2E88CE7D9AD /* Performance */,
 				AE9CB9676DAAF82895268ED2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
