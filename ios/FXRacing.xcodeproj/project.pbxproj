@@ -8,7 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		004F22631D613FD77C80FFAD /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */; };
+		03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */; };
 		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
+		09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */; };
 		13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB930FED2C9918990560892D /* ProfileView.swift */; };
 		15A35EDF463399B42FDE98C4 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14286D0206D40A69C9846583 /* SignInView.swift */; };
 		17D7CD514BB71E2F6255E7B7 /* FriendProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */; };
@@ -30,6 +32,7 @@
 		5771DC391FADB666B9DFE228 /* APIRequesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718194229A0DEFC8E011350D /* APIRequesting.swift */; };
 		5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC608F5043DC5E71554B62 /* Pick.swift */; };
 		63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729249B04B9379843CF60133 /* FXTheme.swift */; };
+		6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */; };
 		6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D2367A25C738D1170388BC /* DriverFixtures.swift */; };
 		6C5745BF80FDDB2A207E96CE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D3E751E777A6941A1B94279 /* APIClient.swift */; };
 		6CDA97F174415BB802878078 /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */; };
@@ -96,6 +99,7 @@
 
 /* Begin PBXFileReference section */
 		092C369B26A52C1665C301C2 /* FXRacingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAPIClientSpy.swift; sourceTree = "<group>"; };
 		0D3E751E777A6941A1B94279 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		0E706759022F3FFAC680CFAB /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		0ED3FE402EF77A443F5B4130 /* FXRacingApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRacingApp.swift; sourceTree = "<group>"; };
@@ -145,6 +149,7 @@
 		A7FB64FA47AB498AC8707E4A /* ClockProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockProviding.swift; sourceTree = "<group>"; };
 		AF272627CBEFA6E4197F290B /* RaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceFixtures.swift; sourceTree = "<group>"; };
 		B3038F28BDB417F657AC9E3F /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
+		B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepositoryCoreTests.swift; sourceTree = "<group>"; };
 		B3F3F8E414C88D0CD0398908 /* FXRacing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FXRacing.entitlements; sourceTree = "<group>"; };
 		B4B7FEB54C964FBE6925BC26 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		B5DC608F5043DC5E71554B62 /* Pick.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pick.swift; sourceTree = "<group>"; };
@@ -163,6 +168,7 @@
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
+		EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepository.swift; sourceTree = "<group>"; };
 		EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceCardView.swift; sourceTree = "<group>"; };
 		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryRaceSnapshotCache.swift; sourceTree = "<group>"; };
@@ -252,6 +258,7 @@
 			children = (
 				9C808C928ABC015907CF35F4 /* APIClientSpy.swift */,
 				98D2367A25C738D1170388BC /* DriverFixtures.swift */,
+				0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */,
 				F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */,
 				AF272627CBEFA6E4197F290B /* RaceFixtures.swift */,
 				1F08159ED08D5C973E155610 /* TestClock.swift */,
@@ -326,6 +333,7 @@
 		9F566683AD959853375A079A /* Races */ = {
 			isa = PBXGroup;
 			children = (
+				B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */,
 				B93F2A851054E21570EFBF91 /* RaceSnapshotCacheTests.swift */,
 			);
 			path = Races;
@@ -412,6 +420,7 @@
 		E22A955C150B573313BD34BA /* Races */ = {
 			isa = PBXGroup;
 			children = (
+				EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */,
 				5362BBB4B470202A06020494 /* RaceSnapshotCache.swift */,
 				3303D344376925DE6E68388B /* RaceSnapshots.swift */,
 			);
@@ -558,8 +567,10 @@
 				787D8958572B1E7531E02439 /* APIClientSpy.swift in Sources */,
 				BD33D81A7938D759F624B4EB /* APIClientTests.swift in Sources */,
 				6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */,
+				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
+				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
 				FF575F5EEC120390DD7D30AA /* RaceSnapshotCacheTests.swift in Sources */,
 				394C92F0F9D71CB1FF425EB9 /* TestClock.swift in Sources */,
 			);
@@ -618,6 +629,7 @@
 				2025CA7B03FD1CA4E7AFC81F /* RaceCardView.swift in Sources */,
 				F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */,
 				C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */,
+				03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */,
 				3CE9ADD38616EF20C2A0F7DA /* RaceSnapshotCache.swift in Sources */,
 				D149F9EAC8C9512A27A49590 /* RaceSnapshots.swift in Sources */,
 				2AB55EB21797F2EDBBF7CA3C /* RacesListView.swift in Sources */,
