@@ -1,187 +1,156 @@
 # FX Racing iOS — Engineering Memory
 
-## Stack
-- Swift 6, SwiftUI, iOS 17+, `@Observable`, Xcode 16
-- `xcodegen generate` rebuilds the `.xcodeproj` from `project.yml` after every new file
-- Backend: Next.js 14 App Router at `Config.apiBaseURL` (localhost:3000 in DEBUG, prod URL in Release)
-- Auth: Sign In with Apple → `POST /api/auth/mobile/exchange` → Bearer JWT stored in Keychain
-- No native XCTest suite; iOS regression coverage currently uses Node source tests under `ios/*.test.mjs`, grouped by `npm run test:ios`
+## Product invariant
 
-## Folder map (relevant files)
+The native app is intentionally simple: for each race, a player chooses P1, P10, and the first DNF, saves the three picks, and later sees the official score/ranking. UI work must not change that gameplay or the shared backend scoring rules.
 
-```
+## Stack and project generation
+
+- Swift 6, SwiftUI, Observation, iOS 17+
+- iOS 26 Liquid Glass is optional and isolated behind `FXGlassSurface`; content cards remain readable on older systems and accessibility settings
+- `ios/project.yml` is the XcodeGen source of truth; regenerate the project after adding/removing source files
+- App API: `Config.apiBaseURL` (localhost in Debug, production in Release)
+- Auth: Sign in with Apple → mobile exchange endpoint → Bearer JWT in Keychain
+- Native XCTest/XCUITest targets live in `FXRacingTests` and `FXRacingUITests`; Node source-contract tests live under `ios/*.test.mjs`
+
+## Current app structure
+
+```text
 ios/FXRacing/
-├── FXRacingApp.swift           @main — injects AuthManager, LocalPickStore, GuestStore
-├── RootView.swift              Auth state machine → MainTabView (always) or UsernamePickerView
-│
+├── FXRacingApp.swift
+├── RootView.swift
 ├── Core/
-│   ├── Config.swift            apiBaseURL (DEBUG=localhost, Release=prod)
-│   ├── Auth/
-│   │   ├── AuthManager.swift   @Observable state machine; signInWithApple → migrateGuestPicks
-│   │   ├── KeychainService.swift
-│   │   └── AppleSignInHandler.swift
-│   ├── Networking/
-│   │   ├── APIClient.swift     URLSession wrapper, Bearer auth, JSONDecoder.api
-│   │   ├── APIEndpoint.swift   All endpoint static factories
-│   │   └── APIError.swift
-│   ├── Models/
-│   │   ├── Race.swift          lockCutoffUtc: Date; isLocked = Date() >= lockCutoffUtc
-│   │   ├── Pick.swift          LocalPick for guest, Pick for server
-│   │   ├── Driver.swift
-│   │   ├── User.swift
-│   │   ├── LeaderboardRow.swift
-│   │   ├── FriendRequest.swift
-│   │   └── FriendProfile.swift
-│   ├── Storage/
-│   │   ├── LocalPickStore.swift  @Observable; UserDefaults-backed [raceId: LocalPick]
-│   │   └── GuestStore.swift      @Observable; UserDefaults: localUsername, localTeamSlug
-│   └── Sync/
-│       └── SyncManager.swift     Migrates guest picks → server after sign-in
-│
+│   ├── Auth/                 AuthManager + Keychain token lifecycle
+│   ├── Images/               one injected FXImagePipeline
+│   ├── Networking/           APIClient + endpoints/errors
+│   ├── Performance/          points-of-interest signposts
+│   ├── Races/                RaceRepository + disk snapshots
+│   ├── Storage/              owner-scoped LocalPickStore + guest/tutorial stores
+│   └── Sync/                 revision-safe SyncManager worker
 ├── DesignSystem/
-│   ├── FXTheme.swift           Colors, Radius, Spacing; fxCardSurface() (Liquid Glass iOS 26+)
-│   ├── Extensions.swift        Color(hex:)
-│   ├── StatusBadge.swift
-│   ├── DriverBubbleView.swift  + SlotDriverBubble for SlotDriver contexts
-│   ├── Haptics.swift           select/pick/success/error/locked/scoreReveal
-│   ├── SkeletonView.swift      shimmer loaders
-│   └── ErrorBanner.swift       RetryView + ErrorBanner
-│
-└── Features/
-    ├── Auth/
-    │   ├── SignInView.swift         Full-screen sign-in (cold launch / onboarding only)
-    │   ├── SignInViewModel.swift
-    │   └── SignInPromptView.swift   Compact sheet with reason string (contextual auth gate)
-    ├── Onboarding/
-    │   ├── UsernamePickerView.swift   isChange: Bool → POST or PATCH
-    │   └── UsernamePickerViewModel.swift
-    ├── Races/
-    │   ├── RacesListView.swift       List + skeleton + RetryView
-    │   ├── RacesListViewModel.swift
-    │   ├── RaceCardView.swift
-    │   ├── RaceDetailView.swift      Guest + auth pick UI; local-first save
-    │   ├── RaceDetailViewModel.swift Local-first: saves LocalPick if guest; uploads if auth
-    │   └── DriverPickerSheet.swift
-    ├── Rankings/
-    │   ├── LeaderboardView.swift     Global visible to guests; Friends requires auth
-    │   ├── LeaderboardViewModel.swift
-    │   ├── LeaderboardRowView.swift
-    │   ├── FriendsViewModel.swift
-    │   └── FriendSearchView.swift    Browse OK; Add requires auth → SignInPromptView
-    └── Profile/
-        ├── ProfileView.swift         Switches between GuestProfileView / ownProfileList
-        ├── GuestProfileView.swift    Local username + avatar picker; "Sign in to track picks"
-        ├── FriendProfileView.swift
-        ├── FriendProfileViewModel.swift
-        └── SettingsView.swift        Sign out, username change
+│   ├── FXTheme.swift
+│   ├── FXGlassSurface.swift
+│   ├── FXRemoteImage.swift
+│   └── shared bubbles, banners, haptics, skeletons
+├── Features/
+│   ├── Home/                 persistent MainShellView + section picker
+│   ├── Races/                swipe decks, cards, sheets, results, pick panel
+│   ├── Rankings/
+│   └── Profile/
+└── Performance/              compile-time-only deterministic fixtures
 ```
 
-## Auth state machine
+## Shell and race navigation
 
+- `MainShellView` owns one persistent `RaceDeckViewModel` and leaderboard model. Switching Upcoming, Past, Rankings, or Profile does not rebuild the app's data layer.
+- Upcoming and Past are independent centered horizontal pagers. Selections are stored separately and normalized deterministically when the calendar changes.
+- `RaceDeckView` creates private detail state only for the selected race. Public detail/image prefetch may retain the selected race and its next neighbor. Schedule and driver choice use native sheets; ranking rows open `FriendProfileView` in a dismissible native sheet. None requires an outer shell `NavigationStack`.
+- Live → completed transitions move the race from Upcoming to Past without discarding a visited detail model or interrupting an unrelated Past selection.
+- Supporting previous-race context is cache-only; it must not create a hidden detail load.
+- While the shell is active, race status polls every 60 seconds even before a race becomes live. A published live status also revalidates the selected live detail; foreground race and account refreshes run independently.
+
+## Public race data and cancellation
+
+`RaceRepository` is the sole race-list/detail data boundary.
+
+- Publish cached list/detail snapshots first, then refresh according to `RaceFetchPolicy`.
+- List and detail requests are single-flight; late results are protected by token, generation, epoch, and race-identity checks.
+- A list/detail status mismatch is stale even if the snapshot age would normally be fresh.
+- Freshness windows are 60 seconds for the list, 30 seconds for foreground list revalidation, 5 minutes for upcoming detail, 60 seconds for live detail, and 6 hours for completed/cancelled detail.
+- Prefetch scope is capped to the selected race and its next neighbor.
+- Visible detail callers have waiter accounting. Canceling/swiping releases visible demand; work is retained only if still useful to the two-race prefetch scope, otherwise it is canceled.
+- Season rollover advances the detail epoch, cancels old flights, and prevents old-season writes from repopulating current cache state.
+- `RaceDetailViewModel.cancelLoad()` invalidates later public/private merges. `RaceDeckView` calls it on selected-model replacement, backgrounding, and disappearance; `RaceDeckViewModel.setPrivateScope` cancels and evicts the prior account/device scope atomically on account change.
+
+## Image pipeline
+
+- Inject exactly one `FXImagePipeline` at the app root. Do not use `AsyncImage` or create per-view URL sessions/caches.
+- Requests include exact rendered pixel dimensions, display scale, and content mode so decoded images are not oversized.
+- A decoded `NSCache` is capped at 48 MB/160 images; response `URLCache` uses 16 MB memory/100 MB disk. In-flight requests are shared and prefetch loading is capped at four workers.
+- Production prefetch uses the same active/next race cohort as detail prefetch.
+- Upcoming cards prefetch 36-point headshots and visible 28-point team logos; compact Past rows prefetch 30-point headshots and no hidden logos.
+- Prefetch replacement uses owner IDs so an outgoing view cannot clear a newer view's scope.
+
+## Auth and private-state isolation
+
+```text
+launch → restore Keychain token → GET /api/users/me
+  200 → authenticated user
+  401 → delete token and become guest
+  cold transient/network/5xx → retain token and expose accountUnavailable
+  foreground transient/network/5xx → retain an already-authenticated cached user
 ```
-App launch → AuthManager.restoreSession()
-  Keychain token → GET /api/users/me
-    200 → .authenticated(User)
-    401 → clear token → .unauthenticated
-  No token → .unauthenticated
 
-.unknown          → blank screen (splash)
-.unauthenticated  → MainTabView (guest mode — all tabs accessible)
-.authenticated, usernameSet=false → UsernamePickerView (full-screen)
-.authenticated, usernameSet=true  → MainTabView
+- `privateScopeID` is `device` for guests and `user:<id>` for an account.
+- Detail view-model cache keys include both race ID and private scope. Changing users cancels and evicts the old scope before another user's data can render.
+- Sync work holds a lease over the validated user ID, token, and session UUID. Session invalidation cancels workers, restores captured `.syncing` records to `.queued`, and prevents an old token's 401 or response from signing out or mutating a newer session.
+- Global race/leaderboard data remains guest-readable. Friends, cloud pick sync, and account profile actions require auth.
 
-Sign-in trigger:
-  → contextual: tapping "Add Friend", "Sign in to sync picks" etc.
-  → presents SignInPromptView as a sheet with reason string
-  → on success: SyncManager.migrateGuestPicks runs, then normal app
+## Pick persistence and server authority
+
+`LocalPickStore` persists a versioned `localPicks_v2` envelope. Each `LocalPickRecord` is keyed by `(PickOwnerScope, raceID)`, has a monotonically checked revision, and uses an explicit sync state:
+
+```text
+reviewRequired → queued → syncing(revision, mode) → confirmed
+                                         ↘ conflict / expired
 ```
 
-## Guest mode
+- Owners are `.guest`, `.user(userID)`, or `.legacyAmbiguous`.
+- Local draft/outbox rows and authoritative server picks are stored separately. Official score/result rows always render the server pick.
+- Guest saves are local-first. Authenticated saves enqueue the same revision-safe worker rather than issuing ad-hoc uploads from views.
+- A private 404 is not success: it creates a visible account-repair state when a local account record needs uploading.
+- A 423 lock response reconciles with the authenticated server pick when available; local data cannot overwrite official state.
+- Ambiguous legacy device picks never auto-upload. The player must explicitly review/recover them into the current owner scope.
+- Migration/expiry notices count actual guest migrations only.
+- Local persistence survives restart but not reinstall; Keychain auth may survive reinstall.
 
-**What works without sign-in:**
-- Browse race list and race detail
-- Make picks → stored locally in `LocalPickStore` (UserDefaults)
-- View global leaderboard
-- Browse friend search results
-- Set local username and local avatar/team logo (stored in `GuestStore`)
+## Locking
 
-**What requires sign-in:**
-- Submitting picks to server (picks remain local-only until sign-in)
-- Adding friends
-- Viewing Friends leaderboard tab
-- Profile sync / score tracking
+- `Race.isLocked` derives from server `lockCutoffUtc` and the local clock for immediate UI feedback.
+- The UI disables editing, `LocalPickStore` refuses new locked drafts, and the backend remains authoritative through 423 responses.
+- A picker that becomes locked while open closes and announces the change for VoiceOver.
 
-## Local persistence
+## Accessibility and visual rules
 
-### LocalPickStore (`UserDefaults` key: `"localPicks_v1"`)
-```swift
-struct LocalPick: Codable {
-  raceId, winnerId, p10Id, dnfId: String
-  savedAt: Date
-  synced: Bool   // true once successfully POSTed to server
-  migrationStatus: LocalPickMigrationStatus? // .expired when migration missed the lock
-}
-// Stored as [raceId: LocalPick] JSON
-```
-- On first launch after upgrade, reads legacy `"localPicks"` if `"localPicks_v1"` is absent, persists under `"localPicks_v1"`, then removes the legacy key
-- Survives app backgrounding and device restart
-- Does NOT survive reinstall (acceptable)
-- Does NOT require auth
+- Preserve Dynamic Type; avoid fixed text heights and clipped control labels.
+- All tappable actions need at least a 44×44-point target.
+- Driver picker focus advances with P1 → P10 → DNF and exposes why a duplicate/locked driver is disabled.
+- Pager adjustments respect Reduce Motion.
+- Glass belongs on navigation/action chrome. Dense content/results cards use stable opaque/material surfaces for contrast.
+- Keep native sheet drag affordances and avoid full-screen navigation when the task is a short choice or schedule inspection.
 
-### GuestStore (`UserDefaults`)
-- `"guest_username"` → String? (draft username, never sent to server)
-- `"guest_team_slug"` → String? (local avatar, persisted permanently even after sign-in)
-- Username cleared after successful server sign-in (offered as prefill for UsernamePickerView)
-- Team slug kept permanently (user preference, used as local avatar cache)
+## Performance measurement
 
-## Pick lock rule
+- `FXPerformance` emits points-of-interest spans for launch-to-shell, dependency assembly diagnostics, cached publication, section/race selection, selected detail readiness, picker preparation/presentation, schedule presentation, local save, and server acknowledgement.
+- `FXRacingPerformance` uses the `Performance` build configuration. Fixture code is excluded from Debug/Release and therefore cannot ship in the App Store binary.
+- `scripts/ios-performance` runs deterministic scenarios with 3 warmups, 30 exact-count samples, raw evidence, and p50/p95 summaries. Launch/cache gates use clean normal simulator launches; interaction gates use XCTest signpost metrics and retain `XCUIApplication` wall time only as a diagnostic.
+- Enforced p95 gates are launch 0.8 s, cache publication 0.3 s, race selection 0.6 s, picker preparation 0.1 s, picker presentation 0.5 s, schedule presentation 0.5 s, and local save 0.2 s. Dependency assembly, section switch, selected-detail readiness, and server acknowledgement are instrumented but not wrapper-enforced.
+- Keep network boundaries closed in fixture scenarios; a performance result is invalid if it depends on the live backend.
 
-- `race.lockCutoffUtc` comes from the server (= scheduledStartUtc − 2 min, set during sync-schedule cron)
-- `Race.isLocked` on iOS = `Date() >= lockCutoffUtc`
-- Lock enforced at THREE points:
-  1. **UI**: pick bubbles disabled, save button hidden when `race.isLocked`
-  2. **LocalPickStore**: refuses to save a pick when race is locked
-  3. **Server**: returns 423 on POST /api/picks if locked (catches clock drift)
-- Clock drift: client-side lock is informational; server is authoritative. A user with a behind clock gets 423 on upload, sees "This race is now locked."
-- Migration records locked/expired picks and surfaces a post-sign-in notice
+## Verification order
 
-## Migration flow (guest → authenticated)
-
-1. User completes Sign In with Apple
-2. `AuthManager.signInWithApple(idToken:)` exchanges token with backend
-3. `SyncManager.migrateGuestPicks(token:, localPickStore:)` runs:
-   - Gets all `localPickStore.unsyncedPicks()`
-   - For each: checks `race.isLocked` from cached races list
-   - If locked → mark migration expired, exclude from retry queue, show notice
-   - GET /api/picks?raceId= → if 200, server pick exists → skip (mark synced, server wins)
-   - If 404 → POST local pick to server
-   - On 423 → mark migration expired (server also says locked), exclude from retry queue, show notice
-   - Any other error → leave unsynced (retry on next launch)
-4. After migration, `LocalPickStore` retains all picks (synced/unsynced) for display continuity
-
-## Cross-platform (iOS ↔ web) interoperability
-
-- **Same backend identity**: iOS and web use the same User table, friend system, PickSet table
-- **Same friend graph**: friend requests created on iOS are visible on web and vice versa
-- **Same picks model**: server PickSet has unique constraint on [userId, raceId]
-- **Username**: set once (POST), changed once (PATCH) — same limits on both platforms
-- **Lock times**: both platforms use `race.lockCutoffUtc` from the same DB record
-- **Guest → account**: guest picks uploaded as server PickSets; user becomes compatible with web immediately after sign-in
-- **iOS-only**: local avatar slug (GuestStore) — not sent to server as a file, only as a slug string via PATCH /api/users/team after sign-in. Slug stored locally is the same slug as on web.
-
-## Known edge cases / unresolved
-
-- **Offline picks**: LocalPick saved while offline will upload on next launch after auth. If race locks before upload, migration records `.expired`, stops retrying that pick, keeps it locally for display continuity, and shows a post-sign-in notice.
-- **Reinstall**: LocalPickStore and GuestStore use UserDefaults → cleared on reinstall. Guest picks are lost. Acceptable, but could be mitigated with Keychain storage if needed.
-- **Multiple guest picks for same race**: LocalPickStore keeps one pick per raceId (last write wins).
-- **Server pick conflict during migration**: Server wins. If user made picks on web and then also on iOS as guest, web picks are preserved.
-- **App reinstall after sign-in**: Keychain persists through reinstall. Auth token survives. `LocalPickStore` is cleared but server picks are fetched normally.
-
-## Commands
+From the repository root:
 
 ```bash
-# In ios/ directory:
-xcodegen generate          # regenerate .xcodeproj after adding files
-xcodebuild -project FXRacing.xcodeproj -scheme FXRacing \
-  -destination 'generic/platform=iOS Simulator' build   # verify compile
+# Targeted source contracts first
+node --test ios/<relevant>.test.mjs
+
+# Complete source-contract suite
+npm run test:ios
+
+# Web repository safety checks
+npx tsc --noEmit
+npm run lint
+npm run build
+
+# Native compile/tests (pin a simulator for execution)
+xcodebuild -project ios/FXRacing.xcodeproj -scheme FXRacing \
+  -destination 'generic/platform=iOS Simulator' build
+xcodebuild -project ios/FXRacing.xcodeproj -scheme FXRacing \
+  -destination 'platform=iOS Simulator,id=<UDID>' test
+
+# Deterministic performance scenarios
+scripts/ios-performance --help
 ```
+
+Use focused native suites while iterating, then run the full applicable native/UI/performance sweep before publishing. Do not claim a speed improvement from visual inspection alone; retain measured evidence.

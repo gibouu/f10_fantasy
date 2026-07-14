@@ -19,6 +19,24 @@ Do not log temporary debugging notes here.
 
 ## Entries
 
+### 2026-07-14 — Native iOS uses cached-first race decks with scoped private authority
+- Status: accepted
+- Context: The App Store build used long race/detail navigation, repeated blocking fetches, and process-wide private detail state. The three-pick game must stay unchanged while navigation becomes Apple Sports-like and fast under swiping, relaunches, weak networks, and account changes.
+- Decision: Keep one persistent SwiftUI shell with independent centered Upcoming/Past race decks. `RaceRepository` publishes stale-while-revalidate snapshots, deduplicates detail requests, and limits prefetch ownership to the active race plus its next neighbor. Private detail models and local records are keyed by device/account scope; authoritative server picks are persisted separately from drafts/outbox rows. Sync work holds a validated user/token/session lease; invalidation cancels workers, restores captured syncing rows to queued, and rejects stale-session responses. Driver and schedule interactions use native sheets. iOS 26 Liquid Glass is isolated behind `FXGlassSurface`, and deterministic performance fixtures compile only in the `Performance` configuration.
+- Reason: Cached public data makes the first useful frame immediate; explicit scope boundaries prevent cross-account pick leakage; bounded request/image work keeps rapid swipes smooth; a compile-time-only harness gives reproducible p50/p95 evidence without adding fixture paths to App Store binaries.
+- Tradeoffs: More explicit repository, outbox, and lifecycle state must be maintained. A canceled visible request may continue only when it is still useful to the current two-race prefetch cohort; otherwise it is canceled when its last visible waiter releases.
+- Affected areas: `ios/FXRacing/Features/Home/`, `ios/FXRacing/Features/Races/`, `ios/FXRacing/Core/Races/`, `ios/FXRacing/Core/Storage/`, `ios/FXRacing/Core/Sync/`, `ios/FXRacing/Core/Images/`, `ios/FXRacing/Performance/`, `scripts/ios-performance`.
+- Follow-up: Keep the checked-in thresholds and fixture scenarios representative as the visual deck evolves; change a gate only through a separate evidence-backed decision.
+
+### 2026-07-14 — iOS performance gates use app-owned spans, with XCTest wall time diagnostic
+- Status: accepted
+- Context: Simulator UI-test launches inject debugger/UI-automation work into the app process and diverge materially from normal simulator launches. Issue #360 also stated 300 ms cache and 100 ms picker budgets while the design kept separate 500 ms native-sheet readiness.
+- Decision: Enforce p95 targets from 30 exact-count app-owned samples. Launch and production-cache publication use ordinary `simctl` process launches plus structured points-of-interest logs; race selection, picker preparation/presentation, schedule presentation, and local save use `XCTOSSignpostMetric`. Export raw `XCUIApplication` readiness samples for interaction diagnostics without treating host-side debugger, simulator gesture, or accessibility-query time as shipped-app latency.
+- Reason: Separating the two measurements prevents arbitrary threshold relaxation while preserving both reproducible app evidence and full end-to-end diagnostics.
+- Tradeoffs: Clean launch scenarios produce structured signpost evidence instead of an `.xcresult`; interaction runs retain `.xcresult` evidence. XCTest wall time remains useful for spotting simulator regressions but is not a release gate. Native sheet presentation and synchronous picker preparation have distinct budgets.
+- Affected areas: `ios/FXRacing/Core/Performance/`, `ios/FXRacingUITests/`, `ios/FXRacing/Performance/`, `scripts/ios-performance`, issue #360 performance evidence.
+- Follow-up: Keep required metric names and sample counts explicit; investigate host automation regressions separately from app performance.
+
 ### 2026-04-15 — Three parallel type systems
 - Status: accepted
 - Context: Next.js App Router crosses server/client boundary; Prisma types must not leak to client.

@@ -47,9 +47,9 @@ The implementation baseline is `origin/main` at `aa9e5e1`.
 - `MainTabView` uses bottom tabs for Races, Ranking, and Me.
 - `RacesListView` renders a vertical Upcoming/Past `List` and navigates to a 715-line `RaceDetailView`.
 - `RacesListViewModel` has no shared decoded-model cache or request coalescing.
-- `RaceDetailViewModel` fetches public detail first, then the private pick, and clears visible selections between those operations.
-- `DriverPickerSheet` selects one slot and dismisses.
-- stable team and driver images use direct `AsyncImage` requests.
+- `RaceDetailViewModel` publishes cached detail and the local draft immediately, then refreshes public detail and any authenticated server pick concurrently without clearing visible selections.
+- `DriverPickerSheet` progresses through P1, P10, and DNF in one dismissible flow.
+- stable team and driver images use the shared bounded `FXImagePipeline`.
 - the deployment target is iOS 17.0 and the project uses Swift 6.
 - the local toolchain is Xcode 26.5 with the iOS 26.5 SDK, so true `glassEffect`, `GlassEffectContainer`, `.glass`, and `.glassProminent` APIs are available behind `#available(iOS 26, *)` checks.
 - the booted target is iPhone 17 Pro, iOS 26.5, UDID `D6231AF1-335A-47EA-94DB-D16CD6529F1F`.
@@ -58,7 +58,7 @@ The implementation baseline is `origin/main` at `aa9e5e1`.
 
 ### Main shell
 
-`MainTabView` becomes `MainShellView`, hosted in one `NavigationStack`.
+`MainTabView` becomes `MainShellView`. The persistent shell avoids an outer navigation host. Profile, ranking-player profile, and driver-selection flows each scope their own `NavigationStack` to a dismissible native sheet.
 
 - A compact top control switches between Upcoming, Past, and Rankings.
 - There is no bottom tab bar.
@@ -165,8 +165,8 @@ Glass is a functional navigation/control layer, not the content background.
 
 `FXGlassSurface` provides one availability-gated design-system boundary:
 
-- iOS 26+: `glassEffect(.regular.interactive(), in:)` for floating controls, `.glass` for neutral buttons, and `.glassProminent` or tinted regular glass for the primary Save action;
-- iOS 17–25: adaptive `regularMaterial` or `ultraThinMaterial`, a subtle semantic border, and a restrained shadow;
+- iOS 26+: interactive `Glass.regular.tint(tint)` for floating controls, including the red-tinted primary Save action;
+- iOS 17–25: `.thinMaterial` for neutral controls and an opaque tinted fallback for emphasized controls, with a subtle semantic border and restrained shadow;
 - dense content cards: an opaque/adaptive `FXContentSurface`, never glass-on-glass.
 
 The top section control, profile button, Schedule control, and temporary sheets may use glass. Qualifying rows, score breakdowns, and rankings remain quiet readable surfaces. F10 red is reserved for the current primary pick/save action; gold remains semantic scoring emphasis.
@@ -204,7 +204,7 @@ Modify `RootView`, `RaceDetailViewModel`, `DriverPickerSheet`, `LeaderboardView`
 - `RaceRepository` is an actor that owns public memory snapshots, disk snapshots, and in-flight list/detail tasks.
 - `RaceDetailViewModel` continues to own one race's entrants, results, qualifying, server pick, local draft, lock state, and submission state.
 - `LeaderboardViewModel`, `AuthManager`, `LocalPickStore`, and `SyncManager` keep their existing domain responsibilities.
-- Sheets remain presentation-only.
+- Race schedule and driver-selection sheets remain presentation-only; profile and ranking-player sheets host their existing feature views but never own shell state.
 
 Each unit receives dependencies through an initializer or environment value. Network and cache implementations conform to small protocols so tests can use deterministic fixtures.
 
@@ -259,7 +259,7 @@ The app derives countdowns and lock labels from the current clock, not the snaps
 
 For an authenticated user with no pending account edit, public detail and private pick requests start concurrently. A pending account edit follows the ordering rules below before any fetched server value may replace the visible draft.
 
-- The sheet/card first frame uses `Race` summary data already held by the deck.
+- The card and Schedule sheet first frame use `Race` summary data already held by the deck; pick rows remain visibly unavailable until entrants arrive.
 - Cached public detail is published when available.
 - Network public detail replaces it without clearing the user's current draft.
 - The local pick hydrates immediately from `LocalPickStore` once entrants are known.
@@ -321,7 +321,7 @@ Team-color/code placeholders render synchronously, so an image never blocks sele
 - No cached list and refresh failure: show a compact retry state inside the deck shell.
 - Cached list and refresh failure: keep content interactive and show a dismissible stale banner.
 - Cached detail and detail refresh failure: retain detail and expose retry.
-- No cached detail: open the sheet/card from summary data immediately and show localized placeholders for the missing sections.
+- No cached detail: render the card and Schedule sheet from summary data immediately, keep pick rows visibly unavailable until entrants arrive, and show localized placeholders below the card.
 - Private pick failure: retain the local draft and label it accurately.
 - Decode failure: discard only the incompatible cache entry, log metadata without response bodies, and refresh.
 - Authentication 401: preserve the existing token-clear behavior.
@@ -329,51 +329,40 @@ Team-color/code placeholders render synchronously, so an image never blocks sele
 
 ## Performance Instrumentation and Targets
 
-Use `OSSignposter`/signposts around:
-
-- launch to shell;
-- cache read and cached list paint;
-- network list paint;
-- active race summary paint;
-- detail paint;
-- private pick hydration;
-- driver picker first frame;
-- local save;
-- server acknowledgement.
-
-Capture `URLSessionTaskMetrics` where the existing networking boundary permits it, without logging tokens, payload bodies, or personal data.
+Use `OSSignposter` points of interest for `LaunchToShell`, diagnostic `LaunchDependencyAssembly`, `CachedListPublication`, `SectionSwitch`, `RaceSelectionReady`, `SelectedRaceDetailReady`, `DriverPickerPreparation`, `DriverPickerPresentation`, `SchedulePresentation`, `SaveCompletion`, and `ServerAcknowledgement`. Network/TTFB baselines remain work for #361 rather than claims of this client-only harness.
 
 Internal signposts diagnose where time is spent; they end at state/view-tree readiness and are not labelled as rendered-frame gates:
 
 - launch to shell tree: `FXRacingApp.init` begins; `MainShellView.onAppear` ends;
-- cached list publication: `RaceDeckViewModel.start` begins; non-empty cached state publication on the main actor ends;
+- cached list publication: immediately before `repository.cachedList()` begins; non-empty cached state publication on the main actor ends;
 - active summary/detail publication: race selection begins; summary state and cached-detail state publication end separate intervals;
-- sheet tree: the slot/schedule tap begins; the presented sheet's `onAppear` ends;
+- sheet tree: the slot/schedule tap begins; `DriverPickerPresentation` or `SchedulePresentation` ends at the presented sheet's `onAppear`;
+- picker preparation: slot handling begins; the progressive three-slot state is published and sheet presentation is requested;
 - local save: persistence begins; the atomic store write and visible `savedOnDevice` state publication end;
 - server acknowledgement: request resume begins; a matching current-revision response merge ends.
 
-Gating client measurements use a Release-derived `Performance` build configuration and `FXRacingPerformance` scheme on the pinned iPhone 17 Pro / iOS 26.5 simulator, with animations enabled and the host otherwise idle. `FX_PERF_HARNESS` exists only in that configuration; Archive remains ordinary Release and fails a configuration test if that flag appears. The harness injects a fixed clock, versioned race/detail/cache fixtures, an image fixture loader, and a deterministic failing `URLProtocol`. Launch arguments choose empty, cached, or offline state. None of those seams are selectable in Debug/Release production code.
+Gating client measurements use a Release-derived `Performance` build configuration and `FXRacingPerformance` scheme on the pinned iPhone 17 Pro / iOS 26.5 simulator, with animations enabled and the host otherwise idle. `FX_PERF_HARNESS` exists only in that configuration; Archive remains ordinary Release and fails a configuration test if that flag appears. The harness injects a fixed clock, versioned race/detail/cache fixtures, an image fixture loader, and a deterministic failing `URLProtocol`. Launch arguments choose auth-checking, account-unavailable, empty, cache-prime/cached, offline, image, or gameplay state. None of those seams are selectable in Debug/Release production code.
 
-An `FXRacingUITests` target owns the user-perceived gates. Each interval starts before `app.launch()`, swipe, or tap and ends only when the expected accessibility identifier/value exists and its primary control is `isHittable`; this readiness check is inside the measured wall-clock interval. That includes process launch, system animation, presentation, accessibility-tree publication, and interaction readiness instead of inferring a committed frame from `onAppear` or `CADisplayLink`. `XCTOSSignpostMetric` records the internal phases alongside the UI-test wall time.
+An `FXRacingUITests` target records user-perceived interaction wall time from before a swipe or tap until the expected accessibility state is ready. Those samples remain diagnostic because `XCUIApplication` includes variable host-side debugger attachment, simulator event synthesis, and accessibility-query latency that the shipped app does not control. Strict launch/cache gates collect the same app-owned signposts from normal simulator processes; interaction gates use `XCTOSSignpostMetric`. Sheet presentation spans still include the native presentation transition through the sheet's `onAppear`; picker preparation separately proves the synchronous tap handler stays under the issue's 100 ms budget.
 
-A checked-in `scripts/ios-performance` wrapper performs 3 warm-up iterations followed by 30 recorded iterations, cleans the simulator container when the scenario requires a cold process, seeds the requested fixture through the performance launch mode, runs the scheme, and exports the `.xcresult` plus raw interval JSON/p50/p95 into an ignored artifacts directory. Production API and server-ack timing use the ordinary Release endpoint, are labelled with network conditions, and remain non-gating in #360.
+A checked-in `scripts/ios-performance` wrapper performs 3 warm-up iterations followed by 30 recorded iterations. It uninstalls the simulator app once per run, primes cached scenarios through a separate performance launch, then reads those fixtures through the production `RaceSnapshotCache` and `RaceRepository`. Launch/cache scenarios use ordinary `simctl` launches and export structured signpost capture plus raw interval JSON/p50/p95; interaction scenarios retain `.xcresult` evidence. Every scenario-specific signpost and the exact sample count are required.
 
-Unless stated otherwise, every threshold below is the p95 of those 30 recorded iterations. Launch and cached/offline-list checks use cold processes; race summary, cached detail, driver sheet, and local save checks use a warm process with deterministic fixtures.
+Unless stated otherwise, every threshold below is the p95 of those 30 app-owned intervals. Launch and cached/offline-list checks use clean normal app processes; race summary, cached detail, driver sheet, and local save checks use deterministic fixtures. Raw XCTest wall-clock samples for interactions are exported beside their signposts as diagnostics and are never presented as app execution time.
 
 Release-simulator acceptance targets for #360:
 
 | Flow | Target |
 |---|---:|
-| Cold launch to shell interactive | ≤ 0.8 s |
-| Cold launch to cached/offline race deck interactive | ≤ 1.0 s |
-| Race swipe to selected card and cached context ready | ≤ 0.6 s |
-| Driver tap to picker interactive | ≤ 0.5 s |
-| Schedule tap to sheet interactive | ≤ 0.5 s |
-| Save tap to visible device response | ≤ 0.2 s |
-| Internal cached snapshot publication | ≤ 0.3 s |
+| Cold launch to shell tree (`LaunchToShell`) | ≤ 0.8 s |
+| Production disk-cache decode and publication (`CachedListPublication`) | ≤ 0.3 s |
+| Race selection to cached context ready (`RaceSelectionReady`) | ≤ 0.6 s |
+| Driver tap handler and picker-state publication (`DriverPickerPreparation`) | ≤ 0.1 s |
+| Driver picker native sheet tree (`DriverPickerPresentation`) | ≤ 0.5 s |
+| Schedule tap to sheet tree (`SchedulePresentation`) | ≤ 0.5 s |
+| Save tap to visible device response (`SaveCompletion`) | ≤ 0.2 s |
 | Retry after session restore/foreground | begins within 5 s |
 
-Server acknowledgement time and empty-cache production TTFB are recorded as baselines but are not gating claims for this client-only issue; #361 owns the public-origin/CDN targets. The local save response remains the user-visible latency guarantee.
+`ServerAcknowledgement`, `SectionSwitch`, `SelectedRaceDetailReady`, and dependency assembly remain diagnostic spans rather than wrapper-enforced gates. The five-second foreground retry is a functional scheduling requirement, not a p95 harness gate. #361 owns production-origin/CDN and TTFB targets; the local save response remains the user-visible latency guarantee.
 
 ## Accessibility
 
@@ -408,7 +397,7 @@ Native tests cover:
 - cache version rejection and atomic replacement;
 - decoded-image cost/count limits, size-specific keys/reuse, request coalescing, off-main downsampling, and stale-prefetch cancellation.
 
-Retain and extend the source/configuration regressions under `ios/*.test.mjs`. The baseline is currently green: 28 iOS checks, 79 route checks, and 25 service checks.
+Retain and extend the source/configuration regressions under `ios/*.test.mjs`. The implementation began from a green `origin/main` baseline: 28 iOS checks, 79 route checks, and 25 service checks. Branch verification is recorded in the worklog and PR.
 
 Verification order:
 
