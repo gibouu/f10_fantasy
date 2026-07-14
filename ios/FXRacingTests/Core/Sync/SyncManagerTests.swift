@@ -153,6 +153,205 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .confirmed)
     }
 
+    func testNewerAccountSaveWaitsForGuestMigrationOnTheSameRace() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let guest = try saveRecord(in: context.store, owner: .guest)
+        let accountSelection = PickSelection(
+            winnerDriverID: "leclerc",
+            tenthPlaceDriverID: "norris",
+            dnfDriverID: "piastri"
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET /api/picks": [.failure(.notFound)],
+                "POST /api/picks": [
+                    .json(PickResponse(pick: pick(for: guest))),
+                    .json(PickResponse(pick: pick(
+                        raceID: guest.id.raceID,
+                        selection: accountSelection,
+                        id: "account-newer"
+                    ))),
+                ],
+            ],
+            gatedKeys: ["POST /api/picks"]
+        )
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        let migration = Task {
+            await manager.resumeEligiblePicks(
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+        let guestRequestID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 1
+        )
+        guard case .saved(let account) = context.store.save(
+            selection: accountSelection,
+            race: RaceFixtures.liveSpa,
+            owner: .user("user-a"),
+            now: RaceFixtures.now
+        ) else {
+            return XCTFail("Expected a newer account revision")
+        }
+        let explicitStarted = expectation(description: "Account save entered sync lane")
+        let explicit = Task { @MainActor in
+            explicitStarted.fulfill()
+            return await manager.submitExplicit(
+                id: account.id,
+                revision: account.revision,
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+        await fulfillment(of: [explicitStarted], timeout: 1)
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+        let postsBeforeGuestFinishes = await api.calls(
+            method: "POST",
+            to: "/api/picks"
+        )
+        XCTAssertEqual(postsBeforeGuestFinishes, 1)
+
+        await api.releaseRequest(id: guestRequestID)
+        let accountRequestID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 2
+        )
+        let requests = await api.recordedRequests().filter { $0.method == "POST" }
+        XCTAssertEqual(
+            try body(from: requests[1])["winnerDriverId"] as? String,
+            accountSelection.winnerDriverID
+        )
+        await api.releaseRequest(id: accountRequestID)
+
+        await migration.value
+        guard case .saved(let saved) = await explicit.value else {
+            return XCTFail("Expected the newer account save to finish")
+        }
+        XCTAssertEqual(saved.id, "account-newer")
+        XCTAssertEqual(context.store.record(id: account.id)?.selection, accountSelection)
+        XCTAssertEqual(context.store.record(id: account.id)?.syncState, .confirmed)
+        XCTAssertEqual(context.store.record(id: guest.id)?.syncState, .confirmed)
+    }
+
+    func testFailedNewerAccountSaveSuppressesOlderGuestUpload() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let guest = try saveRecord(in: context.store, owner: .guest)
+        let accountSelection = PickSelection(
+            winnerDriverID: "leclerc",
+            tenthPlaceDriverID: "norris",
+            dnfDriverID: "piastri"
+        )
+        let account = try saveRecord(
+            in: context.store,
+            owner: .user("user-a"),
+            selection: accountSelection
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/picks": [
+                    .failure(.networkFailed(SyncManagerTestError.offline)),
+                ],
+            ],
+            gatedKeys: ["POST /api/picks"]
+        )
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        let explicit = Task {
+            await manager.submitExplicit(
+                id: account.id,
+                revision: account.revision,
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+        let accountRequestID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 1
+        )
+        let migration = Task {
+            await manager.resumeEligiblePicks(
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+
+        await api.releaseRequest(id: accountRequestID)
+        assertQueued(await explicit.value)
+        await migration.value
+
+        let requests = await api.recordedRequests()
+        XCTAssertEqual(requests.map(\.method), ["POST"])
+        XCTAssertNil(context.store.record(id: guest.id))
+        XCTAssertEqual(context.store.record(id: account.id)?.selection, accountSelection)
+        XCTAssertEqual(context.store.record(id: account.id)?.syncState, .queued)
+    }
+
+    func testStaleGuestPreflightCannotRemoveANewerGuestRevision() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let guest = try saveRecord(in: context.store, owner: .guest)
+        let api = GatedAPIClientSpy(
+            responses: ["GET /api/picks": [.failure(.notFound)]],
+            gatedKeys: ["GET /api/picks"]
+        )
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        let migration = Task {
+            await manager.resumeEligiblePicks(
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+        let getRequestID = await api.waitForRequest(
+            method: "GET",
+            to: "/api/picks",
+            ordinal: 1
+        )
+        _ = try saveRecord(
+            in: context.store,
+            owner: .user("user-a"),
+            selection: PickSelection(
+                winnerDriverID: "leclerc",
+                tenthPlaceDriverID: "norris",
+                dnfDriverID: "piastri"
+            )
+        )
+        let newestSelection = PickSelection(
+            winnerDriverID: "piastri",
+            tenthPlaceDriverID: "norris",
+            dnfDriverID: "leclerc"
+        )
+        let newestGuest = try saveRecord(
+            in: context.store,
+            owner: .guest,
+            selection: newestSelection
+        )
+        XCTAssertGreaterThan(newestGuest.revision, guest.revision)
+
+        await api.releaseRequest(id: getRequestID)
+        await migration.value
+
+        XCTAssertEqual(context.store.record(id: guest.id)?.revision, newestGuest.revision)
+        XCTAssertEqual(context.store.record(id: guest.id)?.selection, newestSelection)
+        XCTAssertEqual(context.store.record(id: guest.id)?.syncState, .queued)
+        let postCalls = await api.calls(method: "POST", to: "/api/picks")
+        XCTAssertEqual(postCalls, 0)
+    }
+
     func testExplicitIntentJoiningMatchingAutomaticGetConfirmsWithoutPost() async throws {
         let context = makeContext()
         defer { context.cleanUp() }

@@ -6,75 +6,79 @@ const source = await readFile(
   new URL("./FXRacing/Features/Races/RaceDetailViewModel.swift", import.meta.url),
   "utf8",
 )
+const viewSource = await readFile(
+  new URL("./FXRacing/Features/Races/RaceDetailView.swift", import.meta.url),
+  "utf8",
+)
 
-const loadBlock = source.match(/func load\(token:[\s\S]*?\n    \}/)?.[0]
-const submitBlock = source.match(/func submit\(token:[\s\S]*?\n    \}/)?.[0]
-
-test("RaceDetailViewModel leaves detail-load failures visible for retry", () => {
-  assert.ok(loadBlock, "load(token:localPickStore:) should exist")
-  assert.match(
-    loadBlock,
-    /catch \{\s*errorMessage = error\.localizedDescription[\s\S]*return\s*\}/,
-    "detail request failures should set the retry error and stop before clearing state",
+test("detail refresh preserves a dirty draft and generation guards every merge", () => {
+  assert.match(source, /loadGeneration/)
+  assert.match(source, /guard generation == loadGeneration/)
+  assert.doesNotMatch(
+    source,
+    /selectedWinner(?:ID)? = nil[\s\S]*selectedP10(?:ID)? = nil[\s\S]*selectedDNF(?:ID)? = nil/,
   )
+  assert.match(source, /\.savedOnDevice/)
+  assert.match(source, /\.savedToAccount/)
 })
 
-test("RaceDetailViewModel clears stale pick state after a successful detail load", () => {
-  assert.ok(loadBlock, "load(token:localPickStore:) should exist")
+test("detail hydration is summary-first, cached-first, and concurrent", () => {
+  assert.match(source, /init\([\s\S]*summary: Race/)
+  assert.match(source, /repository\.cachedDetail\(id: raceID\)/)
+  assert.match(source, /withTaskGroup/)
+  assert.match(source, /repository\.refreshDetail\(\s*id:\s*raceID,\s*policy:/)
+  assert.match(source, /api\.request\(\.pickForRace\(raceId: raceID\), token: token\)/)
+})
 
-  const successIndex = loadBlock.indexOf("let detail: RaceDetailPayload = try await")
-  const resetIndex = loadBlock.indexOf("errorMessage = nil")
-  const serverPickIndex = loadBlock.indexOf("// Populate selections: server pick takes precedence")
-  const localFallbackIndex = loadBlock.indexOf("// Fall back to local pick")
-
-  assert.notEqual(successIndex, -1, "successful detail request should be present")
-  assert.notEqual(resetIndex, -1, "successful load should clear stale state")
-  assert.notEqual(serverPickIndex, -1, "server pick fallback should be present")
-  assert.notEqual(localFallbackIndex, -1, "local pick fallback should be present")
-  assert.ok(successIndex < resetIndex, "reset should run only after detail succeeds")
-  assert.ok(resetIndex < serverPickIndex, "reset should run before server pick repopulation")
-  assert.ok(resetIndex < localFallbackIndex, "reset should run before local pick repopulation")
-
-  const resetBlock = loadBlock.slice(resetIndex, serverPickIndex)
-  for (const reset of [
-    "errorMessage = nil",
-    "serverPick = nil",
-    "isLocalOnly = false",
-    "selectedWinner = nil",
-    "selectedP10 = nil",
-    "selectedDNF = nil",
+test("selections use stable IDs and local-first save uses the shared sync path", () => {
+  for (const selectionID of [
+    "selectedWinnerID",
+    "selectedP10ID",
+    "selectedDNFID",
   ]) {
-    assert.match(resetBlock, new RegExp(reset.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    assert.match(source, new RegExp(`var ${selectionID}: String\\?`))
   }
-})
 
-test("RaceDetailViewModel still repopulates selections from a local pick after reset", () => {
-  assert.ok(loadBlock, "load(token:localPickStore:) should exist")
+  assert.match(source, /localPickStore\.save\(/)
+  assert.match(source, /syncManager\.submitExplicit\(/)
+  assert.match(source, /revision: record\.revision/)
+  assert.doesNotMatch(source, /let api = APIClient\(\)/)
 
-  const localBlock = loadBlock.match(/\/\/ Fall back to local pick[\s\S]*?selectedDNF\s*=.*\n        \}/)?.[0]
-  assert.ok(localBlock, "local pick fallback should exist")
-  assert.match(localBlock, /isLocalOnly = !local\.synced/)
-  assert.match(localBlock, /selectedWinner = entrants\.first \{ \$0\.id == local\.winnerId \}/)
-  assert.match(localBlock, /selectedP10\s*= entrants\.first \{ \$0\.id == local\.p10Id \}/)
-  assert.match(localBlock, /selectedDNF\s*= entrants\.first \{ \$0\.id == local\.dnfId \}/)
-})
-
-test("RaceDetailViewModel ignores server pick callbacks after a newer local edit", () => {
-  assert.ok(loadBlock, "load(token:localPickStore:) should exist")
-  assert.match(
-    loadBlock,
-    /if localPickStore\.pick\(for: raceId\)\?\.revision == localRevisionBeforeServerLoad/,
-    "a late GET must not replace a newer local selection",
+  const authenticatedSave = source.slice(
+    source.indexOf("guard case .user(let currentUserID)"),
+    source.indexOf("let result = await syncManager.submitExplicit"),
   )
+  const deviceSaved = authenticatedSave.indexOf("submissionState = .savedOnDevice")
+  const yielded = authenticatedSave.indexOf("await Task.yield()")
+  const syncing = authenticatedSave.indexOf("submissionState = .syncing")
+  assert.ok(deviceSaved >= 0 && deviceSaved < yielded)
+  assert.ok(yielded < syncing)
+})
 
-  assert.ok(submitBlock, "submit(token:localPickStore:) should exist")
-  const markIndex = submitBlock.indexOf("localPickStore.markSynced")
-  const responseIndex = submitBlock.indexOf("serverPick = response.pick")
-  assert.notEqual(markIndex, -1, "submit should revision-check the acknowledgement")
-  assert.notEqual(responseIndex, -1, "submit should publish a matching response")
-  assert.ok(markIndex < responseIndex, "the store must accept the captured revision before UI success")
+test("loading and saving expose explicit non-blocking state", () => {
+  assert.match(source, /enum PickSubmissionState: Equatable/)
+  for (const state of [
+    "idle",
+    "savingLocally",
+    "savedOnDevice",
+    "syncing",
+    "savedToAccount",
+    "conflict",
+    "expired",
+  ]) {
+    assert.match(source, new RegExp(`case(?:\\s+\\w+,)*\\s*${state}|case\\s+${state}`))
+  }
+  assert.match(source, /func loadIfNeeded\(/)
+  assert.match(source, /func refresh\(/)
+})
+
+test("the open detail sheet observes shared local sync transitions", () => {
+  assert.match(source, /func reconcileLocalState\(/)
+  assert.match(viewSource, /onChange\(of: observedGuestRecord\)/)
+  assert.match(viewSource, /onChange\(of: observedAccountRecord\)/)
+  assert.match(viewSource, /viewModel\.reconcileLocalState\(/)
   assert.match(
-    submitBlock,
-    /guard localPickStore\.markSynced\([\s\S]*?revision: savedRevision[\s\S]*?\) else/,
+    viewSource,
+    /viewModel\.selectedWinnerID\s*\?\?\s*viewModel\.serverPick\?\.winnerDriverId/,
   )
 })

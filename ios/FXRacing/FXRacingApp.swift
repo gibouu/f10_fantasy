@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct FXRacingApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    private let syncManager: SyncManager
+    private let raceDetailViewModelFactory: RaceDetailViewModelFactory
     @State private var authManager: AuthManager
     @State private var localPickStore = LocalPickStore()
     @State private var guestStore     = GuestStore()
@@ -11,16 +11,28 @@ struct FXRacingApp: App {
 
     @MainActor
     init() {
-        let syncManager = SyncManager()
-        self.syncManager = syncManager
+        let api = APIClient()
+        let clock = SystemClock()
+        let repository = RaceRepository(
+            api: api,
+            cache: RaceSnapshotCache(),
+            clock: clock
+        )
+        let syncManager = SyncManager(api: api, clock: clock)
+        raceDetailViewModelFactory = RaceDetailViewModelFactory(
+            repository: repository,
+            api: api,
+            syncManager: syncManager,
+            clock: clock
+        )
         _authManager = State(
-            initialValue: AuthManager(syncManager: syncManager)
+            initialValue: AuthManager(api: api, syncManager: syncManager)
         )
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(raceDetailViewModelFactory: raceDetailViewModelFactory)
                 .environment(authManager)
                 .environment(localPickStore)
                 .environment(guestStore)

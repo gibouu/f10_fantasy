@@ -16,9 +16,15 @@ final class SyncManager {
         let task: Task<PickSyncResult, Never>
     }
 
+    private struct RaceLane {
+        let token: UUID
+        let task: Task<Void, Never>
+    }
+
     private let api: any APIRequesting
     private let clock: any ClockProviding
     private var workers: [LocalPickRecordID: Worker] = [:]
+    private var raceLanes: [String: RaceLane] = [:]
     private var latestExplicitRevision: [LocalPickRecordID: UInt64] = [:]
 
     init(
@@ -87,8 +93,11 @@ final class SyncManager {
             return await worker.task.value
         }
 
+        let previousLane = raceLanes[id.raceID]?.task
+        let laneToken = UUID()
         let workerToken = UUID()
         let task = Task { @MainActor [weak self] in
+            await previousLane?.value
             guard let self else { return PickSyncResult.queued }
             let result = await self.runWorker(
                 id: id,
@@ -101,7 +110,17 @@ final class SyncManager {
             return result
         }
         workers[id] = Worker(token: workerToken, task: task)
+        let laneTask = Task { @MainActor [weak self] in
+            _ = await task.value
+            self?.finishRaceLane(raceID: id.raceID, token: laneToken)
+        }
+        raceLanes[id.raceID] = RaceLane(token: laneToken, task: laneTask)
         return await task.value
+    }
+
+    private func finishRaceLane(raceID: String, token: UUID) {
+        guard raceLanes[raceID]?.token == token else { return }
+        raceLanes[raceID] = nil
     }
 
     private func finishWorker(id: LocalPickRecordID, token: UUID) {
@@ -122,6 +141,14 @@ final class SyncManager {
                   isEligible(record.id.owner, currentUserID: currentUserID),
                   isProcessable(record.syncState, revision: record.revision)
             else { return .queued }
+
+            if discardSupersededGuest(
+                record,
+                currentUserID: currentUserID,
+                localPickStore: localPickStore
+            ) {
+                return .queued
+            }
 
             let revision = record.revision
             let isExplicit = latestExplicitRevision[id] == revision
@@ -169,13 +196,22 @@ final class SyncManager {
                         localPickStore: localPickStore
                     ) else { return .queued }
 
+                    if discardSupersededGuest(
+                        record,
+                        currentUserID: currentUserID,
+                        localPickStore: localPickStore
+                    ) {
+                        return .queued
+                    }
+
                     if matches(response.pick, record: record) {
                         return terminalResult(
                             .confirmed,
                             id: id,
                             revision: revision,
                             localPickStore: localPickStore,
-                            success: .saved(response.pick)
+                            success: .saved(response.pick),
+                            confirmedUserID: currentUserID
                         )
                     }
 
@@ -247,6 +283,13 @@ final class SyncManager {
                 equals: revision,
                 localPickStore: localPickStore
             ) else { return .queued }
+            if discardSupersededGuest(
+                record,
+                currentUserID: currentUserID,
+                localPickStore: localPickStore
+            ) {
+                return .queued
+            }
 
             do {
                 let response: PickResponse = try await api.request(
@@ -270,7 +313,8 @@ final class SyncManager {
                     id: id,
                     revision: revision,
                     localPickStore: localPickStore,
-                    success: .saved(response.pick)
+                    success: .saved(response.pick),
+                    confirmedUserID: currentUserID
                 )
             } catch APIError.unauthorized {
                 queueCapturedRevision(
@@ -317,8 +361,37 @@ final class SyncManager {
         id: LocalPickRecordID,
         revision: UInt64,
         localPickStore: LocalPickStore,
-        success: PickSyncResult
+        success: PickSyncResult,
+        confirmedUserID: String? = nil
     ) -> PickSyncResult {
+        if state == .confirmed,
+           id.owner == .guest,
+           let confirmedUserID,
+           let guestRecord = localPickStore.record(id: id),
+           guestRecord.revision == revision {
+            let accountRecord = localPickStore.record(
+                for: id.raceID,
+                owner: .user(confirmedUserID)
+            )
+            if accountRecord == nil || accountRecord?.syncState == .confirmed {
+                switch localPickStore.reconcileConfirmed(
+                    selection: guestRecord.selection,
+                    raceID: id.raceID,
+                    owner: .user(confirmedUserID),
+                    savedAt: clock.now()
+                ) {
+                case .saved, .unchanged:
+                    break
+                case .locked, .invalidOwner, .persistenceFailed:
+                    queueCapturedRevision(
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore
+                    )
+                    return .queued
+                }
+            }
+        }
         guard localPickStore.transition(
             id: id,
             revision: revision,
@@ -344,6 +417,25 @@ final class SyncManager {
               case .syncing = record.syncState
         else { return }
         _ = localPickStore.transition(id: id, revision: revision, to: .queued)
+    }
+
+    private func discardSupersededGuest(
+        _ guestRecord: LocalPickRecord,
+        currentUserID: String,
+        localPickStore: LocalPickStore
+    ) -> Bool {
+        guard guestRecord.id.owner == .guest,
+              let currentGuest = localPickStore.record(id: guestRecord.id),
+              currentGuest.revision == guestRecord.revision,
+              let accountRecord = localPickStore.record(
+                  for: guestRecord.id.raceID,
+                  owner: .user(currentUserID)
+              ),
+              accountRecord.revision > currentGuest.revision
+        else { return false }
+
+        _ = localPickStore.remove(raceId: guestRecord.id.raceID)
+        return true
     }
 
     private func currentRevision(

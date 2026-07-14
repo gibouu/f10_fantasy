@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+    let raceDetailViewModelFactory: RaceDetailViewModelFactory
     @Environment(AuthManager.self) private var authManager
     @Environment(LocalPickStore.self) private var localPickStore
     @Environment(TutorialStore.self) private var tutorialStore
@@ -36,18 +37,18 @@ struct RootView: View {
 
             case .unauthenticated:
                 // Guest mode — full app accessible, sign-in is contextual
-                MainTabView()
+                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
 
             case .accountUnavailable:
                 // Keep public race content available while account restoration retries.
-                MainTabView()
+                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
 
             case .authenticated(let user) where !user.usernameSet:
                 // Newly signed-in user has not set a username yet
                 UsernamePickerView()
 
             case .authenticated:
-                MainTabView()
+                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
             }
         }
         .preferredColorScheme(preferredColorScheme)
@@ -72,10 +73,14 @@ struct RootView: View {
 // MARK: - Main tab shell
 
 struct MainTabView: View {
+    let raceDetailViewModelFactory: RaceDetailViewModelFactory
+
     var body: some View {
         TabView {
             NavigationStack {
-                RacesListView()
+                RacesListView(
+                    raceDetailViewModelFactory: raceDetailViewModelFactory
+                )
             }
             .tabItem { Label("Races",   systemImage: "flag.2.crossed") }
 

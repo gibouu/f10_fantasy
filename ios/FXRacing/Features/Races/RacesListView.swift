@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RacesListView: View {
+    let raceDetailViewModelFactory: RaceDetailViewModelFactory
     @State private var viewModel = RacesListViewModel()
     @Environment(TutorialStore.self) private var tutorialStore
     @Environment(AuthManager.self) private var authManager
@@ -105,7 +106,17 @@ struct RacesListView: View {
         .listStyle(.plain)
         .refreshable { await viewModel.load() }
         .navigationDestination(for: String.self) { raceId in
-            RaceDetailView(raceId: raceId)
+            if let summary = viewModel.races.first(where: { $0.id == raceId }) {
+                RaceDetailView(
+                    viewModel: raceDetailViewModelFactory.make(summary: summary)
+                )
+            } else {
+                ContentUnavailableView(
+                    "Race unavailable",
+                    systemImage: "flag.2.crossed",
+                    description: Text("Refresh the race calendar and try again.")
+                )
+            }
         }
     }
 

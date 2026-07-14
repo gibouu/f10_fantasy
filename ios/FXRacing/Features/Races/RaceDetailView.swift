@@ -10,42 +10,73 @@ struct RaceDetailView: View {
     @State private var activeSlot: PickSlot?
     @State private var showSignIn = false
 
-    init(raceId: String) {
-        self.raceId = raceId
-        _viewModel = State(initialValue: RaceDetailViewModel(raceId: raceId))
+    init(viewModel: RaceDetailViewModel) {
+        raceId = viewModel.race.id
+        _viewModel = State(initialValue: viewModel)
+    }
+
+    private var observedGuestRecord: LocalPickRecord? {
+        localPickStore.record(for: raceId, owner: .guest)
+    }
+
+    private var observedAccountRecord: LocalPickRecord? {
+        guard let userID = authManager.authenticatedUser?.id else { return nil }
+        return localPickStore.record(for: raceId, owner: .user(userID))
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if viewModel.isLoading && viewModel.race == nil {
-                    raceDetailSkeleton
-                } else if let err = viewModel.errorMessage, viewModel.race == nil {
-                    RetryView(message: err) { await viewModel.load(token: authManager.accessToken, localPickStore: localPickStore) }
-                        .padding(.top, 40)
-                } else if let race = viewModel.race {
-                    raceHeader(race)
-                    picksCard(race)
-                    if race.status == .completed {
-                        resultsCard
+                raceHeader(viewModel.race)
+                if let error = viewModel.loadErrorMessage {
+                    ErrorBanner(message: error) {
+                        Task {
+                            await viewModel.refresh(
+                                token: authManager.accessToken,
+                                userID: authManager.authenticatedUser?.id,
+                                localPickStore: localPickStore
+                            )
+                        }
                     }
-                    qualifyingCard(race)
                 }
+                picksCard(viewModel.race)
+                if viewModel.race.status == .completed {
+                    resultsCard
+                }
+                qualifyingCard(viewModel.race)
             }
             .padding(FXTheme.Spacing.md)
         }
-        .navigationTitle(viewModel.race?.name ?? "Race")
+        .navigationTitle(viewModel.race.name)
         .navigationBarTitleDisplayMode(.large)
-        .task { await viewModel.load(token: authManager.accessToken, localPickStore: localPickStore) }
+        .task(id: authManager.authenticatedUser?.id ?? "device") {
+            await viewModel.loadIfNeeded(
+                token: authManager.accessToken,
+                userID: authManager.authenticatedUser?.id,
+                localPickStore: localPickStore
+            )
+        }
         .onChange(of: scenePhase) { _, phase in
             // Reload when returning to foreground — catches the case where
             // the user backgrounded the app before lock cutoff and resumed
             // after; ensures the lock banner + race status reflect reality.
             guard phase == .active else { return }
-            Task { await viewModel.load(token: authManager.accessToken, localPickStore: localPickStore) }
+            Task {
+                await viewModel.refresh(
+                    token: authManager.accessToken,
+                    userID: authManager.authenticatedUser?.id,
+                    localPickStore: localPickStore
+                )
+            }
+        }
+        .onChange(of: observedGuestRecord) { _, _ in
+            reconcileObservedLocalState()
+        }
+        .onChange(of: observedAccountRecord) { _, _ in
+            reconcileObservedLocalState()
         }
         .onChange(of: viewModel.serverPick?.scoreBreakdown?.totalScore) { _, score in
-            if score != nil, viewModel.race?.status == .completed {
+            if score != nil, viewModel.race.status == .completed {
                 Haptics.scoreReveal()
             }
         }
@@ -59,7 +90,7 @@ struct RaceDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !tutorialStore.hasSeenPickTutorial && !authManager.isAuthenticated,
-               let race = viewModel.race, race.status != .completed, !race.isLocked {
+               viewModel.race.status != .completed, !viewModel.race.isLocked {
                 TutorialCard(
                     icon: "hand.tap.fill",
                     title: "Make your picks",
@@ -72,6 +103,14 @@ struct RaceDetailView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+    }
+
+    private func reconcileObservedLocalState() {
+        viewModel.reconcileLocalState(
+            token: authManager.accessToken,
+            userID: authManager.authenticatedUser?.id,
+            localPickStore: localPickStore
+        )
     }
 
     // MARK: - Detail skeleton
@@ -176,7 +215,10 @@ struct RaceDetailView: View {
     private func picksCardContent(_ race: Race, now: Date) -> some View {
         let isLocked = now >= race.lockCutoffUtc || viewModel.serverPick?.lockedAt != nil
         let isCompleted = race.status == .completed
-        let hasAnyPick = viewModel.serverPick != nil || localPickStore.pick(for: raceId) != nil
+        let hasAnyPick = viewModel.serverPick != nil
+            || viewModel.selectedWinnerID != nil
+            || viewModel.selectedP10ID != nil
+            || viewModel.selectedDNFID != nil
 
         // Resolve actual result drivers for each slot
         let driverMap = Dictionary(uniqueKeysWithValues: viewModel.entrants.map { ($0.id, $0) })
@@ -244,7 +286,13 @@ struct RaceDetailView: View {
                 }
 
                 Button {
-                    Task { await viewModel.submit(token: authManager.accessToken, localPickStore: localPickStore) }
+                    Task {
+                        await viewModel.submit(
+                            token: authManager.accessToken,
+                            userID: authManager.authenticatedUser?.id,
+                            localPickStore: localPickStore
+                        )
+                    }
                 } label: {
                     Group {
                         if viewModel.isSubmitting {
@@ -549,9 +597,12 @@ struct RaceDetailView: View {
             .sorted { ($0.position ?? 999) < ($1.position ?? 999) }
 
         // User's picks for highlighting
-        let pickedWinnerId  = viewModel.serverPick?.winnerDriverId   ?? viewModel.selectedWinner?.id
-        let pickedP10Id     = viewModel.serverPick?.tenthPlaceDriverId ?? viewModel.selectedP10?.id
-        let pickedDNFId     = viewModel.serverPick?.dnfDriverId       ?? viewModel.selectedDNF?.id
+        let pickedWinnerId = viewModel.selectedWinnerID
+            ?? viewModel.serverPick?.winnerDriverId
+        let pickedP10Id = viewModel.selectedP10ID
+            ?? viewModel.serverPick?.tenthPlaceDriverId
+        let pickedDNFId = viewModel.selectedDNFID
+            ?? viewModel.serverPick?.dnfDriverId
 
         if !classified.isEmpty || !nonClassified.isEmpty {
             VStack(alignment: .leading, spacing: 10) {

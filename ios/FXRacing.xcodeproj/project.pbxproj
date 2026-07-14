@@ -54,6 +54,7 @@
 		93AB6EEB22878BFAA5B2DC3D /* SignInPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27964BA90CCF80BCB440B253 /* SignInPromptView.swift */; };
 		97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF272627CBEFA6E4197F290B /* RaceFixtures.swift */; };
 		97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26E8B8213C775919164F61D6 /* TutorialStore.swift */; };
+		9CA847720054D425717BB2EC /* RaceDetailViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */; };
 		9F4CB010F34803172181F256 /* SyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14BE2DAC50E1A3F315CC644F /* SyncManager.swift */; };
 		A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E706759022F3FFAC680CFAB /* Config.swift */; };
 		A200925D8BB441BE36706F1E /* APIResponseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA07E9B11C4B68102004778 /* APIResponseModels.swift */; };
@@ -75,6 +76,7 @@
 		CED85355FAC48D6EF2BC8FC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */; };
 		D149F9EAC8C9512A27A49590 /* RaceSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3303D344376925DE6E68388B /* RaceSnapshots.swift */; };
 		D5225AA736C9F73800DDBCD0 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40A855BDB590560551CE328 /* User.swift */; };
+		D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */; };
 		D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B893A7A9D248C607360F4 /* AuthManagerTests.swift */; };
 		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
 		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
@@ -142,6 +144,7 @@
 		79ED2E04D9D0A55566BB0D71 /* LeaderboardRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardRowView.swift; sourceTree = "<group>"; };
 		7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendSearchView.swift; sourceTree = "<group>"; };
 		7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTeamOption.swift; sourceTree = "<group>"; };
+		825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModelFactory.swift; sourceTree = "<group>"; };
 		883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialCard.swift; sourceTree = "<group>"; };
 		88F5AA93289CEB8669AACFDD /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 		8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
@@ -187,6 +190,7 @@
 		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryRaceSnapshotCache.swift; sourceTree = "<group>"; };
 		F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceScenario.swift; sourceTree = "<group>"; };
+		FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModelTests.swift; sourceTree = "<group>"; };
 		FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -198,6 +202,7 @@
 				EDDEBFC40FCFF7099CC8D6E8 /* RaceCardView.swift */,
 				5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */,
 				96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */,
+				825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */,
 				6AEE3B16ED8A558720015BBC /* RacesListView.swift */,
 				9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */,
 			);
@@ -224,9 +229,18 @@
 			isa = PBXGroup;
 			children = (
 				594F2001A129AC3D5853C532 /* Core */,
+				4785CB34430E25D79CF77C46 /* Features */,
 				680530EB18CF7D9156702629 /* Fixtures */,
 			);
 			path = FXRacingTests;
+			sourceTree = "<group>";
+		};
+		246B217A5DE2B5F7785718C4 /* Races */ = {
+			isa = PBXGroup;
+			children = (
+				FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */,
+			);
+			path = Races;
 			sourceTree = "<group>";
 		};
 		28BFB8ED4A7831B6E625B61A /* Storage */ = {
@@ -254,6 +268,14 @@
 				9059D4BC746CBD1E9B5AE6F1 /* APIClientTests.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		4785CB34430E25D79CF77C46 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				246B217A5DE2B5F7785718C4 /* Races */,
+			);
+			path = Features;
 			sourceTree = "<group>";
 		};
 		57D0716A52540373DFEFC5DA = {
@@ -616,6 +638,7 @@
 				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
 				A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */,
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
+				9CA847720054D425717BB2EC /* RaceDetailViewModelTests.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
 				ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */,
@@ -680,6 +703,7 @@
 				2025CA7B03FD1CA4E7AFC81F /* RaceCardView.swift in Sources */,
 				F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */,
 				C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */,
+				D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */,
 				03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */,
 				3CE9ADD38616EF20C2A0F7DA /* RaceSnapshotCache.swift in Sources */,
 				D149F9EAC8C9512A27A49590 /* RaceSnapshots.swift in Sources */,

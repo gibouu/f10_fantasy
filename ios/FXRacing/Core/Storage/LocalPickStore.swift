@@ -145,7 +145,8 @@ final class LocalPickStore {
         selection: PickSelection,
         race: Race,
         owner: PickOwnerScope,
-        now: Date? = nil
+        now: Date? = nil,
+        forceNewRevision: Bool = false
     ) -> LocalPickSaveResult {
         guard owner != .legacyAmbiguous else {
             return .invalidOwner
@@ -160,11 +161,57 @@ final class LocalPickStore {
             switch existing.syncState {
             case .conflict, .expired:
                 break
-            case .queued, .syncing, .confirmed:
+            case .queued, .syncing:
                 return .unchanged(existing)
+            case .confirmed:
+                if !forceNewRevision {
+                    return .unchanged(existing)
+                }
             }
         }
 
+        return storeNewRecord(
+            id: id,
+            selection: selection,
+            savedAt: savedAt,
+            syncState: .queued
+        )
+    }
+
+    /// Reconciles an authoritative account pick into the local baseline.
+    /// This is not a user edit, so it remains valid after the race cutoff.
+    @discardableResult
+    func reconcileConfirmed(
+        selection: PickSelection,
+        raceID: String,
+        owner: PickOwnerScope,
+        savedAt: Date? = nil
+    ) -> LocalPickSaveResult {
+        guard owner != .legacyAmbiguous else {
+            return .invalidOwner
+        }
+
+        let id = LocalPickRecordID(owner: owner, raceID: raceID)
+        if let existing = records[id],
+           existing.selection == selection,
+           existing.syncState == .confirmed {
+            return .unchanged(existing)
+        }
+
+        return storeNewRecord(
+            id: id,
+            selection: selection,
+            savedAt: savedAt ?? clock.now(),
+            syncState: .confirmed
+        )
+    }
+
+    private func storeNewRecord(
+        id: LocalPickRecordID,
+        selection: PickSelection,
+        savedAt: Date,
+        syncState: LocalPickSyncState
+    ) -> LocalPickSaveResult {
         let previousRecord = records[id]
         let previousNextRevision = nextRevision
         let revision = previousNextRevision
@@ -181,7 +228,7 @@ final class LocalPickStore {
             selection: selection,
             savedAt: savedAt,
             revision: revision,
-            syncState: .queued
+            syncState: syncState
         )
         records[id] = record
         guard persistV2() else {
