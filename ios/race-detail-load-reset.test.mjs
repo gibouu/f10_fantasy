@@ -8,6 +8,7 @@ const source = await readFile(
 )
 
 const loadBlock = source.match(/func load\(token:[\s\S]*?\n    \}/)?.[0]
+const submitBlock = source.match(/func submit\(token:[\s\S]*?\n    \}/)?.[0]
 
 test("RaceDetailViewModel leaves detail-load failures visible for retry", () => {
   assert.ok(loadBlock, "load(token:localPickStore:) should exist")
@@ -56,4 +57,24 @@ test("RaceDetailViewModel still repopulates selections from a local pick after r
   assert.match(localBlock, /selectedWinner = entrants\.first \{ \$0\.id == local\.winnerId \}/)
   assert.match(localBlock, /selectedP10\s*= entrants\.first \{ \$0\.id == local\.p10Id \}/)
   assert.match(localBlock, /selectedDNF\s*= entrants\.first \{ \$0\.id == local\.dnfId \}/)
+})
+
+test("RaceDetailViewModel ignores server pick callbacks after a newer local edit", () => {
+  assert.ok(loadBlock, "load(token:localPickStore:) should exist")
+  assert.match(
+    loadBlock,
+    /if localPickStore\.pick\(for: raceId\)\?\.revision == localRevisionBeforeServerLoad/,
+    "a late GET must not replace a newer local selection",
+  )
+
+  assert.ok(submitBlock, "submit(token:localPickStore:) should exist")
+  const markIndex = submitBlock.indexOf("localPickStore.markSynced")
+  const responseIndex = submitBlock.indexOf("serverPick = response.pick")
+  assert.notEqual(markIndex, -1, "submit should revision-check the acknowledgement")
+  assert.notEqual(responseIndex, -1, "submit should publish a matching response")
+  assert.ok(markIndex < responseIndex, "the store must accept the captured revision before UI success")
+  assert.match(
+    submitBlock,
+    /guard localPickStore\.markSynced\([\s\S]*?revision: savedRevision[\s\S]*?\) else/,
+  )
 })

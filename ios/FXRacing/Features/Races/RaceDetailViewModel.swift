@@ -73,22 +73,26 @@ final class RaceDetailViewModel {
         if let token {
             do {
                 let response: PickResponse = try await api.request(.pickForRace(raceId: raceId), token: token)
-                serverPick = response.pick
-                isLocalOnly = false
-                selectedWinner = entrants.first { $0.id == response.pick.winnerDriverId }
-                selectedP10    = entrants.first { $0.id == response.pick.tenthPlaceDriverId }
-                selectedDNF    = entrants.first { $0.id == response.pick.dnfDriverId }
-                if selectedWinner == nil || selectedP10 == nil || selectedDNF == nil {
-                    fxWarn(.pick, "server pick driver id not in entrants — winner=\(selectedWinner == nil ? "missing" : "ok") p10=\(selectedP10 == nil ? "missing" : "ok") dnf=\(selectedDNF == nil ? "missing" : "ok")")
-                } else {
-                    fxLog(.pick, "server pick loaded raceId=\(raceId)")
+                if localPickStore.pick(for: raceId)?.revision == localRevisionBeforeServerLoad {
+                    if let localRevisionBeforeServerLoad {
+                        _ = localPickStore.markSynced(
+                            raceId: raceId,
+                            revision: localRevisionBeforeServerLoad
+                        )
+                    }
+                    serverPick = response.pick
+                    isLocalOnly = false
+                    selectedWinner = entrants.first { $0.id == response.pick.winnerDriverId }
+                    selectedP10    = entrants.first { $0.id == response.pick.tenthPlaceDriverId }
+                    selectedDNF    = entrants.first { $0.id == response.pick.dnfDriverId }
+                    if selectedWinner == nil || selectedP10 == nil || selectedDNF == nil {
+                        fxWarn(.pick, "server pick driver id not in entrants — winner=\(selectedWinner == nil ? "missing" : "ok") p10=\(selectedP10 == nil ? "missing" : "ok") dnf=\(selectedDNF == nil ? "missing" : "ok")")
+                    } else {
+                        fxLog(.pick, "server pick loaded raceId=\(raceId)")
+                    }
+                    return
                 }
-                // Mark local pick synced if server has it
-                localPickStore.markSynced(
-                    raceId: raceId,
-                    revision: localRevisionBeforeServerLoad
-                )
-                return
+                fxLog(.pick, "ignored stale server pick raceId=\(raceId)")
             } catch APIError.notFound {
                 fxLog(.pick, "no server pick for raceId=\(raceId) — falling back to local")
                 serverPick = nil
@@ -185,9 +189,15 @@ final class RaceDetailViewModel {
                 ),
                 token: token
             )
+            guard localPickStore.markSynced(
+                raceId: raceId,
+                revision: savedRevision
+            ) else {
+                fxLog(.pick, "ignored stale submit acknowledgement raceId=\(raceId)")
+                return
+            }
             serverPick = response.pick
             isLocalOnly = false
-            localPickStore.markSynced(raceId: raceId, revision: savedRevision)
             submitSuccess = true
             fxLog(.pick, "submit OK raceId=\(raceId) winner=\(winner.code) p10=\(p10.code) dnf=\(dnf.code)")
             Haptics.success()

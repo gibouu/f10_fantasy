@@ -169,7 +169,10 @@ final class LocalPickStore {
         let previousNextRevision = nextRevision
         let revision = previousNextRevision
         let (incrementedRevision, overflow) = previousNextRevision.addingReportingOverflow(1)
-        guard previousNextRevision > 0, !overflow else {
+        guard previousNextRevision > 0,
+              !overflow,
+              incrementedRevision < .max
+        else {
             return .persistenceFailed
         }
         nextRevision = incrementedRevision
@@ -362,13 +365,8 @@ final class LocalPickStore {
     }
 
     private func migrateLegacyIfPresent() {
-        let sourceData = persistence.data(forKey: Self.v1Key)
-            ?? persistence.data(forKey: Self.legacyKey)
-        guard let sourceData,
-              let legacyPicks = try? JSONDecoder().decode(
-                  [String: LegacyLocalPickV1].self,
-                  from: sourceData
-              )
+        guard let legacyPicks = decodedLegacyPicks(forKey: Self.v1Key)
+                ?? decodedLegacyPicks(forKey: Self.legacyKey)
         else { return }
 
         for raceID in legacyPicks.keys.sorted() {
@@ -401,6 +399,16 @@ final class LocalPickStore {
         // either legacy key is removed, so an acknowledged in-memory write alone
         // can never destroy the only durable copy.
         _ = persistV2()
+    }
+
+    private func decodedLegacyPicks(
+        forKey key: String
+    ) -> [String: LegacyLocalPickV1]? {
+        guard let data = persistence.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(
+            [String: LegacyLocalPickV1].self,
+            from: data
+        )
     }
 
     private func isValid(_ envelope: LocalPickEnvelopeV2) -> Bool {
@@ -436,6 +444,7 @@ final class LocalPickStore {
             nextRevision: nextRevision,
             records: records.values.sorted { $0.revision < $1.revision }
         )
+        guard isValid(envelope) else { return false }
         guard let data = try? JSONEncoder().encode(envelope) else {
             return false
         }

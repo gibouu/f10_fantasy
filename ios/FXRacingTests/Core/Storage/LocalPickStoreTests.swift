@@ -119,6 +119,41 @@ final class LocalPickStoreTests: XCTestCase {
         XCTAssertNil(context.defaults.data(forKey: "localPicks"))
     }
 
+    func testCorruptV1FallsBackToValidLegacyKeyWithoutDeletingItEarly() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let corruptV1 = Data("not-json".utf8)
+        let legacy = LegacyLocalPickV1(
+            raceId: "spa",
+            winnerId: "norris",
+            p10Id: "piastri",
+            dnfId: "leclerc",
+            savedAt: RaceFixtures.now,
+            synced: false,
+            migrationStatus: nil
+        )
+        let validLegacy = try JSONEncoder().encode(["spa": legacy])
+        persistence.seed(corruptV1, forKey: "localPicks_v1")
+        persistence.seed(validLegacy, forKey: "localPicks")
+
+        let migrated = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+
+        XCTAssertNotNil(migrated.legacyConflict(for: "spa"))
+        XCTAssertEqual(persistence.data(forKey: "localPicks_v1"), corruptV1)
+        XCTAssertEqual(persistence.data(forKey: "localPicks"), validLegacy)
+        XCTAssertNotNil(persistence.data(forKey: "localPicks_v2"))
+
+        let reloaded = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        XCTAssertNotNil(reloaded.legacyConflict(for: "spa"))
+        XCTAssertNil(persistence.data(forKey: "localPicks_v1"))
+        XCTAssertNil(persistence.data(forKey: "localPicks"))
+    }
+
     func testLegacyMigrationAssignsRevisionsInStableRaceIDOrder() throws {
         let context = makeDefaults()
         defer { context.cleanUp() }
@@ -309,6 +344,46 @@ final class LocalPickStoreTests: XCTestCase {
             XCTAssertNil(store.record(for: race.id, owner: .guest))
             XCTAssertNil(store.record(for: "duplicate", owner: .guest))
         }
+    }
+
+    func testExhaustedRevisionEnvelopeStaysReadableAndRejectsAnotherSave() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let existing = LocalPickRecord(
+            id: LocalPickRecordID(owner: .guest, raceID: "existing"),
+            selection: selection,
+            savedAt: RaceFixtures.now,
+            revision: UInt64.max - 2,
+            syncState: .queued
+        )
+        let fixture = try makeV2EnvelopeData(
+            nextRevision: UInt64.max - 1,
+            records: [existing]
+        )
+        persistence.seed(fixture, forKey: "localPicks_v2")
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+
+        XCTAssertEqual(store.record(id: existing.id), existing)
+        XCTAssertEqual(
+            store.save(
+                selection: selection,
+                race: makeUnlockedRace(id: "exhausted", round: 2),
+                owner: .guest,
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(store.record(id: existing.id), existing)
+        XCTAssertNil(store.record(for: "exhausted", owner: .guest))
+        XCTAssertEqual(persistence.data(forKey: "localPicks_v2"), fixture)
+
+        let reloaded = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        XCTAssertEqual(reloaded.record(id: existing.id), existing)
     }
 
     func testOrdinarySaveCannotClaimLegacyAmbiguousOwnership() throws {
