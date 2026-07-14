@@ -56,10 +56,12 @@
 		A040AB5447FFBE3C096B3AEF /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E706759022F3FFAC680CFAB /* Config.swift */; };
 		A200925D8BB441BE36706F1E /* APIResponseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA07E9B11C4B68102004778 /* APIResponseModels.swift */; };
 		A5232EDCA0F08EC91B7878C3 /* Driver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494452DD6B3E19BC8F850FF2 /* Driver.swift */; };
+		A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE2CC51C4103C26FBF4BDCC /* LocalPickStoreTests.swift */; };
 		AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */; };
 		B539AE28DBF60E6E6BD3B539 /* FriendProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89D6F2921C74496E154358E /* FriendProfile.swift */; };
 		B7287621224A9D77F438B14B /* RacesListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AFF18F5F1197C9A6EB7B798 /* RacesListViewModel.swift */; };
 		B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411961C10248D3714B7E98 /* UsernamePickerView.swift */; };
+		B8C1F6B3F3CFD9B81A0E3570 /* LocalPickRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */; };
 		BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE9A0A87BBC8A893D98DED /* Logger.swift */; };
 		BD33D81A7938D759F624B4EB /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9059D4BC746CBD1E9B5AE6F1 /* APIClientTests.swift */; };
 		C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */; };
@@ -124,6 +126,7 @@
 		511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverBubbleView.swift; sourceTree = "<group>"; };
 		5362BBB4B470202A06020494 /* RaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceSnapshotCache.swift; sourceTree = "<group>"; };
 		5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailView.swift; sourceTree = "<group>"; };
+		5EE2CC51C4103C26FBF4BDCC /* LocalPickStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickStoreTests.swift; sourceTree = "<group>"; };
 		6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		68411961C10248D3714B7E98 /* UsernamePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernamePickerView.swift; sourceTree = "<group>"; };
 		6AEE3B16ED8A558720015BBC /* RacesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacesListView.swift; sourceTree = "<group>"; };
@@ -168,6 +171,7 @@
 		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickRecord.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
 		EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepository.swift; sourceTree = "<group>"; };
@@ -213,6 +217,7 @@
 			isa = PBXGroup;
 			children = (
 				EA877484EEF85B2D263F7702 /* GuestStore.swift */,
+				E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */,
 				C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */,
 				26E8B8213C775919164F61D6 /* TutorialStore.swift */,
 			);
@@ -251,6 +256,7 @@
 			children = (
 				3CBBF0D319977C0E57F4AECF /* Networking */,
 				9F566683AD959853375A079A /* Races */,
+				F33E3E976D243A79EBC55650 /* Storage */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -439,6 +445,14 @@
 			path = FXRacingUITests;
 			sourceTree = "<group>";
 		};
+		F33E3E976D243A79EBC55650 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				5EE2CC51C4103C26FBF4BDCC /* LocalPickStoreTests.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
 		FAE9B2EC426C7A5975FDCF4C /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
@@ -571,6 +585,7 @@
 				BD33D81A7938D759F624B4EB /* APIClientTests.swift in Sources */,
 				6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */,
 				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
+				A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */,
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
@@ -624,6 +639,7 @@
 				8DDEC8406C5A0D7FACC61884 /* LeaderboardRowView.swift in Sources */,
 				44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */,
 				C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */,
+				B8C1F6B3F3CFD9B81A0E3570 /* LocalPickRecord.swift in Sources */,
 				7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */,
 				BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */,
 				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
