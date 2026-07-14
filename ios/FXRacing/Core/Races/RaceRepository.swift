@@ -17,6 +17,7 @@ protocol RaceRepositoryProtocol: Sendable {
     func refreshList(policy: RaceFetchPolicy) async throws -> RaceListSnapshot
     func cachedDetail(id: String) async -> RaceDetailSnapshot?
     func refreshDetail(id: String, policy: RaceFetchPolicy) async throws -> RaceDetailSnapshot
+    func prefetchDetail(ids: [String]) async
 }
 
 actor RaceRepository: RaceRepositoryProtocol {
@@ -209,6 +210,24 @@ actor RaceRepository: RaceRepositoryProtocol {
         detailTasks[id] = DetailFlight(token: token, epoch: epoch, task: task)
         await onEvent?(.startedDetailFlight(id))
         return try await task.value
+    }
+
+    func prefetchDetail(ids: [String]) async {
+        var seen: Set<String> = []
+        var selected: [String] = []
+        for id in ids {
+            guard seen.insert(id).inserted else { continue }
+            selected.append(id)
+            if selected.count == 2 { break }
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for id in selected {
+                group.addTask {
+                    _ = try? await self.refreshDetail(id: id, policy: .ifStale)
+                }
+            }
+        }
     }
 
     private func fetchAndPublishList() async throws -> RaceListSnapshot {

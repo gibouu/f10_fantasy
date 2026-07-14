@@ -610,6 +610,132 @@ final class RaceRepositoryCoreTests: XCTestCase {
         XCTAssertEqual(callCount, 3)
     }
 
+    func testPrefetchUsesFirstTwoUniqueIDsConcurrentlyAndSwallowsFailures() async {
+        let firstRace = RaceFixtures.race(
+            id: "prefetch-a",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let secondRace = RaceFixtures.race(
+            id: "prefetch-b",
+            round: 2,
+            status: .upcoming,
+            startOffset: 7_200
+        )
+        let cappedRace = RaceFixtures.race(
+            id: "prefetch-c",
+            round: 3,
+            status: .upcoming,
+            startOffset: 10_800
+        )
+        let firstPath = "/api/races/\(firstRace.id)"
+        let secondPath = "/api/races/\(secondRace.id)"
+        let cappedPath = "/api/races/\(cappedRace.id)"
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET \(firstPath)": [.failure(.serverError(503, nil))],
+                "GET \(secondPath)": [.json(makeDetailPayload(race: secondRace))],
+            ],
+            gatedKeys: ["GET \(firstPath)"]
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed
+        )
+
+        let prefetch = Task {
+            await repository.prefetchDetail(
+                ids: [firstRace.id, firstRace.id, secondRace.id, cappedRace.id]
+            )
+        }
+        await api.waitForCalls(to: firstPath, count: 1)
+        await api.waitForCalls(to: secondPath, count: 1)
+        await api.releaseRequests(to: firstPath)
+        await prefetch.value
+
+        let firstCalls = await api.calls(to: firstPath)
+        let secondCalls = await api.calls(to: secondPath)
+        let cappedCalls = await api.calls(to: cappedPath)
+        let requests = await api.recordedRequests()
+
+        XCTAssertEqual(firstCalls, 1)
+        XCTAssertEqual(secondCalls, 1)
+        XCTAssertEqual(cappedCalls, 0)
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertTrue(requests.allSatisfy { $0.token == nil })
+    }
+
+    func testPrefetchReusesFreshCacheAndAlreadyInflightDetail() async throws {
+        let cachedRace = RaceFixtures.race(
+            id: "prefetch-cached",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let inflightRace = RaceFixtures.race(
+            id: "prefetch-inflight",
+            round: 2,
+            status: .upcoming,
+            startOffset: 7_200
+        )
+        let cappedRace = RaceFixtures.race(
+            id: "prefetch-capped",
+            round: 3,
+            status: .upcoming,
+            startOffset: 10_800
+        )
+        let cachedPath = "/api/races/\(cachedRace.id)"
+        let inflightPath = "/api/races/\(inflightRace.id)"
+        let cappedPath = "/api/races/\(cappedRace.id)"
+        let cachedDetail = makeDetail(
+            savedAt: RaceFixtures.now,
+            race: cachedRace,
+            entrants: [DriverFixtures.norris]
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET \(inflightPath)": [
+                    .json(makeDetailPayload(race: inflightRace, entrants: [DriverFixtures.piastri])),
+                ],
+            ],
+            gatedKeys: ["GET \(inflightPath)"]
+        )
+        let events = RepositoryEventProbe()
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(details: [cachedRace.id: cachedDetail]),
+            clock: TestClock.fixed,
+            onEvent: { event in await events.record(event) }
+        )
+
+        let inflight = Task {
+            try await repository.refreshDetail(id: inflightRace.id, policy: .force)
+        }
+        await api.waitForCalls(to: inflightPath, count: 1)
+        let prefetch = Task {
+            await repository.prefetchDetail(
+                ids: [cachedRace.id, inflightRace.id, cappedRace.id]
+            )
+        }
+        await events.waitForDetailJoins(id: inflightRace.id, count: 1)
+        await api.releaseRequests(to: inflightPath)
+
+        _ = try await inflight.value
+        await prefetch.value
+        let cachedCalls = await api.calls(to: cachedPath)
+        let inflightCalls = await api.calls(to: inflightPath)
+        let cappedCalls = await api.calls(to: cappedPath)
+        let requests = await api.recordedRequests()
+
+        XCTAssertEqual(cachedCalls, 0)
+        XCTAssertEqual(inflightCalls, 1)
+        XCTAssertEqual(cappedCalls, 0)
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertTrue(requests.allSatisfy { $0.token == nil })
+    }
+
     private func makeList(
         savedAt: Date,
         season: Season? = RaceFixtures.season2026,
