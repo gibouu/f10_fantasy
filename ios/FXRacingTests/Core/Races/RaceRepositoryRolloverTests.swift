@@ -335,6 +335,24 @@ final class RaceRepositoryRolloverTests: XCTestCase {
         XCTAssertNil(stale)
     }
 
+    func testColdStartRejectsOldSeasonOrphanAbsentFromCurrentList() async throws {
+        let oldRace = makeRace(id: "old-orphan", seasonID: "season-old", round: 1)
+        let newRace = makeRace(id: "new-race", seasonID: "season-new", round: 1)
+        let cache = MemoryRaceSnapshotCache(
+            list: makeList(seasonID: "season-new", races: [newRace]),
+            details: [oldRace.id: makeDetail(race: oldRace, driver: DriverFixtures.norris)]
+        )
+        let repository = RaceRepository(
+            api: APIClientSpy(responses: [:]),
+            cache: cache,
+            clock: TestClock.fixed
+        )
+
+        let stale = await repository.cachedDetail(id: oldRace.id)
+
+        XCTAssertNil(stale)
+    }
+
     private func makeRace(
         id: String,
         seasonID: String,

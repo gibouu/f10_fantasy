@@ -331,10 +331,16 @@ actor RaceRepository: RaceRepositoryProtocol {
         guard race.id == requestedID else {
             return false
         }
-        guard let currentRace = list?.races.first(where: { $0.id == requestedID }) else {
+        guard let currentList = list else {
             return true
         }
-        return currentRace.seasonId == race.seasonId
+        if let currentRace = currentList.races.first(where: { $0.id == requestedID }) {
+            return currentRace.seasonId == race.seasonId
+        }
+        guard let currentSeasonID = currentList.season?.id else {
+            return true
+        }
+        return currentSeasonID == race.seasonId
     }
 
     private func isFresh(_ snapshot: RaceListSnapshot, for policy: RaceFetchPolicy) -> Bool {
