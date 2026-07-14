@@ -7,12 +7,14 @@ final class AuthManager {
     enum State: Equatable {
         case unknown          // App just launched; session check in progress
         case unauthenticated  // No token — guest mode
+        case accountUnavailable
         case authenticated(User)
 
         static func == (lhs: State, rhs: State) -> Bool {
             switch (lhs, rhs) {
             case (.unknown, .unknown),
-                 (.unauthenticated, .unauthenticated):
+                 (.unauthenticated, .unauthenticated),
+                 (.accountUnavailable, .accountUnavailable):
                 return true
             case (.authenticated(let a), .authenticated(let b)):
                 return a.id == b.id
@@ -24,8 +26,20 @@ final class AuthManager {
 
     private(set) var state: State = .unknown
 
-    private let api = APIClient()
-    private let syncManager = SyncManager()
+    private let api: any APIRequesting
+    private let tokenStore: any TokenStoring
+    private let syncManager: SyncManager
+    private var sessionGeneration = UUID()
+
+    init(
+        api: any APIRequesting = APIClient(),
+        tokenStore: any TokenStoring = KeychainTokenStore(),
+        syncManager: SyncManager = SyncManager()
+    ) {
+        self.api = api
+        self.tokenStore = tokenStore
+        self.syncManager = syncManager
+    }
 
     // Injected at launch — set before restoreSession() is called.
     var localPickStore: LocalPickStore?
@@ -33,34 +47,70 @@ final class AuthManager {
 
     // MARK: - Session lifecycle
 
-    func restoreSession() async {
-        guard let token = KeychainService.loadToken() else {
+    func restoreSession(races: [Race] = []) async {
+        let generation = advanceSessionGeneration()
+        guard let token = tokenStore.loadToken() else {
             fxLog(.auth, "restoreSession: no keychain token → guest")
             state = .unauthenticated
             return
         }
         do {
             let user: User = try await api.request(.me, token: token)
+            guard isCurrent(generation) else { return }
             fxLog(.auth, "restoreSession: authenticated user=\(user.id) usernameSet=\(user.usernameSet)")
             state = .authenticated(user)
+            await resumeEligiblePicks(
+                userID: user.id,
+                token: token,
+                races: races
+            )
         } catch APIError.unauthorized {
+            guard isCurrent(generation) else { return }
             fxWarn(.auth, "restoreSession: token rejected (401) → clearing keychain")
-            KeychainService.deleteToken()
+            tokenStore.deleteToken()
             state = .unauthenticated
         } catch {
-            fxWarn(.auth, "restoreSession: \(error.localizedDescription) → falling back to guest")
-            state = .unauthenticated
+            guard isCurrent(generation) else { return }
+            fxWarn(.auth, "restoreSession: \(error.localizedDescription) → account temporarily unavailable")
+            state = .accountUnavailable
+        }
+    }
+
+    func retrySession(races: [Race] = []) async {
+        await restoreSession(races: races)
+    }
+
+    func handleForeground(races: [Race] = []) async {
+        switch state {
+        case .unknown, .accountUnavailable:
+            await restoreSession(races: races)
+        case .unauthenticated:
+            return
+        case .authenticated(let user):
+            guard let token = tokenStore.loadToken() else {
+                _ = advanceSessionGeneration()
+                state = .unauthenticated
+                return
+            }
+            await resumeEligiblePicks(
+                userID: user.id,
+                token: token,
+                races: races
+            )
         }
     }
 
     // MARK: - Sign in
 
     func signInWithApple(idToken: String) async throws {
+        let generation = advanceSessionGeneration()
         fxLog(.auth, "signInWithApple: exchanging Apple id_token")
         let exchange: ExchangeResponse = try await api.request(
-            .mobileExchange(provider: "apple", idToken: idToken)
+            .mobileExchange(provider: "apple", idToken: idToken),
+            token: nil
         )
-        try KeychainService.saveToken(exchange.accessToken)
+        try requireCurrent(generation)
+        try tokenStore.saveToken(exchange.accessToken)
         fxLog(.auth, "signInWithApple: token issued, userId=\(exchange.userId) usernameSet=\(exchange.usernameSet)")
 
         // Sign-in succeeds the moment the exchange returns — the token is
@@ -72,8 +122,14 @@ final class AuthManager {
         // sign-in sheet error out post-authorization.
         let user: User
         do {
-            user = try await api.request(.me, token: exchange.accessToken)
+            let fetchedUser: User = try await api.request(
+                .me,
+                token: exchange.accessToken
+            )
+            try requireCurrent(generation)
+            user = fetchedUser
         } catch {
+            try requireCurrent(generation)
             fxWarn(.auth, "signInWithApple: /me failed (\(error.localizedDescription)) — proceeding with exchange response")
             user = User(
                 id: exchange.userId,
@@ -88,13 +144,20 @@ final class AuthManager {
                 createdAt: Date()
             )
         }
+        try requireCurrent(generation)
         state = .authenticated(user)
         fxLog(.auth, "signInWithApple: state=authenticated user=\(user.id)")
 
         // Migrate any guest picks in the background — don't block sign-in completion
         // so the caller can dismiss sheets / transition views before migration finishes.
         if let store = localPickStore {
-            Task { await syncManager.migrateGuestPicks(token: exchange.accessToken, localPickStore: store) }
+            Task {
+                await syncManager.resumeEligiblePicks(
+                    currentUserID: user.id,
+                    token: exchange.accessToken,
+                    localPickStore: store
+                )
+            }
         }
 
         // Offer the guest draft username as a prefill (caller reads guestStore if needed)
@@ -105,8 +168,12 @@ final class AuthManager {
     // MARK: - Onboarding
 
     func setUsername(_ username: String) async throws {
-        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let response: UsernameSetResponse = try await api.request(.setUsername(username), token: token)
+        let context = try authenticatedContext()
+        let response: UsernameSetResponse = try await api.request(
+            .setUsername(username),
+            token: context.token
+        )
+        try requireCurrent(context)
         // Optimistic local update — server has accepted the username, so flip
         // RootView immediately without waiting for a second GET /me roundtrip.
         // The previous double-roundtrip kept the spinner visible long enough
@@ -118,32 +185,46 @@ final class AuthManager {
     }
 
     func changeUsername(_ username: String) async throws {
-        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let response: UsernameSetResponse = try await api.request(.changeUsername(username), token: token)
+        let context = try authenticatedContext()
+        let response: UsernameSetResponse = try await api.request(
+            .changeUsername(username),
+            token: context.token
+        )
+        try requireCurrent(context)
         if case .authenticated(let user) = state {
             state = .authenticated(user.withUsernameChanged(response.username))
         }
     }
 
     func setFavoriteTeam(_ slug: String?) async throws {
-        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let _: TeamResponse = try await api.request(.setFavoriteTeam(slug), token: token)
-        let user: User = try await api.request(.me, token: token)
+        let context = try authenticatedContext()
+        let _: TeamResponse = try await api.request(
+            .setFavoriteTeam(slug),
+            token: context.token
+        )
+        try requireCurrent(context)
+        let user: User = try await api.request(.me, token: context.token)
+        try requireCurrent(context)
         state = .authenticated(user)
     }
 
     // MARK: - Sign out
 
     func signOut() {
-        KeychainService.deleteToken()
+        _ = advanceSessionGeneration()
+        tokenStore.deleteToken()
         state = .unauthenticated
     }
 
     // MARK: - Account deletion
 
     func deleteAccount() async throws {
-        guard let token = KeychainService.loadToken() else { throw APIError.unauthorized }
-        let _: DeleteAccountResponse = try await api.request(.deleteAccount, token: token)
+        let context = try authenticatedContext()
+        let _: DeleteAccountResponse = try await api.request(
+            .deleteAccount,
+            token: context.token
+        )
+        try requireCurrent(context)
         signOut()
     }
 
@@ -152,7 +233,7 @@ final class AuthManager {
 
     var accessToken: String? {
         guard isAuthenticated else { return nil }
-        return KeychainService.loadToken()
+        return tokenStore.loadToken()
     }
 
     var isAuthenticated: Bool {
@@ -163,6 +244,58 @@ final class AuthManager {
     var authenticatedUser: User? {
         if case .authenticated(let user) = state { return user }
         return nil
+    }
+
+    private struct AuthenticatedContext {
+        let userID: String
+        let token: String
+        let generation: UUID
+    }
+
+    private func authenticatedContext() throws -> AuthenticatedContext {
+        guard case .authenticated(let user) = state,
+              let token = tokenStore.loadToken()
+        else { throw APIError.unauthorized }
+        return AuthenticatedContext(
+            userID: user.id,
+            token: token,
+            generation: sessionGeneration
+        )
+    }
+
+    private func advanceSessionGeneration() -> UUID {
+        let generation = UUID()
+        sessionGeneration = generation
+        return generation
+    }
+
+    private func isCurrent(_ generation: UUID) -> Bool {
+        sessionGeneration == generation
+    }
+
+    private func requireCurrent(_ generation: UUID) throws {
+        guard isCurrent(generation) else { throw CancellationError() }
+    }
+
+    private func requireCurrent(_ context: AuthenticatedContext) throws {
+        guard isCurrent(context.generation),
+              case .authenticated(let user) = state,
+              user.id == context.userID
+        else { throw CancellationError() }
+    }
+
+    private func resumeEligiblePicks(
+        userID: String,
+        token: String,
+        races: [Race]
+    ) async {
+        guard let localPickStore else { return }
+        await syncManager.resumeEligiblePicks(
+            currentUserID: userID,
+            token: token,
+            localPickStore: localPickStore,
+            races: races
+        )
     }
 }
 

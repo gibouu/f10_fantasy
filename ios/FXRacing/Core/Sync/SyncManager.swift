@@ -1,123 +1,402 @@
 import Foundation
 
-/// Uploads unsynced local guest picks to the server after sign-in.
-/// Server picks always win on conflict — a 200 on GET means skip.
+enum PickSyncResult: Sendable {
+    case saved(Pick)
+    case queued
+    case conflict(Pick?)
+    case expired(Pick?)
+    case unauthorized
+}
+
+/// Serializes each owner/race outbox record through one revision-checked worker.
 @MainActor
 final class SyncManager {
+    private struct Worker {
+        let token: UUID
+        let task: Task<PickSyncResult, Never>
+    }
 
-    private let api = APIClient()
+    private let api: any APIRequesting
+    private let clock: any ClockProviding
+    private var workers: [LocalPickRecordID: Worker] = [:]
+    private var latestExplicitRevision: [LocalPickRecordID: UInt64] = [:]
 
-    /// Call once immediately after sign-in completes.
-    /// - Parameters:
-    ///   - token: The authenticated Bearer token.
-    ///   - localPickStore: The local pick store to read from and mark synced.
-    ///   - races: Currently loaded race list (used for lock checks). May be empty;
-    ///            picks for unknown races are attempted anyway — server enforces lock.
-    func migrateGuestPicks(
+    init(
+        api: any APIRequesting = APIClient(),
+        clock: any ClockProviding = SystemClock()
+    ) {
+        self.api = api
+        self.clock = clock
+    }
+
+    func submitExplicit(
+        id: LocalPickRecordID,
+        revision: UInt64,
+        currentUserID: String,
+        token: String,
+        localPickStore: LocalPickStore
+    ) async -> PickSyncResult {
+        guard case .user(let ownerID) = id.owner,
+              ownerID == currentUserID,
+              let record = localPickStore.record(id: id),
+              record.revision == revision,
+              isProcessable(record.syncState, revision: revision)
+        else { return .queued }
+
+        latestExplicitRevision[id] = max(
+            latestExplicitRevision[id] ?? 0,
+            revision
+        )
+        return await runOrJoin(
+            id: id,
+            currentUserID: currentUserID,
+            token: token,
+            localPickStore: localPickStore,
+            races: []
+        )
+    }
+
+    func resumeEligiblePicks(
+        currentUserID: String,
         token: String,
         localPickStore: LocalPickStore,
         races: [Race] = []
     ) async {
-        let unsynced = localPickStore.unsyncedPicks()
-        guard !unsynced.isEmpty else {
-            fxLog(.sync, "migrateGuestPicks: nothing to migrate")
-            return
-        }
-        fxLog(.sync, "migrateGuestPicks: \(unsynced.count) unsynced picks")
-
-        let raceMap = Dictionary(uniqueKeysWithValues: races.map { ($0.id, $0) })
-
-        for localPick in unsynced {
-            // Client-side lock check — skip if we know the race is locked
-            if let race = raceMap[localPick.raceId], race.isLocked {
-                fxLog(.sync, "skip raceId=\(localPick.raceId) (locked)")
-                localPickStore.markMigrationExpired(
-                    raceId: localPick.raceId,
-                    revision: localPick.revision
-                )
-                continue
-            }
-
-            // Check if server already has a pick (server wins on conflict).
-            // Unknown preflight failures must not be treated as missing; leave
-            // the local pick unsynced so a later migration can retry safely.
-            switch await checkServerPick(raceId: localPick.raceId, token: token) {
-            case .exists:
-                fxLog(.sync, "skip raceId=\(localPick.raceId) (server already has pick)")
-                localPickStore.markSynced(
-                    raceId: localPick.raceId,
-                    revision: localPick.revision
-                )
-                continue
-            case .failed:
-                fxWarn(.sync, "server pick check failed raceId=\(localPick.raceId) — will retry on next sign-in")
-                continue
-            case .missing:
-                break
-            }
-
-            // Upload
-            switch await uploadPick(localPick, token: token) {
-            case .uploaded:
-                fxLog(.sync, "uploaded raceId=\(localPick.raceId)")
-                localPickStore.markSynced(
-                    raceId: localPick.raceId,
-                    revision: localPick.revision
-                )
-            case .locked:
-                fxWarn(.sync, "upload locked raceId=\(localPick.raceId) — marking migration expired")
-                localPickStore.markMigrationExpired(
-                    raceId: localPick.raceId,
-                    revision: localPick.revision
-                )
-            case .failed:
-                fxWarn(.sync, "upload failed raceId=\(localPick.raceId) — will retry on next sign-in")
-            }
-            // On network error → leave unsynced; will retry on next sign-in
-        }
-    }
-
-    // MARK: - Private
-
-    private enum ServerPickStatus {
-        case exists
-        case missing
-        case failed
-    }
-
-    private enum UploadPickResult {
-        case uploaded
-        case locked
-        case failed
-    }
-
-    private func checkServerPick(raceId: String, token: String) async -> ServerPickStatus {
-        do {
-            let _: PickResponse = try await api.request(.pickForRace(raceId: raceId), token: token)
-            return .exists
-        } catch APIError.notFound {
-            return .missing
-        } catch {
-            return .failed
-        }
-    }
-
-    private func uploadPick(_ pick: LocalPick, token: String) async -> UploadPickResult {
-        do {
-            let _: PickResponse = try await api.request(
-                .submitPick(
-                    raceId: pick.raceId,
-                    tenthPlaceDriverId: pick.p10Id,
-                    winnerDriverId: pick.winnerId,
-                    dnfDriverId: pick.dnfId
-                ),
-                token: token
+        for record in localPickStore.queuedRecords(currentUserID: currentUserID) {
+            let result = await runOrJoin(
+                id: record.id,
+                currentUserID: currentUserID,
+                token: token,
+                localPickStore: localPickStore,
+                races: races
             )
-            return .uploaded
-        } catch APIError.serverError(let code, _) where code == 423 {
-            return .locked
-        } catch {
-            return .failed
+            if case .unauthorized = result {
+                return
+            }
         }
+    }
+
+    private func runOrJoin(
+        id: LocalPickRecordID,
+        currentUserID: String,
+        token: String,
+        localPickStore: LocalPickStore,
+        races: [Race]
+    ) async -> PickSyncResult {
+        if let worker = workers[id] {
+            return await worker.task.value
+        }
+
+        let workerToken = UUID()
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return PickSyncResult.queued }
+            let result = await self.runWorker(
+                id: id,
+                currentUserID: currentUserID,
+                token: token,
+                localPickStore: localPickStore,
+                races: races
+            )
+            self.finishWorker(id: id, token: workerToken)
+            return result
+        }
+        workers[id] = Worker(token: workerToken, task: task)
+        return await task.value
+    }
+
+    private func finishWorker(id: LocalPickRecordID, token: UUID) {
+        guard workers[id]?.token == token else { return }
+        workers[id] = nil
+        latestExplicitRevision[id] = nil
+    }
+
+    private func runWorker(
+        id: LocalPickRecordID,
+        currentUserID: String,
+        token: String,
+        localPickStore: LocalPickStore,
+        races: [Race]
+    ) async -> PickSyncResult {
+        while true {
+            guard let record = localPickStore.record(id: id),
+                  isEligible(record.id.owner, currentUserID: currentUserID),
+                  isProcessable(record.syncState, revision: record.revision)
+            else { return .queued }
+
+            let revision = record.revision
+            let isExplicit = latestExplicitRevision[id] == revision
+            let mode: PickSyncMode = isExplicit
+                ? .direct
+                : record.id.owner == .guest
+                    ? .guestMigration
+                    : .authenticatedRetry
+
+            if record.syncState == .queued {
+                guard localPickStore.transition(
+                    id: id,
+                    revision: revision,
+                    to: .syncing(revision: revision, mode: mode)
+                ) else { return .queued }
+            }
+
+            if !isExplicit {
+                if let race = races.first(where: { $0.id == id.raceID }),
+                   clock.now() >= race.lockCutoffUtc {
+                    return terminalResult(
+                        .expired,
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore,
+                        success: .expired(nil)
+                    )
+                }
+
+                do {
+                    let response: PickResponse = try await api.request(
+                        .pickForRace(raceId: id.raceID),
+                        token: token
+                    )
+                    if shouldFollowNewerExplicitRevision(
+                        id: id,
+                        capturedRevision: revision,
+                        localPickStore: localPickStore
+                    ) {
+                        continue
+                    }
+                    guard currentRevision(
+                        id: id,
+                        equals: revision,
+                        localPickStore: localPickStore
+                    ) else { return .queued }
+
+                    if matches(response.pick, record: record) {
+                        return terminalResult(
+                            .confirmed,
+                            id: id,
+                            revision: revision,
+                            localPickStore: localPickStore,
+                            success: .saved(response.pick)
+                        )
+                    }
+
+                    if latestExplicitRevision[id] != revision {
+                        let reason: PickConflictReason = record.id.owner == .guest
+                            ? .serverWins
+                            : .accountPickFound
+                        return terminalResult(
+                            .conflict(reason),
+                            id: id,
+                            revision: revision,
+                            localPickStore: localPickStore,
+                            success: .conflict(response.pick)
+                        )
+                    }
+                } catch APIError.notFound {
+                    // A missing server pick is the only automatic path to POST.
+                } catch APIError.unauthorized {
+                    queueCapturedRevision(
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore
+                    )
+                    return .unauthorized
+                } catch APIError.serverError(let code, _) where code == 423 {
+                    if shouldFollowNewerExplicitRevision(
+                        id: id,
+                        capturedRevision: revision,
+                        localPickStore: localPickStore
+                    ) {
+                        continue
+                    }
+                    guard latestExplicitRevision[id] == revision else {
+                        queueCapturedRevision(
+                            id: id,
+                            revision: revision,
+                            localPickStore: localPickStore
+                        )
+                        return .queued
+                    }
+                } catch {
+                    if shouldFollowNewerExplicitRevision(
+                        id: id,
+                        capturedRevision: revision,
+                        localPickStore: localPickStore
+                    ) {
+                        continue
+                    }
+                    guard latestExplicitRevision[id] == revision else {
+                        queueCapturedRevision(
+                            id: id,
+                            revision: revision,
+                            localPickStore: localPickStore
+                        )
+                        return .queued
+                    }
+                }
+            }
+
+            if shouldFollowNewerExplicitRevision(
+                id: id,
+                capturedRevision: revision,
+                localPickStore: localPickStore
+            ) {
+                continue
+            }
+            guard currentRevision(
+                id: id,
+                equals: revision,
+                localPickStore: localPickStore
+            ) else { return .queued }
+
+            do {
+                let response: PickResponse = try await api.request(
+                    .submitPick(
+                        raceId: id.raceID,
+                        tenthPlaceDriverId: record.selection.tenthPlaceDriverID,
+                        winnerDriverId: record.selection.winnerDriverID,
+                        dnfDriverId: record.selection.dnfDriverID
+                    ),
+                    token: token
+                )
+                if shouldFollowNewerExplicitRevision(
+                    id: id,
+                    capturedRevision: revision,
+                    localPickStore: localPickStore
+                ) {
+                    continue
+                }
+                return terminalResult(
+                    .confirmed,
+                    id: id,
+                    revision: revision,
+                    localPickStore: localPickStore,
+                    success: .saved(response.pick)
+                )
+            } catch APIError.unauthorized {
+                queueCapturedRevision(
+                    id: id,
+                    revision: revision,
+                    localPickStore: localPickStore
+                )
+                return .unauthorized
+            } catch APIError.serverError(let code, _) where code == 423 {
+                if shouldFollowNewerExplicitRevision(
+                    id: id,
+                    capturedRevision: revision,
+                    localPickStore: localPickStore
+                ) {
+                    continue
+                }
+                return terminalResult(
+                    .expired,
+                    id: id,
+                    revision: revision,
+                    localPickStore: localPickStore,
+                    success: .expired(nil)
+                )
+            } catch {
+                if shouldFollowNewerExplicitRevision(
+                    id: id,
+                    capturedRevision: revision,
+                    localPickStore: localPickStore
+                ) {
+                    continue
+                }
+                queueCapturedRevision(
+                    id: id,
+                    revision: revision,
+                    localPickStore: localPickStore
+                )
+                return .queued
+            }
+        }
+    }
+
+    private func terminalResult(
+        _ state: LocalPickSyncState,
+        id: LocalPickRecordID,
+        revision: UInt64,
+        localPickStore: LocalPickStore,
+        success: PickSyncResult
+    ) -> PickSyncResult {
+        guard localPickStore.transition(
+            id: id,
+            revision: revision,
+            to: state
+        ) else {
+            queueCapturedRevision(
+                id: id,
+                revision: revision,
+                localPickStore: localPickStore
+            )
+            return .queued
+        }
+        return success
+    }
+
+    private func queueCapturedRevision(
+        id: LocalPickRecordID,
+        revision: UInt64,
+        localPickStore: LocalPickStore
+    ) {
+        guard let record = localPickStore.record(id: id),
+              record.revision == revision,
+              case .syncing = record.syncState
+        else { return }
+        _ = localPickStore.transition(id: id, revision: revision, to: .queued)
+    }
+
+    private func currentRevision(
+        id: LocalPickRecordID,
+        equals revision: UInt64,
+        localPickStore: LocalPickStore
+    ) -> Bool {
+        localPickStore.record(id: id)?.revision == revision
+    }
+
+    private func shouldFollowNewerExplicitRevision(
+        id: LocalPickRecordID,
+        capturedRevision: UInt64,
+        localPickStore: LocalPickStore
+    ) -> Bool {
+        guard let current = localPickStore.record(id: id),
+              current.revision != capturedRevision,
+              latestExplicitRevision[id] == current.revision
+        else { return false }
+        return isProcessable(current.syncState, revision: current.revision)
+    }
+
+    private func isEligible(
+        _ owner: PickOwnerScope,
+        currentUserID: String
+    ) -> Bool {
+        switch owner {
+        case .guest:
+            return true
+        case .user(let userID):
+            return userID == currentUserID
+        case .legacyAmbiguous:
+            return false
+        }
+    }
+
+    private func isProcessable(
+        _ state: LocalPickSyncState,
+        revision: UInt64
+    ) -> Bool {
+        switch state {
+        case .queued:
+            return true
+        case .syncing(let stateRevision, _):
+            return stateRevision == revision
+        case .confirmed, .conflict, .expired:
+            return false
+        }
+    }
+
+    private func matches(_ pick: Pick, record: LocalPickRecord) -> Bool {
+        pick.winnerDriverId == record.selection.winnerDriverID
+            && pick.tenthPlaceDriverId == record.selection.tenthPlaceDriverID
+            && pick.dnfDriverId == record.selection.dnfDriverID
     }
 }

@@ -93,38 +93,47 @@ test("legacy v1 picks become terminal legacy records before old keys are deleted
   )
 })
 
-test("SyncManager records locked migration results instead of marking them synced", () => {
-  const lockedSkipBlock = syncManager.match(
-    /if let race = raceMap\[localPick\.raceId\], race\.isLocked \{[\s\S]*?continue\s*\}/,
-  )?.[0]
-  assert.ok(lockedSkipBlock, "client-side locked race branch should exist")
+test("SyncManager serializes owner-scoped revisions through one worker", () => {
   assert.match(
-    lockedSkipBlock,
-    /markMigrationExpired\([\s\S]*?raceId: localPick\.raceId,[\s\S]*?revision: localPick\.revision/,
+    syncManager,
+    /func submitExplicit\([\s\S]*?currentUserID: String[\s\S]*?case \.user\(let ownerID\) = id\.owner,[\s\S]*?ownerID == currentUserID/,
   )
-  assert.doesNotMatch(
-    lockedSkipBlock,
-    /markSynced\(/,
-    "client-known locked races should not be marked synced",
-  )
-
-  assert.match(syncManager, /private enum UploadPickResult[\s\S]*case locked/)
-
-  const serverLockedBlock = syncManager.match(/catch APIError\.serverError\(let code,[\s\S]*?code == 423 \{[\s\S]*?\n        \}/)?.[0]
-  assert.ok(serverLockedBlock, "uploadPick should handle HTTP 423 explicitly")
-  assert.match(serverLockedBlock, /return \.locked/)
-  assert.doesNotMatch(serverLockedBlock, /return true/, "HTTP 423 should not be treated as upload success")
-
-  const lockedUploadCase = syncManager.match(/case \.locked:[\s\S]*?(?=\n            case \.failed:)/)?.[0]
-  assert.ok(lockedUploadCase, "migration should handle locked upload results")
   assert.match(
-    lockedUploadCase,
-    /markMigrationExpired\([\s\S]*?raceId: localPick\.raceId,[\s\S]*?revision: localPick\.revision/,
+    syncManager,
+    /private var workers: \[LocalPickRecordID: Worker\]/,
+    "workers must be keyed by composite owner/race ID",
   )
-  assert.doesNotMatch(
-    lockedUploadCase,
-    /markSynced\(/,
-    "server-locked uploads should not be marked synced",
+  assert.match(
+    syncManager,
+    /latestExplicitRevision: \[LocalPickRecordID: UInt64\]/,
+  )
+  assert.match(
+    syncManager,
+    /if !isExplicit \{[\s\S]*?\.pickForRace\(raceId: id\.raceID\)/,
+    "only automatic work should preflight the server pick",
+  )
+  assert.match(syncManager, /\.submitPick\([\s\S]*?raceId: id\.raceID/)
+  assert.match(syncManager, /\? \.serverWins[\s\S]*: \.accountPickFound/)
+})
+
+test("SyncManager keeps locked and unauthorized outcomes revision safe", () => {
+  assert.match(
+    syncManager,
+    /clock\.now\(\) >= race\.lockCutoffUtc[\s\S]*?terminalResult\([\s\S]*?\.expired/,
+    "a known locked race should expire without a request",
+  )
+  assert.match(
+    syncManager,
+    /catch APIError\.serverError\(let code, _\) where code == 423[\s\S]*?terminalResult\([\s\S]*?\.expired/,
+    "POST 423 must expire the captured revision",
+  )
+  assert.match(
+    syncManager,
+    /catch APIError\.unauthorized[\s\S]*?queueCapturedRevision\([\s\S]*?return \.unauthorized/,
+  )
+  assert.match(
+    syncManager,
+    /localPickStore\.transition\([\s\S]*?revision: revision/,
   )
 })
 

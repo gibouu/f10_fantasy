@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		004F22631D613FD77C80FFAD /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */; };
+		02CE196FD6B18BC37F014CDC /* SyncManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B6C34ABB2FD33F772A744F /* SyncManagerTests.swift */; };
 		03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */; };
 		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
 		09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */; };
@@ -20,6 +21,7 @@
 		277EBDD4E9B0D0BA9121656F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 347020C4691D77E3D65C73AD /* SettingsView.swift */; };
 		2AB55EB21797F2EDBBF7CA3C /* RacesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEE3B16ED8A558720015BBC /* RacesListView.swift */; };
 		2DEF125081A1D2B64CFBF985 /* PerformanceScenario.swift in Sources */ = {isa = PBXBuildFile; fileRef = F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */; };
+		389AF06E388BE942DCCAB690 /* TokenStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F9481C7CC2978C8951133C /* TokenStoring.swift */; };
 		394C92F0F9D71CB1FF425EB9 /* TestClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F08159ED08D5C973E155610 /* TestClock.swift */; };
 		3CE9ADD38616EF20C2A0F7DA /* RaceSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5362BBB4B470202A06020494 /* RaceSnapshotCache.swift */; };
 		403CB3A277C61BE2E5390605 /* ClockProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FB64FA47AB498AC8707E4A /* ClockProviding.swift */; };
@@ -73,8 +75,10 @@
 		CED85355FAC48D6EF2BC8FC8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */; };
 		D149F9EAC8C9512A27A49590 /* RaceSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3303D344376925DE6E68388B /* RaceSnapshots.swift */; };
 		D5225AA736C9F73800DDBCD0 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40A855BDB590560551CE328 /* User.swift */; };
+		D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B893A7A9D248C607360F4 /* AuthManagerTests.swift */; };
 		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
 		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
+		E06EDD1519160858A1262EBB /* TokenStoreSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35891E3E81C2D88EF83431 /* TokenStoreSpy.swift */; };
 		E60D296D9ACA985C52D4FB27 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */; };
 		ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */; };
 		F5C776BC4419042C212A52DD /* RaceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4D19AB31D10F573559CA2A /* RaceDetailView.swift */; };
@@ -101,7 +105,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		081B893A7A9D248C607360F4 /* AuthManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManagerTests.swift; sourceTree = "<group>"; };
 		092C369B26A52C1665C301C2 /* FXRacingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C35891E3E81C2D88EF83431 /* TokenStoreSpy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStoreSpy.swift; sourceTree = "<group>"; };
 		0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAPIClientSpy.swift; sourceTree = "<group>"; };
 		0D3E751E777A6941A1B94279 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		0E706759022F3FFAC680CFAB /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
@@ -151,8 +157,10 @@
 		9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C808C928ABC015907CF35F4 /* APIClientSpy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientSpy.swift; sourceTree = "<group>"; };
 		9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileViewModel.swift; sourceTree = "<group>"; };
+		A7F9481C7CC2978C8951133C /* TokenStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStoring.swift; sourceTree = "<group>"; };
 		A7FB64FA47AB498AC8707E4A /* ClockProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockProviding.swift; sourceTree = "<group>"; };
 		AF272627CBEFA6E4197F290B /* RaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceFixtures.swift; sourceTree = "<group>"; };
+		B1B6C34ABB2FD33F772A744F /* SyncManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncManagerTests.swift; sourceTree = "<group>"; };
 		B3038F28BDB417F657AC9E3F /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepositoryCoreTests.swift; sourceTree = "<group>"; };
 		B3F3F8E414C88D0CD0398908 /* FXRacing.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FXRacing.entitlements; sourceTree = "<group>"; };
@@ -204,6 +212,14 @@
 			path = Sync;
 			sourceTree = "<group>";
 		};
+		16DB40B161FACCE340FCDA16 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				081B893A7A9D248C607360F4 /* AuthManagerTests.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
 		22C57AAB1B0AFD0442B9EC1F /* FXRacingTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -222,6 +238,14 @@
 				26E8B8213C775919164F61D6 /* TutorialStore.swift */,
 			);
 			path = Storage;
+			sourceTree = "<group>";
+		};
+		37164241A41A8810BD5D371C /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				B1B6C34ABB2FD33F772A744F /* SyncManagerTests.swift */,
+			);
+			path = Sync;
 			sourceTree = "<group>";
 		};
 		3CBBF0D319977C0E57F4AECF /* Networking */ = {
@@ -254,9 +278,11 @@
 		594F2001A129AC3D5853C532 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				16DB40B161FACCE340FCDA16 /* Auth */,
 				3CBBF0D319977C0E57F4AECF /* Networking */,
 				9F566683AD959853375A079A /* Races */,
 				F33E3E976D243A79EBC55650 /* Storage */,
+				37164241A41A8810BD5D371C /* Sync */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -270,6 +296,7 @@
 				F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */,
 				AF272627CBEFA6E4197F290B /* RaceFixtures.swift */,
 				1F08159ED08D5C973E155610 /* TestClock.swift */,
+				0C35891E3E81C2D88EF83431 /* TokenStoreSpy.swift */,
 			);
 			path = Fixtures;
 			sourceTree = "<group>";
@@ -324,6 +351,7 @@
 			children = (
 				6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */,
 				3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */,
+				A7F9481C7CC2978C8951133C /* TokenStoring.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -583,6 +611,7 @@
 			files = (
 				787D8958572B1E7531E02439 /* APIClientSpy.swift in Sources */,
 				BD33D81A7938D759F624B4EB /* APIClientTests.swift in Sources */,
+				D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */,
 				6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */,
 				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
 				A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */,
@@ -591,7 +620,9 @@
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
 				ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */,
 				FF575F5EEC120390DD7D30AA /* RaceSnapshotCacheTests.swift in Sources */,
+				02CE196FD6B18BC37F014CDC /* SyncManagerTests.swift in Sources */,
 				394C92F0F9D71CB1FF425EB9 /* TestClock.swift in Sources */,
+				E06EDD1519160858A1262EBB /* TokenStoreSpy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -662,6 +693,7 @@
 				FF43C9A1A5AE13D40A09CE15 /* SkeletonView.swift in Sources */,
 				730F85A4392CF36F04644DAD /* StatusBadge.swift in Sources */,
 				9F4CB010F34803172181F256 /* SyncManager.swift in Sources */,
+				389AF06E388BE942DCCAB690 /* TokenStoring.swift in Sources */,
 				7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */,
 				97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */,
 				D5225AA736C9F73800DDBCD0 /* User.swift in Sources */,

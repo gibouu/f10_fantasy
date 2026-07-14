@@ -18,6 +18,8 @@ actor GatedAPIClientSpy: APIRequesting {
         let method: String
         let path: String
         let token: String?
+        let query: [String: String]
+        let bodyData: Data?
     }
 
     private struct CallWaiter {
@@ -49,8 +51,19 @@ actor GatedAPIClientSpy: APIRequesting {
         let key = "\(endpoint.method) \(endpoint.path)"
         nextRequestID += 1
         let requestID = nextRequestID
+        let query = endpoint.queryItems.reduce(into: [String: String]()) { values, item in
+            guard let value = item.value else { return }
+            values[item.name] = value
+        }
         requests.append(
-            Request(id: requestID, method: endpoint.method, path: endpoint.path, token: token)
+            Request(
+                id: requestID,
+                method: endpoint.method,
+                path: endpoint.path,
+                token: token,
+                query: query,
+                bodyData: endpoint.bodyData
+            )
         )
         requestKeys[requestID] = key
 
@@ -77,8 +90,12 @@ actor GatedAPIClientSpy: APIRequesting {
         }
     }
 
-    func waitForCalls(to path: String, count: Int) async {
-        let key = "GET \(path)"
+    func waitForCalls(
+        method: String = "GET",
+        to path: String,
+        count: Int
+    ) async {
+        let key = "\(method) \(path)"
         guard calls(for: key) < count else { return }
         await withCheckedContinuation { continuation in
             callWaiters[key, default: []].append(
@@ -87,9 +104,13 @@ actor GatedAPIClientSpy: APIRequesting {
         }
     }
 
-    func waitForRequest(to path: String, ordinal: Int) async -> Int {
-        await waitForCalls(to: path, count: ordinal)
-        return requests.filter { $0.method == "GET" && $0.path == path }[ordinal - 1].id
+    func waitForRequest(
+        method: String = "GET",
+        to path: String,
+        ordinal: Int
+    ) async -> Int {
+        await waitForCalls(method: method, to: path, count: ordinal)
+        return requests.filter { $0.method == method && $0.path == path }[ordinal - 1].id
     }
 
     func releaseRequest(id: Int) {
@@ -100,8 +121,8 @@ actor GatedAPIClientSpy: APIRequesting {
         continuation.resume()
     }
 
-    func releaseRequests(to path: String) {
-        let key = "GET \(path)"
+    func releaseRequests(method: String = "GET", to path: String) {
+        let key = "\(method) \(path)"
         gatedKeys.remove(key)
         let ids = gatedRequestIDs.removeValue(forKey: key) ?? []
         for id in ids {
@@ -109,8 +130,8 @@ actor GatedAPIClientSpy: APIRequesting {
         }
     }
 
-    func calls(to path: String) -> Int {
-        requests.filter { $0.method == "GET" && $0.path == path }.count
+    func calls(method: String = "GET", to path: String) -> Int {
+        requests.filter { $0.method == method && $0.path == path }.count
     }
 
     func recordedRequests() -> [Request] {

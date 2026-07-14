@@ -31,10 +31,10 @@ test("restoreSession clears stored tokens when unauthorized", () => {
   const unauthorizedCatch = authManager.match(/catch APIError\.unauthorized \{[\s\S]*?\n        \}/)?.[0]
 
   assert.ok(unauthorizedCatch, "restoreSession should catch APIError.unauthorized")
-  assert.match(unauthorizedCatch, /KeychainService\.deleteToken\(\)/)
+  assert.match(unauthorizedCatch, /tokenStore\.deleteToken\(\)/)
   assert.match(unauthorizedCatch, /state = \.unauthenticated/)
   assert.ok(
-    unauthorizedCatch.indexOf("KeychainService.deleteToken()") <
+    unauthorizedCatch.indexOf("tokenStore.deleteToken()") <
       unauthorizedCatch.indexOf("state = .unauthenticated"),
     "restoreSession should delete the stale token before entering guest state",
   )

@@ -38,6 +38,10 @@ struct RootView: View {
                 // Guest mode — full app accessible, sign-in is contextual
                 MainTabView()
 
+            case .accountUnavailable:
+                // Keep public race content available while account restoration retries.
+                MainTabView()
+
             case .authenticated(let user) where !user.usernameSet:
                 // Newly signed-in user has not set a username yet
                 UsernamePickerView()
