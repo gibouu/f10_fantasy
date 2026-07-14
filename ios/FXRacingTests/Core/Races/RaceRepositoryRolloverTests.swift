@@ -45,9 +45,11 @@ final class RaceRepositoryRolloverTests: XCTestCase {
         let pruneAfterRelease = await cache.pruneCount
         let prunedSets = await cache.prunedRaceIDSets
         let diskDetails = await cache.details
+        let persistedList = await cache.list
         XCTAssertEqual(pruneAfterRelease, 1)
         XCTAssertEqual(prunedSets.last, Set([newRace.id]))
         XCTAssertNil(diskDetails[oldRace.id])
+        XCTAssertEqual(persistedList?.validatedDetailSeasonID, "season-new")
     }
 
     func testRolloverListWriteFailurePublishesAndHidesOrphanWithoutDiskPrune() async throws {
@@ -339,7 +341,11 @@ final class RaceRepositoryRolloverTests: XCTestCase {
         let oldRace = makeRace(id: "old-orphan", seasonID: "season-old", round: 1)
         let newRace = makeRace(id: "new-race", seasonID: "season-new", round: 1)
         let cache = MemoryRaceSnapshotCache(
-            list: makeList(seasonID: "season-new", races: [newRace]),
+            list: makeList(
+                seasonID: "season-new",
+                races: [newRace],
+                validatedDetailSeasonID: "season-new"
+            ),
             details: [oldRace.id: makeDetail(race: oldRace, driver: DriverFixtures.norris)]
         )
         let repository = RaceRepository(
@@ -373,12 +379,17 @@ final class RaceRepositoryRolloverTests: XCTestCase {
         )
     }
 
-    private func makeList(seasonID: String, races: [Race]) -> RaceListSnapshot {
+    private func makeList(
+        seasonID: String,
+        races: [Race],
+        validatedDetailSeasonID: String? = nil
+    ) -> RaceListSnapshot {
         RaceListSnapshot(
             schemaVersion: RaceListSnapshot.currentSchemaVersion,
             savedAt: RaceFixtures.now,
             season: Season(id: seasonID, year: seasonID == "season-old" ? 2026 : 2027),
-            races: races
+            races: races,
+            validatedDetailSeasonID: validatedDetailSeasonID
         )
     }
 

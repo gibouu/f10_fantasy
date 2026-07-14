@@ -215,19 +215,30 @@ actor RaceRepository: RaceRepositoryProtocol {
         defer { listTask = nil }
 
         let payload: RaceListPayload = try await api.request(.races, token: nil)
-        let previousSeasonID = list?.season?.id
+        let previousList = list
+        let previousSeasonID = previousList?.season?.id
+        let nextSeasonID = payload.season?.id
+        let isSeasonRollover = previousSeasonID != nil
+            && nextSeasonID != nil
+            && previousSeasonID != nextSeasonID
+        let validatedDetailSeasonID: String?
+        if isSeasonRollover {
+            validatedDetailSeasonID = nextSeasonID
+        } else if previousSeasonID != nil, previousSeasonID == nextSeasonID {
+            validatedDetailSeasonID = previousList?.validatedDetailSeasonID
+        } else {
+            validatedDetailSeasonID = nil
+        }
         let snapshot = RaceListSnapshot(
             schemaVersion: RaceListSnapshot.currentSchemaVersion,
             savedAt: clock.now(),
             season: payload.season,
-            races: payload.races
+            races: payload.races,
+            validatedDetailSeasonID: validatedDetailSeasonID
         )
 
         list = snapshot
         let newRaceIDs = Set(snapshot.races.map(\.id))
-        let isSeasonRollover = previousSeasonID != nil
-            && snapshot.season?.id != nil
-            && previousSeasonID != snapshot.season?.id
 
         if isSeasonRollover {
             detailEpoch &+= 1
@@ -337,10 +348,10 @@ actor RaceRepository: RaceRepositoryProtocol {
         if let currentRace = currentList.races.first(where: { $0.id == requestedID }) {
             return currentRace.seasonId == race.seasonId
         }
-        guard let currentSeasonID = currentList.season?.id else {
+        guard let validatedSeasonID = currentList.validatedDetailSeasonID else {
             return true
         }
-        return currentSeasonID == race.seasonId
+        return validatedSeasonID == race.seasonId
     }
 
     private func isFresh(_ snapshot: RaceListSnapshot, for policy: RaceFetchPolicy) -> Bool {

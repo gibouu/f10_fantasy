@@ -33,6 +33,23 @@ final class RaceSnapshotCacheTests: XCTestCase {
         XCTAssertEqual(restored.races.map(\.id), [RaceFixtures.liveSpa.id, RaceFixtures.upcoming.id])
     }
 
+    func testListRoundTripPreservesValidatedDetailSeason() async throws {
+        let cache = makeCache()
+        let snapshot = RaceListSnapshot(
+            schemaVersion: RaceListSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            season: RaceFixtures.season2026,
+            races: [RaceFixtures.liveSpa],
+            validatedDetailSeasonID: RaceFixtures.season2026.id
+        )
+
+        try await cache.writeList(snapshot)
+        let stored = try await cache.readList()
+        let restored = try XCTUnwrap(stored)
+
+        XCTAssertEqual(restored.validatedDetailSeasonID, RaceFixtures.season2026.id)
+    }
+
     func testDetailRoundTripKeepsQualifyingResultsNonOptional() async throws {
         let cache = makeCache()
         let snapshot = makeDetailSnapshot(race: RaceFixtures.liveSpa)
