@@ -26,6 +26,20 @@ actor RaceRepository: RaceRepositoryProtocol {
         let task: Task<RaceDetailSnapshot, Error>
     }
 
+    private struct DetailEpochBarrier: Sendable {
+        let epoch: UInt64
+        let task: Task<Void, Never>
+    }
+
+    private struct DetailIdentityError: LocalizedError {
+        let expectedID: String
+        let actualID: String
+
+        var errorDescription: String? {
+            "Race detail identity mismatch (expected \(expectedID), received \(actualID))."
+        }
+    }
+
     private let api: any APIRequesting
     private let cache: any RaceSnapshotCaching
     private let clock: any ClockProviding
@@ -37,6 +51,7 @@ actor RaceRepository: RaceRepositoryProtocol {
     private var detailTasks: [String: DetailFlight] = [:]
     private var detailEpoch: UInt64 = 0
     private var nextDetailToken: UInt64 = 0
+    private var detailEpochBarrier: DetailEpochBarrier?
     private var allowedDetailIDsAfterRollover: Set<String>?
 
     init(
@@ -97,7 +112,18 @@ actor RaceRepository: RaceRepositoryProtocol {
             return nil
         }
 
+        if list == nil {
+            _ = await cachedList()
+            guard isDetailAllowed(id) else {
+                return nil
+            }
+        }
+
         if let detail = details[id] {
+            guard isCompatible(detail.race, requestedID: id) else {
+                details[id] = nil
+                return nil
+            }
             return detail
         }
 
@@ -107,14 +133,23 @@ actor RaceRepository: RaceRepositoryProtocol {
                 return nil
             }
             if let detail = details[id] {
+                guard isCompatible(detail.race, requestedID: id) else {
+                    details[id] = nil
+                    return nil
+                }
                 return detail
             }
-            if let disk {
+            if let disk, isCompatible(disk.race, requestedID: id) {
                 details[id] = disk
+                return disk
             }
-            return disk
+            return nil
         } catch {
-            return details[id]
+            guard let detail = details[id], isCompatible(detail.race, requestedID: id) else {
+                details[id] = nil
+                return nil
+            }
+            return detail
         }
     }
 
@@ -131,7 +166,12 @@ actor RaceRepository: RaceRepositoryProtocol {
             return try await task.task.value
         }
 
-        var cached = await cachedDetail(id: id)
+        var cached: RaceDetailSnapshot?
+        if policy == .force {
+            cached = nil
+        } else {
+            cached = await cachedDetail(id: id)
+        }
 
         guard isDetailAllowed(id) else {
             throw APIError.notFound
@@ -191,6 +231,9 @@ actor RaceRepository: RaceRepositoryProtocol {
 
         if isSeasonRollover {
             detailEpoch &+= 1
+            let newEpoch = detailEpoch
+            let epochTask = Task { await self.cache.advanceDetailEpoch(to: newEpoch) }
+            detailEpochBarrier = DetailEpochBarrier(epoch: newEpoch, task: epochTask)
             allowedDetailIDsAfterRollover = newRaceIDs
 
             var racesByID: [String: Race] = [:]
@@ -205,6 +248,11 @@ actor RaceRepository: RaceRepositoryProtocol {
             let oldFlights = detailTasks.values.map(\.task)
             detailTasks.removeAll()
             oldFlights.forEach { $0.cancel() }
+
+            await epochTask.value
+            if detailEpochBarrier?.epoch == newEpoch {
+                detailEpochBarrier = nil
+            }
         } else if allowedDetailIDsAfterRollover != nil {
             allowedDetailIDsAfterRollover?.formUnion(newRaceIDs)
         }
@@ -235,6 +283,11 @@ actor RaceRepository: RaceRepositoryProtocol {
         guard epoch == detailEpoch, isDetailAllowed(id) else {
             throw CancellationError()
         }
+        guard isCompatible(payload.race, requestedID: id) else {
+            throw APIError.decodingFailed(
+                DetailIdentityError(expectedID: id, actualID: payload.race.id)
+            )
+        }
         let snapshot = RaceDetailSnapshot(
             schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
             savedAt: clock.now(),
@@ -245,7 +298,13 @@ actor RaceRepository: RaceRepositoryProtocol {
         )
 
         details[id] = snapshot
-        try? await cache.writeDetail(snapshot)
+        if let barrier = detailEpochBarrier, barrier.epoch == epoch {
+            await barrier.task.value
+        }
+        guard epoch == detailEpoch, isDetailAllowed(id) else {
+            throw CancellationError()
+        }
+        _ = try? await cache.writeDetail(snapshot, epoch: epoch)
         guard epoch == detailEpoch, isDetailAllowed(id) else {
             throw CancellationError()
         }
@@ -266,6 +325,16 @@ actor RaceRepository: RaceRepositoryProtocol {
 
     private func isDetailAllowed(_ id: String) -> Bool {
         allowedDetailIDsAfterRollover?.contains(id) ?? true
+    }
+
+    private func isCompatible(_ race: Race, requestedID: String) -> Bool {
+        guard race.id == requestedID else {
+            return false
+        }
+        guard let currentRace = list?.races.first(where: { $0.id == requestedID }) else {
+            return true
+        }
+        return currentRace.seasonId == race.seasonId
     }
 
     private func isFresh(_ snapshot: RaceListSnapshot, for policy: RaceFetchPolicy) -> Bool {

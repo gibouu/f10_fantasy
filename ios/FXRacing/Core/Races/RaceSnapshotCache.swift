@@ -5,6 +5,8 @@ protocol RaceSnapshotCaching: Sendable {
     func writeList(_ snapshot: RaceListSnapshot) async throws
     func readDetail(id: String) async throws -> RaceDetailSnapshot?
     func writeDetail(_ snapshot: RaceDetailSnapshot) async throws
+    func writeDetail(_ snapshot: RaceDetailSnapshot, epoch: UInt64) async throws -> Bool
+    func advanceDetailEpoch(to epoch: UInt64) async
     func removeDetail(id: String) async
     func pruneDetails(keeping raceIDs: Set<String>) async
 }
@@ -12,6 +14,7 @@ protocol RaceSnapshotCaching: Sendable {
 actor RaceSnapshotCache: RaceSnapshotCaching {
     private let fileManager: FileManager
     private let directory: URL
+    private var detailEpoch: UInt64 = 0
 
     init(
         baseDirectory: URL? = nil,
@@ -56,7 +59,22 @@ actor RaceSnapshotCache: RaceSnapshotCaching {
     }
 
     func writeDetail(_ snapshot: RaceDetailSnapshot) async throws {
+        _ = try await writeDetail(snapshot, epoch: detailEpoch)
+    }
+
+    func writeDetail(
+        _ snapshot: RaceDetailSnapshot,
+        epoch: UInt64
+    ) async throws -> Bool {
+        guard epoch == detailEpoch else {
+            return false
+        }
         try writeEntry(snapshot, to: detailURL(id: snapshot.race.id))
+        return true
+    }
+
+    func advanceDetailEpoch(to epoch: UInt64) async {
+        detailEpoch = epoch
     }
 
     func removeDetail(id: String) async {

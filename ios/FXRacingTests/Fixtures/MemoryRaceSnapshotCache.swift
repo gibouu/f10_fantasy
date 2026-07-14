@@ -18,6 +18,7 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     private(set) var prunedRaceIDSets: [Set<String>] = []
     private(set) var detailReadCounts: [String: Int] = [:]
     private(set) var detailWriteCounts: [String: Int] = [:]
+    private var detailEpoch: UInt64 = 0
 
     private var failListReads: Bool
     private var failListWrites: Bool
@@ -26,12 +27,15 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     private var gatesListReads: Bool
     private var gatesListWrites: Bool
     private var gatedDetailReads: Set<String>
+    private var gatedDetailWrites: Set<String>
     private var listReadContinuations: [CheckedContinuation<Void, Never>] = []
     private var listWriteContinuations: [CheckedContinuation<Void, Never>] = []
     private var detailReadContinuations: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private var detailWriteContinuations: [String: [CheckedContinuation<Void, Never>]] = [:]
     private var listReadWaiters: [ReadWaiter] = []
     private var listWriteWaiters: [ReadWaiter] = []
     private var detailReadWaiters: [String: [ReadWaiter]] = [:]
+    private var detailWriteWaiters: [String: [ReadWaiter]] = [:]
 
     init(
         list: RaceListSnapshot? = nil,
@@ -42,7 +46,8 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         failedDetailWrites: Set<String> = [],
         gatesListReads: Bool = false,
         gatesListWrites: Bool = false,
-        gatedDetailReads: Set<String> = []
+        gatedDetailReads: Set<String> = [],
+        gatedDetailWrites: Set<String> = []
     ) {
         self.list = list
         self.details = details
@@ -53,6 +58,7 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         self.gatesListReads = gatesListReads
         self.gatesListWrites = gatesListWrites
         self.gatedDetailReads = gatedDetailReads
+        self.gatedDetailWrites = gatedDetailWrites
     }
 
     func readList() async throws -> RaceListSnapshot? {
@@ -98,11 +104,32 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     }
 
     func writeDetail(_ snapshot: RaceDetailSnapshot) async throws {
+        _ = try await writeDetail(snapshot, epoch: detailEpoch)
+    }
+
+    func writeDetail(
+        _ snapshot: RaceDetailSnapshot,
+        epoch: UInt64
+    ) async throws -> Bool {
         detailWriteCounts[snapshot.race.id, default: 0] += 1
+        resumeDetailWriteWaiters(id: snapshot.race.id)
+        if gatedDetailWrites.contains(snapshot.race.id) {
+            await withCheckedContinuation { continuation in
+                detailWriteContinuations[snapshot.race.id, default: []].append(continuation)
+            }
+        }
+        guard epoch == detailEpoch else {
+            return false
+        }
         if failedDetailWrites.contains(snapshot.race.id) {
             throw Failure.requested
         }
         details[snapshot.race.id] = snapshot
+        return true
+    }
+
+    func advanceDetailEpoch(to epoch: UInt64) async {
+        detailEpoch = epoch
     }
 
     func removeDetail(id: String) async {
@@ -146,6 +173,15 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         }
     }
 
+    func waitForDetailWrites(id: String, count: Int) async {
+        guard detailWriteCounts[id, default: 0] < count else { return }
+        await withCheckedContinuation { continuation in
+            detailWriteWaiters[id, default: []].append(
+                ReadWaiter(count: count, continuation: continuation)
+            )
+        }
+    }
+
     func releaseListReads() {
         gatesListReads = false
         let continuations = listReadContinuations
@@ -163,6 +199,12 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
     func releaseDetailReads(id: String) {
         gatedDetailReads.remove(id)
         let continuations = detailReadContinuations.removeValue(forKey: id) ?? []
+        continuations.forEach { $0.resume() }
+    }
+
+    func releaseDetailWrites(id: String) {
+        gatedDetailWrites.remove(id)
+        let continuations = detailWriteContinuations.removeValue(forKey: id) ?? []
         continuations.forEach { $0.resume() }
     }
 
@@ -202,6 +244,21 @@ actor MemoryRaceSnapshotCache: RaceSnapshotCaching {
         }
         if !pending.isEmpty {
             detailReadWaiters[id] = pending
+        }
+    }
+
+    private func resumeDetailWriteWaiters(id: String) {
+        let count = detailWriteCounts[id, default: 0]
+        var pending: [ReadWaiter] = []
+        for waiter in detailWriteWaiters.removeValue(forKey: id) ?? [] {
+            if count >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                pending.append(waiter)
+            }
+        }
+        if !pending.isEmpty {
+            detailWriteWaiters[id] = pending
         }
     }
 }

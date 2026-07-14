@@ -275,6 +275,66 @@ final class RaceRepositoryRolloverTests: XCTestCase {
         XCTAssertEqual(published?.entrants.map(\.id), [DriverFixtures.piastri.id])
     }
 
+    func testOldEpochDetailWriteResumingAfterPruneCannotRecreateDiskEntry() async throws {
+        let oldRace = makeRace(id: "old-race", seasonID: "season-old", round: 1)
+        let newRace = makeRace(id: "new-race", seasonID: "season-new", round: 1)
+        let cache = MemoryRaceSnapshotCache(
+            list: makeList(seasonID: "season-old", races: [oldRace]),
+            gatedDetailWrites: [oldRace.id]
+        )
+        let api = APIClientSpy(
+            responses: [
+                "GET /api/races/\(oldRace.id)": .json(
+                    makePayload(race: oldRace, driver: DriverFixtures.norris)
+                ),
+                "GET /api/races": .json(
+                    RaceListPayload(
+                        races: [newRace],
+                        season: Season(id: "season-new", year: 2027)
+                    )
+                ),
+            ]
+        )
+        let repository = RaceRepository(api: api, cache: cache, clock: TestClock.fixed)
+        _ = await repository.cachedList()
+
+        let oldRefresh = Task {
+            try await repository.refreshDetail(id: oldRace.id, policy: .force)
+        }
+        await cache.waitForDetailWrites(id: oldRace.id, count: 1)
+
+        _ = try await repository.refreshList(policy: .force)
+        let pruneCount = await cache.pruneCount
+        XCTAssertEqual(pruneCount, 1)
+
+        await cache.releaseDetailWrites(id: oldRace.id)
+        _ = try? await oldRefresh.value
+
+        let diskDetails = await cache.details
+        let visible = await repository.cachedDetail(id: oldRace.id)
+        XCTAssertNil(diskDetails[oldRace.id])
+        XCTAssertNil(visible)
+    }
+
+    func testColdStartRejectsOldSeasonDiskDetailForReusedRaceID() async throws {
+        let sharedID = "shared-race"
+        let oldRace = makeRace(id: sharedID, seasonID: "season-old", round: 1)
+        let newRace = makeRace(id: sharedID, seasonID: "season-new", round: 1)
+        let cache = MemoryRaceSnapshotCache(
+            list: makeList(seasonID: "season-new", races: [newRace]),
+            details: [sharedID: makeDetail(race: oldRace, driver: DriverFixtures.norris)]
+        )
+        let repository = RaceRepository(
+            api: APIClientSpy(responses: [:]),
+            cache: cache,
+            clock: TestClock.fixed
+        )
+
+        let stale = await repository.cachedDetail(id: sharedID)
+
+        XCTAssertNil(stale)
+    }
+
     private func makeRace(
         id: String,
         seasonID: String,
