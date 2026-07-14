@@ -18,13 +18,31 @@ protocol RaceRepositoryProtocol: Sendable {
     func cachedDetail(id: String) async -> RaceDetailSnapshot?
     func refreshDetail(id: String, policy: RaceFetchPolicy) async throws -> RaceDetailSnapshot
     func prefetchDetail(ids: [String]) async
+    func replaceDetailPrefetch(ids: [String]) async
+}
+
+extension RaceRepositoryProtocol {
+    func replaceDetailPrefetch(ids: [String]) async {
+        await prefetchDetail(ids: ids)
+    }
 }
 
 actor RaceRepository: RaceRepositoryProtocol {
+    private enum DetailDemand: Sendable {
+        case visible
+        case prefetch(generation: UInt64)
+
+        var isPrefetch: Bool {
+            if case .prefetch = self { return true }
+            return false
+        }
+    }
+
     private struct DetailFlight: Sendable {
         let token: UInt64
         let epoch: UInt64
         let task: Task<RaceDetailSnapshot, Error>
+        var isPrefetchOnly: Bool
     }
 
     private struct DetailEpochBarrier: Sendable {
@@ -54,6 +72,8 @@ actor RaceRepository: RaceRepositoryProtocol {
     private var nextDetailToken: UInt64 = 0
     private var detailEpochBarrier: DetailEpochBarrier?
     private var allowedDetailIDsAfterRollover: Set<String>?
+    private var prefetchGeneration: UInt64 = 0
+    private var prefetchScopeIDs: Set<String> = []
 
     init(
         api: any APIRequesting,
@@ -158,11 +178,20 @@ actor RaceRepository: RaceRepositoryProtocol {
         id: String,
         policy: RaceFetchPolicy
     ) async throws -> RaceDetailSnapshot {
+        try await refreshDetail(id: id, policy: policy, demand: .visible)
+    }
+
+    private func refreshDetail(
+        id: String,
+        policy: RaceFetchPolicy,
+        demand: DetailDemand
+    ) async throws -> RaceDetailSnapshot {
         guard isDetailAllowed(id) else {
             throw APIError.notFound
         }
+        try ensureCurrent(demand: demand, id: id)
 
-        if let task = currentDetailFlight(id: id) {
+        if let task = currentDetailFlight(id: id, demand: demand) {
             await onEvent?(.joinedDetailFlight(id))
             return try await task.task.value
         }
@@ -177,8 +206,9 @@ actor RaceRepository: RaceRepositoryProtocol {
         guard isDetailAllowed(id) else {
             throw APIError.notFound
         }
+        try ensureCurrent(demand: demand, id: id)
 
-        if let task = currentDetailFlight(id: id) {
+        if let task = currentDetailFlight(id: id, demand: demand) {
             await onEvent?(.joinedDetailFlight(id))
             return try await task.task.value
         }
@@ -189,7 +219,8 @@ actor RaceRepository: RaceRepositoryProtocol {
                 guard isDetailAllowed(id) else {
                     throw APIError.notFound
                 }
-                if let task = currentDetailFlight(id: id) {
+                try ensureCurrent(demand: demand, id: id)
+                if let task = currentDetailFlight(id: id, demand: demand) {
                     await onEvent?(.joinedDetailFlight(id))
                     return try await task.task.value
                 }
@@ -201,18 +232,31 @@ actor RaceRepository: RaceRepositoryProtocol {
             }
         }
 
+        try ensureCurrent(demand: demand, id: id)
+
         nextDetailToken &+= 1
         let token = nextDetailToken
         let epoch = detailEpoch
         let task = Task {
             try await self.fetchAndPublishDetail(id: id, token: token, epoch: epoch)
         }
-        detailTasks[id] = DetailFlight(token: token, epoch: epoch, task: task)
+        detailTasks[id] = DetailFlight(
+            token: token,
+            epoch: epoch,
+            task: task,
+            isPrefetchOnly: demand.isPrefetch
+        )
         await onEvent?(.startedDetailFlight(id))
         return try await task.value
     }
 
     func prefetchDetail(ids: [String]) async {
+        await replaceDetailPrefetch(ids: ids)
+    }
+
+    func replaceDetailPrefetch(ids: [String]) async {
+        guard !Task.isCancelled else { return }
+
         var seen: Set<String> = []
         var selected: [String] = []
         for id in ids {
@@ -221,10 +265,26 @@ actor RaceRepository: RaceRepositoryProtocol {
             if selected.count == 2 { break }
         }
 
+        prefetchGeneration &+= 1
+        let generation = prefetchGeneration
+        let nextScope = Set(selected)
+        let removedIDs = prefetchScopeIDs.subtracting(nextScope)
+        prefetchScopeIDs = nextScope
+
+        for id in removedIDs {
+            guard let flight = detailTasks[id], flight.isPrefetchOnly else { continue }
+            flight.task.cancel()
+            detailTasks[id] = nil
+        }
+
         await withTaskGroup(of: Void.self) { group in
             for id in selected {
                 group.addTask {
-                    _ = try? await self.refreshDetail(id: id, policy: .ifStale)
+                    _ = try? await self.refreshDetail(
+                        id: id,
+                        policy: .ifStale,
+                        demand: .prefetch(generation: generation)
+                    )
                 }
             }
         }
@@ -261,6 +321,8 @@ actor RaceRepository: RaceRepositoryProtocol {
 
         if isSeasonRollover {
             detailEpoch &+= 1
+            prefetchGeneration &+= 1
+            prefetchScopeIDs.removeAll()
             let newEpoch = detailEpoch
             let epochTask = Task { await self.cache.advanceDetailEpoch(to: newEpoch) }
             detailEpochBarrier = DetailEpochBarrier(epoch: newEpoch, task: epochTask)
@@ -310,9 +372,7 @@ actor RaceRepository: RaceRepositoryProtocol {
         }
 
         let payload: RaceDetailPayload = try await api.request(.raceDetail(id: id), token: nil)
-        guard epoch == detailEpoch, isDetailAllowed(id) else {
-            throw CancellationError()
-        }
+        try ensureCurrentDetailFlight(id: id, token: token, epoch: epoch)
         guard isCompatible(payload.race, requestedID: id) else {
             throw APIError.decodingFailed(
                 DetailIdentityError(expectedID: id, actualID: payload.race.id)
@@ -327,22 +387,23 @@ actor RaceRepository: RaceRepositoryProtocol {
             qualifyingResults: payload.qualifyingResults ?? []
         )
 
+        try ensureCurrentDetailFlight(id: id, token: token, epoch: epoch)
         details[id] = snapshot
         if let barrier = detailEpochBarrier, barrier.epoch == epoch {
+            try ensureCurrentDetailFlight(id: id, token: token, epoch: epoch)
             await barrier.task.value
         }
-        guard epoch == detailEpoch, isDetailAllowed(id) else {
-            throw CancellationError()
-        }
+        try ensureCurrentDetailFlight(id: id, token: token, epoch: epoch)
         _ = try? await cache.writeDetail(snapshot, epoch: epoch)
-        guard epoch == detailEpoch, isDetailAllowed(id) else {
-            throw CancellationError()
-        }
+        try ensureCurrentDetailFlight(id: id, token: token, epoch: epoch)
         return snapshot
     }
 
-    private func currentDetailFlight(id: String) -> DetailFlight? {
-        guard let flight = detailTasks[id] else {
+    private func currentDetailFlight(
+        id: String,
+        demand: DetailDemand
+    ) -> DetailFlight? {
+        guard var flight = detailTasks[id] else {
             return nil
         }
         guard flight.epoch == detailEpoch else {
@@ -350,7 +411,36 @@ actor RaceRepository: RaceRepositoryProtocol {
             detailTasks[id] = nil
             return nil
         }
+
+        if case .visible = demand, flight.isPrefetchOnly {
+            flight.isPrefetchOnly = false
+            detailTasks[id] = flight
+        }
         return flight
+    }
+
+    private func ensureCurrent(demand: DetailDemand, id: String) throws {
+        guard case .prefetch(let generation) = demand else { return }
+        guard !Task.isCancelled,
+              generation == prefetchGeneration,
+              prefetchScopeIDs.contains(id)
+        else {
+            throw CancellationError()
+        }
+    }
+
+    private func ensureCurrentDetailFlight(
+        id: String,
+        token: UInt64,
+        epoch: UInt64
+    ) throws {
+        guard !Task.isCancelled,
+              epoch == detailEpoch,
+              isDetailAllowed(id),
+              detailTasks[id]?.token == token
+        else {
+            throw CancellationError()
+        }
     }
 
     private func isDetailAllowed(_ id: String) -> Bool {

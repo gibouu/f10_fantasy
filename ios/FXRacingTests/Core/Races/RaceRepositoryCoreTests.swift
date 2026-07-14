@@ -736,6 +736,201 @@ final class RaceRepositoryCoreTests: XCTestCase {
         XCTAssertTrue(requests.allSatisfy { $0.token == nil })
     }
 
+    func testReplacingPrefetchScopeCancelsStaleFlightsAndStartsOnlyLatestPair() async {
+        let staleFirst = RaceFixtures.race(
+            id: "prefetch-stale-a",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let staleSecond = RaceFixtures.race(
+            id: "prefetch-stale-b",
+            round: 2,
+            status: .upcoming,
+            startOffset: 7_200
+        )
+        let active = RaceFixtures.race(
+            id: "prefetch-active",
+            round: 3,
+            status: .upcoming,
+            startOffset: 10_800
+        )
+        let next = RaceFixtures.race(
+            id: "prefetch-next",
+            round: 4,
+            status: .upcoming,
+            startOffset: 14_400
+        )
+        let capped = RaceFixtures.race(
+            id: "prefetch-capped-latest",
+            round: 5,
+            status: .upcoming,
+            startOffset: 18_000
+        )
+        let api = CancellableDetailAPIClientSpy(
+            payloads: [staleFirst, staleSecond, active, next, capped].reduce(into: [:]) {
+                $0["/api/races/\($1.id)"] = makeDetailPayload(race: $1)
+            }
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed
+        )
+
+        let stalePrefetch = Task {
+            await repository.replaceDetailPrefetch(
+                ids: [staleFirst.id, staleFirst.id, staleSecond.id, capped.id]
+            )
+        }
+        await api.waitForCalls(to: "/api/races/\(staleFirst.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(staleSecond.id)", count: 1)
+
+        let latestPrefetch = Task {
+            await repository.replaceDetailPrefetch(ids: [active.id, next.id, capped.id])
+        }
+        await api.waitForCancellations(to: "/api/races/\(staleFirst.id)", count: 1)
+        await api.waitForCancellations(to: "/api/races/\(staleSecond.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(active.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(next.id)", count: 1)
+
+        await api.releaseRequests(to: "/api/races/\(active.id)")
+        await api.releaseRequests(to: "/api/races/\(next.id)")
+        await latestPrefetch.value
+        await stalePrefetch.value
+
+        let cappedCalls = await api.calls(to: "/api/races/\(capped.id)")
+        XCTAssertEqual(cappedCalls, 0)
+    }
+
+    func testReplacingPrefetchScopePreservesFlightPromotedByVisibleDetailDemand() async throws {
+        let visibleRace = RaceFixtures.race(
+            id: "prefetch-visible",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let staleRace = RaceFixtures.race(
+            id: "prefetch-stale",
+            round: 2,
+            status: .upcoming,
+            startOffset: 7_200
+        )
+        let active = RaceFixtures.race(
+            id: "prefetch-replacement-active",
+            round: 3,
+            status: .upcoming,
+            startOffset: 10_800
+        )
+        let next = RaceFixtures.race(
+            id: "prefetch-replacement-next",
+            round: 4,
+            status: .upcoming,
+            startOffset: 14_400
+        )
+        let api = CancellableDetailAPIClientSpy(
+            payloads: [visibleRace, staleRace, active, next].reduce(into: [:]) {
+                $0["/api/races/\($1.id)"] = makeDetailPayload(race: $1)
+            }
+        )
+        let events = RepositoryEventProbe()
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed,
+            onEvent: { event in await events.record(event) }
+        )
+
+        let firstPrefetch = Task {
+            await repository.replaceDetailPrefetch(ids: [visibleRace.id, staleRace.id])
+        }
+        await api.waitForCalls(to: "/api/races/\(visibleRace.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(staleRace.id)", count: 1)
+        let visibleDetail = Task {
+            try await repository.refreshDetail(id: visibleRace.id, policy: .force)
+        }
+        await events.waitForDetailJoins(id: visibleRace.id, count: 1)
+
+        let replacement = Task {
+            await repository.replaceDetailPrefetch(ids: [active.id, next.id])
+        }
+        await api.waitForCancellations(to: "/api/races/\(staleRace.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(active.id)", count: 1)
+        await api.waitForCalls(to: "/api/races/\(next.id)", count: 1)
+        await api.releaseRequests(to: "/api/races/\(visibleRace.id)")
+        await api.releaseRequests(to: "/api/races/\(active.id)")
+        await api.releaseRequests(to: "/api/races/\(next.id)")
+
+        let detail = try await visibleDetail.value
+        await replacement.value
+        await firstPrefetch.value
+
+        XCTAssertEqual(detail.race.id, visibleRace.id)
+        let visibleCancellations = await api.cancellations(
+            to: "/api/races/\(visibleRace.id)"
+        )
+        XCTAssertEqual(visibleCancellations, 0)
+    }
+
+    func testCancelledPrefetchCannotPublishAfterNewerVisibleSameIDFlight() async throws {
+        let race = RaceFixtures.race(
+            id: "prefetch-same-id",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let path = "/api/races/\(race.id)"
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET \(path)": [
+                    .json(
+                        makeDetailPayload(
+                            race: race,
+                            entrants: [DriverFixtures.norris]
+                        )
+                    ),
+                    .json(
+                        makeDetailPayload(
+                            race: race,
+                            entrants: [DriverFixtures.piastri]
+                        )
+                    ),
+                ],
+            ],
+            gatedKeys: ["GET \(path)"]
+        )
+        let cache = MemoryRaceSnapshotCache()
+        let repository = RaceRepository(
+            api: api,
+            cache: cache,
+            clock: TestClock.fixed
+        )
+
+        let stalePrefetch = Task {
+            await repository.replaceDetailPrefetch(ids: [race.id])
+        }
+        let staleRequestID = await api.waitForRequest(to: path, ordinal: 1)
+        await repository.replaceDetailPrefetch(ids: [])
+
+        let visibleRefresh = Task {
+            try await repository.refreshDetail(id: race.id, policy: .force)
+        }
+        let visibleRequestID = await api.waitForRequest(to: path, ordinal: 2)
+        await api.releaseRequest(id: visibleRequestID)
+        let visible = try await visibleRefresh.value
+
+        await api.releaseRequest(id: staleRequestID)
+        await stalePrefetch.value
+
+        let published = await repository.cachedDetail(id: race.id)
+        let persisted = await cache.details[race.id]
+        let writeCount = await cache.detailWriteCounts[race.id, default: 0]
+        XCTAssertEqual(visible.entrants.map(\.id), [DriverFixtures.piastri.id])
+        XCTAssertEqual(published?.entrants.map(\.id), [DriverFixtures.piastri.id])
+        XCTAssertEqual(persisted?.entrants.map(\.id), [DriverFixtures.piastri.id])
+        XCTAssertEqual(writeCount, 1)
+    }
+
     private func makeList(
         savedAt: Date,
         season: Season? = RaceFixtures.season2026,
@@ -845,6 +1040,146 @@ private actor RepositoryEventProbe {
         }
         if !pending.isEmpty {
             detailWaiters[id] = pending
+        }
+    }
+}
+
+private actor CancellableDetailAPIClientSpy: APIRequesting {
+    private struct PendingRequest {
+        let path: String
+        let continuation: CheckedContinuation<Data, Error>
+    }
+
+    private struct CountWaiter {
+        let count: Int
+        let continuation: CheckedContinuation<Void, Never>
+    }
+
+    private let payloads: [String: RaceDetailPayload]
+    private var nextRequestID = 0
+    private var pendingRequests: [Int: PendingRequest] = [:]
+    private var callCounts: [String: Int] = [:]
+    private var cancellationCounts: [String: Int] = [:]
+    private var callWaiters: [String: [CountWaiter]] = [:]
+    private var cancellationWaiters: [String: [CountWaiter]] = [:]
+
+    init(payloads: [String: RaceDetailPayload]) {
+        self.payloads = payloads
+    }
+
+    func request<T: Decodable & Sendable>(
+        _ endpoint: APIEndpoint,
+        token: String?
+    ) async throws -> T {
+        let path = endpoint.path
+        guard let payload = payloads[path] else {
+            throw APIError.notFound
+        }
+
+        nextRequestID += 1
+        let requestID = nextRequestID
+        callCounts[path, default: 0] += 1
+        resumeSatisfiedCallWaiters(for: path)
+
+        let data: Data = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Data, Error>) in
+                if Task.isCancelled {
+                    recordCancellation(path: path)
+                    continuation.resume(throwing: CancellationError())
+                } else {
+                    pendingRequests[requestID] = PendingRequest(
+                        path: path,
+                        continuation: continuation
+                    )
+                }
+            }
+        } onCancel: {
+            Task { await self.cancelRequest(id: requestID) }
+        }
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode(payload)
+        guard data.isEmpty else {
+            return try JSONDecoder.api().decode(T.self, from: data)
+        }
+        return try JSONDecoder.api().decode(T.self, from: encoded)
+    }
+
+    func waitForCalls(to path: String, count: Int) async {
+        guard callCounts[path, default: 0] < count else { return }
+        await withCheckedContinuation { continuation in
+            callWaiters[path, default: []].append(
+                CountWaiter(count: count, continuation: continuation)
+            )
+        }
+    }
+
+    func waitForCancellations(to path: String, count: Int) async {
+        guard cancellationCounts[path, default: 0] < count else { return }
+        await withCheckedContinuation { continuation in
+            cancellationWaiters[path, default: []].append(
+                CountWaiter(count: count, continuation: continuation)
+            )
+        }
+    }
+
+    func releaseRequests(to path: String) {
+        let matchingIDs = pendingRequests.compactMap { id, request in
+            request.path == path ? id : nil
+        }
+        for id in matchingIDs {
+            pendingRequests.removeValue(forKey: id)?.continuation.resume(returning: Data())
+        }
+    }
+
+    func calls(to path: String) -> Int {
+        callCounts[path, default: 0]
+    }
+
+    func cancellations(to path: String) -> Int {
+        cancellationCounts[path, default: 0]
+    }
+
+    private func cancelRequest(id: Int) {
+        guard let request = pendingRequests.removeValue(forKey: id) else { return }
+        recordCancellation(path: request.path)
+        request.continuation.resume(throwing: CancellationError())
+    }
+
+    private func recordCancellation(path: String) {
+        cancellationCounts[path, default: 0] += 1
+        resumeSatisfiedCancellationWaiters(for: path)
+    }
+
+    private func resumeSatisfiedCallWaiters(for path: String) {
+        let count = callCounts[path, default: 0]
+        var pending: [CountWaiter] = []
+        for waiter in callWaiters.removeValue(forKey: path) ?? [] {
+            if count >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                pending.append(waiter)
+            }
+        }
+        if !pending.isEmpty {
+            callWaiters[path] = pending
+        }
+    }
+
+    private func resumeSatisfiedCancellationWaiters(for path: String) {
+        let count = cancellationCounts[path, default: 0]
+        var pending: [CountWaiter] = []
+        for waiter in cancellationWaiters.removeValue(forKey: path) ?? [] {
+            if count >= waiter.count {
+                waiter.continuation.resume()
+            } else {
+                pending.append(waiter)
+            }
+        }
+        if !pending.isEmpty {
+            cancellationWaiters[path] = pending
         }
     }
 }

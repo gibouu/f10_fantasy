@@ -134,6 +134,13 @@ final class RaceDetailViewModel {
         self.clock = clock
     }
 
+    /// Refreshes list-owned race fields without replacing per-race detail or
+    /// the user's in-progress three-pick draft.
+    func updateSummary(_ summary: Race) {
+        guard summary.id == raceID else { return }
+        race = summary
+    }
+
     // MARK: - Load
 
     func loadIfNeeded(
