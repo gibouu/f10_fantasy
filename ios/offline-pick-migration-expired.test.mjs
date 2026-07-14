@@ -78,8 +78,18 @@ test("legacy v1 picks become terminal legacy records before old keys are deleted
   )
   assert.match(
     localPickStore,
-    /guard persistV2\(\) else \{ return \}[\s\S]*removeData\(forKey: Self\.v1Key\)/,
-    "legacy keys must remain until v2 persistence reads back successfully",
+    /if let v2Data[\s\S]*isValid\(envelope\)[\s\S]*removeData\(forKey: Self\.v1Key\)/,
+    "a later valid v2 load should retire the legacy copy",
+  )
+  const migrationBlock = localPickStore.match(
+    /private func migrateLegacyIfPresent\(\) \{[\s\S]*?\n    \}\n\n    private func isValid/,
+  )?.[0]
+  assert.ok(migrationBlock, "legacy migration should remain explicit")
+  assert.match(migrationBlock, /_ = persistV2\(\)/)
+  assert.doesNotMatch(
+    migrationBlock,
+    /removeData\(forKey:/,
+    "the process that writes v2 must retain v1 until a later launch reads v2",
   )
 })
 
@@ -88,10 +98,13 @@ test("SyncManager records locked migration results instead of marking them synce
     /if let race = raceMap\[localPick\.raceId\], race\.isLocked \{[\s\S]*?continue\s*\}/,
   )?.[0]
   assert.ok(lockedSkipBlock, "client-side locked race branch should exist")
-  assert.match(lockedSkipBlock, /markMigrationExpired\(raceId: localPick\.raceId\)/)
+  assert.match(
+    lockedSkipBlock,
+    /markMigrationExpired\([\s\S]*?raceId: localPick\.raceId,[\s\S]*?revision: localPick\.revision/,
+  )
   assert.doesNotMatch(
     lockedSkipBlock,
-    /markSynced\(raceId: localPick\.raceId\)/,
+    /markSynced\(/,
     "client-known locked races should not be marked synced",
   )
 
@@ -104,10 +117,13 @@ test("SyncManager records locked migration results instead of marking them synce
 
   const lockedUploadCase = syncManager.match(/case \.locked:[\s\S]*?(?=\n            case \.failed:)/)?.[0]
   assert.ok(lockedUploadCase, "migration should handle locked upload results")
-  assert.match(lockedUploadCase, /markMigrationExpired\(raceId: localPick\.raceId\)/)
+  assert.match(
+    lockedUploadCase,
+    /markMigrationExpired\([\s\S]*?raceId: localPick\.raceId,[\s\S]*?revision: localPick\.revision/,
+  )
   assert.doesNotMatch(
     lockedUploadCase,
-    /markSynced\(raceId: localPick\.raceId\)/,
+    /markSynced\(/,
     "server-locked uploads should not be marked synced",
   )
 })

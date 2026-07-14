@@ -49,4 +49,6 @@ enum LocalPickSaveResult: Equatable, Sendable {
     case saved(LocalPickRecord)
     case unchanged(LocalPickRecord)
     case locked
+    case invalidOwner
+    case persistenceFailed
 }

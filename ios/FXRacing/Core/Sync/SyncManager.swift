@@ -31,7 +31,10 @@ final class SyncManager {
             // Client-side lock check — skip if we know the race is locked
             if let race = raceMap[localPick.raceId], race.isLocked {
                 fxLog(.sync, "skip raceId=\(localPick.raceId) (locked)")
-                localPickStore.markMigrationExpired(raceId: localPick.raceId)
+                localPickStore.markMigrationExpired(
+                    raceId: localPick.raceId,
+                    revision: localPick.revision
+                )
                 continue
             }
 
@@ -41,7 +44,10 @@ final class SyncManager {
             switch await checkServerPick(raceId: localPick.raceId, token: token) {
             case .exists:
                 fxLog(.sync, "skip raceId=\(localPick.raceId) (server already has pick)")
-                localPickStore.markSynced(raceId: localPick.raceId)
+                localPickStore.markSynced(
+                    raceId: localPick.raceId,
+                    revision: localPick.revision
+                )
                 continue
             case .failed:
                 fxWarn(.sync, "server pick check failed raceId=\(localPick.raceId) — will retry on next sign-in")
@@ -54,10 +60,16 @@ final class SyncManager {
             switch await uploadPick(localPick, token: token) {
             case .uploaded:
                 fxLog(.sync, "uploaded raceId=\(localPick.raceId)")
-                localPickStore.markSynced(raceId: localPick.raceId)
+                localPickStore.markSynced(
+                    raceId: localPick.raceId,
+                    revision: localPick.revision
+                )
             case .locked:
                 fxWarn(.sync, "upload locked raceId=\(localPick.raceId) — marking migration expired")
-                localPickStore.markMigrationExpired(raceId: localPick.raceId)
+                localPickStore.markMigrationExpired(
+                    raceId: localPick.raceId,
+                    revision: localPick.revision
+                )
             case .failed:
                 fxWarn(.sync, "upload failed raceId=\(localPick.raceId) — will retry on next sign-in")
             }

@@ -66,7 +66,10 @@ final class RaceDetailViewModel {
         selectedP10 = nil
         selectedDNF = nil
 
-        // Populate selections: server pick takes precedence over local pick
+        // Populate selections: server pick takes precedence over local pick.
+        // Capture the guest revision before the request so a late response
+        // cannot confirm a newer local edit.
+        let localRevisionBeforeServerLoad = localPickStore.pick(for: raceId)?.revision
         if let token {
             do {
                 let response: PickResponse = try await api.request(.pickForRace(raceId: raceId), token: token)
@@ -81,7 +84,10 @@ final class RaceDetailViewModel {
                     fxLog(.pick, "server pick loaded raceId=\(raceId)")
                 }
                 // Mark local pick synced if server has it
-                localPickStore.markSynced(raceId: raceId)
+                localPickStore.markSynced(
+                    raceId: raceId,
+                    revision: localRevisionBeforeServerLoad
+                )
                 return
             } catch APIError.notFound {
                 fxLog(.pick, "no server pick for raceId=\(raceId) — falling back to local")
@@ -159,6 +165,7 @@ final class RaceDetailViewModel {
             Haptics.locked()
             return
         }
+        let savedRevision = localPickStore.pick(for: raceId)?.revision
         isLocalOnly = true
 
         // 2. Upload to server if authenticated
@@ -180,7 +187,7 @@ final class RaceDetailViewModel {
             )
             serverPick = response.pick
             isLocalOnly = false
-            localPickStore.markSynced(raceId: raceId)
+            localPickStore.markSynced(raceId: raceId, revision: savedRevision)
             submitSuccess = true
             fxLog(.pick, "submit OK raceId=\(raceId) winner=\(winner.code) p10=\(p10.code) dnf=\(dnf.code)")
             Haptics.success()

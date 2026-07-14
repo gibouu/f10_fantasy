@@ -13,6 +13,7 @@ struct LegacyLocalPickV1: Codable, Sendable {
     let savedAt: Date
     var synced: Bool
     var migrationStatus: LocalPickMigrationStatus?
+    let revision: UInt64?
 
     init(
         raceId: String,
@@ -21,7 +22,8 @@ struct LegacyLocalPickV1: Codable, Sendable {
         dnfId: String,
         savedAt: Date,
         synced: Bool,
-        migrationStatus: LocalPickMigrationStatus? = nil
+        migrationStatus: LocalPickMigrationStatus? = nil,
+        revision: UInt64? = nil
     ) {
         self.raceId = raceId
         self.winnerId = winnerId
@@ -30,6 +32,7 @@ struct LegacyLocalPickV1: Codable, Sendable {
         self.savedAt = savedAt
         self.synced = synced
         self.migrationStatus = migrationStatus
+        self.revision = revision
     }
 }
 
@@ -74,6 +77,7 @@ final class LocalPickStore {
     private let clock: any ClockProviding
     private var records: [LocalPickRecordID: LocalPickRecord] = [:]
     private var nextRevision: UInt64 = 1
+    private var canPersistV2 = true
     private(set) var expiredMigrationNoticeCount = 0
 
     init(
@@ -143,6 +147,9 @@ final class LocalPickStore {
         owner: PickOwnerScope,
         now: Date? = nil
     ) -> LocalPickSaveResult {
+        guard owner != .legacyAmbiguous else {
+            return .invalidOwner
+        }
         let savedAt = now ?? clock.now()
         guard savedAt < race.lockCutoffUtc else {
             return .locked
@@ -158,8 +165,14 @@ final class LocalPickStore {
             }
         }
 
-        let revision = nextRevision
-        nextRevision &+= 1
+        let previousRecord = records[id]
+        let previousNextRevision = nextRevision
+        let revision = previousNextRevision
+        let (incrementedRevision, overflow) = previousNextRevision.addingReportingOverflow(1)
+        guard previousNextRevision > 0, !overflow else {
+            return .persistenceFailed
+        }
+        nextRevision = incrementedRevision
         let record = LocalPickRecord(
             id: id,
             selection: selection,
@@ -168,7 +181,15 @@ final class LocalPickStore {
             syncState: .queued
         )
         records[id] = record
-        _ = persistV2()
+        guard persistV2() else {
+            nextRevision = previousNextRevision
+            if let previousRecord {
+                records[id] = previousRecord
+            } else {
+                records[id] = nil
+            }
+            return .persistenceFailed
+        }
         return .saved(record)
     }
 
@@ -181,18 +202,28 @@ final class LocalPickStore {
         guard var record = records[id], record.revision == revision else {
             return false
         }
+        switch record.syncState {
+        case .confirmed, .conflict, .expired:
+            return false
+        case .queued, .syncing:
+            break
+        }
         if case .syncing(let stateRevision, _) = syncState,
            stateRevision != revision {
             return false
         }
 
-        let newlyExpired = record.syncState != .expired && syncState == .expired
+        let previousRecord = record
+        let newlyExpired = syncState == .expired
         record.syncState = syncState
         records[id] = record
+        guard persistV2() else {
+            records[id] = previousRecord
+            return false
+        }
         if newlyExpired {
             expiredMigrationNoticeCount += 1
         }
-        _ = persistV2()
         return true
     }
 
@@ -229,34 +260,46 @@ final class LocalPickStore {
             tenthPlaceDriverID: pick.p10Id,
             dnfDriverID: pick.dnfId
         )
-        return save(
+        switch save(
             selection: selection,
             race: race,
             owner: .guest,
             now: clock.now()
-        ) != .locked
+        ) {
+        case .saved, .unchanged:
+            return true
+        case .locked, .invalidOwner, .persistenceFailed:
+            return false
+        }
     }
 
-    func markSynced(raceId: String) {
+    @discardableResult
+    func markSynced(raceId: String, revision: UInt64?) -> Bool {
+        guard let revision else { return false }
         let id = LocalPickRecordID(owner: .guest, raceID: raceId)
-        guard let record = records[id] else { return }
-        _ = transition(id: id, revision: record.revision, to: .confirmed)
+        return transition(id: id, revision: revision, to: .confirmed)
     }
 
-    func markMigrationExpired(raceId: String) {
+    @discardableResult
+    func markMigrationExpired(raceId: String, revision: UInt64?) -> Bool {
+        guard let revision else { return false }
         let id = LocalPickRecordID(owner: .guest, raceID: raceId)
-        guard let record = records[id] else { return }
-        _ = transition(id: id, revision: record.revision, to: .expired)
+        return transition(id: id, revision: revision, to: .expired)
     }
 
     func clearExpiredMigrationNotice() {
         expiredMigrationNoticeCount = 0
     }
 
-    func remove(raceId: String) {
+    @discardableResult
+    func remove(raceId: String) -> Bool {
         let id = LocalPickRecordID(owner: .guest, raceID: raceId)
-        guard records.removeValue(forKey: id) != nil else { return }
-        _ = persistV2()
+        guard let removed = records.removeValue(forKey: id) else { return false }
+        guard persistV2() else {
+            records[id] = removed
+            return false
+        }
+        return true
     }
 
     private func legacyPick(from record: LocalPickRecord) -> LocalPick {
@@ -271,7 +314,8 @@ final class LocalPickStore {
             dnfId: record.selection.dnfDriverID,
             savedAt: record.savedAt,
             synced: isConfirmed,
-            migrationStatus: migrationStatus
+            migrationStatus: migrationStatus,
+            revision: record.revision
         )
     }
 
@@ -282,20 +326,18 @@ final class LocalPickStore {
             guard let envelope = try? JSONDecoder().decode(
                 LocalPickEnvelopeV2.self,
                 from: v2Data
-            ), envelope.schemaVersion == LocalPickEnvelopeV2.currentSchemaVersion
+            ), envelope.schemaVersion == LocalPickEnvelopeV2.currentSchemaVersion,
+               isValid(envelope)
             else {
                 // Preserve unsupported/corrupt future data rather than overwriting it.
+                canPersistV2 = false
                 return
             }
 
             for record in envelope.records {
-                if let existing = records[record.id], existing.revision >= record.revision {
-                    continue
-                }
                 records[record.id] = record
             }
-            let highestRevision = records.values.map(\.revision).max() ?? 0
-            nextRevision = max(envelope.nextRevision, highestRevision + 1, 1)
+            nextRevision = envelope.nextRevision
 
             var normalizedSyncing = false
             for id in Array(records.keys) {
@@ -346,16 +388,49 @@ final class LocalPickStore {
                 revision: nextRevision,
                 syncState: syncState
             )
-            nextRevision &+= 1
+            let (incrementedRevision, overflow) = nextRevision.addingReportingOverflow(1)
+            guard nextRevision > 0, !overflow else {
+                records.removeAll()
+                canPersistV2 = false
+                return
+            }
+            nextRevision = incrementedRevision
         }
 
-        guard persistV2() else { return }
-        persistence.removeData(forKey: Self.v1Key)
-        persistence.removeData(forKey: Self.legacyKey)
+        // Keep v1 for this process. A later initialization must decode v2 before
+        // either legacy key is removed, so an acknowledged in-memory write alone
+        // can never destroy the only durable copy.
+        _ = persistV2()
+    }
+
+    private func isValid(_ envelope: LocalPickEnvelopeV2) -> Bool {
+        guard envelope.nextRevision > 0, envelope.nextRevision < .max else {
+            return false
+        }
+
+        var ids = Set<LocalPickRecordID>()
+        var revisions = Set<UInt64>()
+        var highestRevision: UInt64 = 0
+
+        for record in envelope.records {
+            guard record.revision > 0,
+                  ids.insert(record.id).inserted,
+                  revisions.insert(record.revision).inserted
+            else { return false }
+
+            if case .syncing(let stateRevision, _) = record.syncState,
+               stateRevision != record.revision {
+                return false
+            }
+            highestRevision = max(highestRevision, record.revision)
+        }
+
+        return envelope.nextRevision > highestRevision
     }
 
     @discardableResult
     private func persistV2() -> Bool {
+        guard canPersistV2 else { return false }
         let envelope = LocalPickEnvelopeV2(
             schemaVersion: LocalPickEnvelopeV2.currentSchemaVersion,
             nextRevision: nextRevision,
