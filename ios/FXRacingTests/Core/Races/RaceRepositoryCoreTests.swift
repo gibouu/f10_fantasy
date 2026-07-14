@@ -338,14 +338,14 @@ final class RaceRepositoryCoreTests: XCTestCase {
         }
     }
 
-    func testCurrentListStatusOverridesCachedDetailStatusForFreshness() async throws {
+    func testListAndDetailStatusMismatchIsNeverFresh() async throws {
         let cases: [(
             listStatus: RaceStatus,
             detailStatus: RaceStatus,
             expectedCalls: Int
         )] = [
             (.live, .completed, 1),
-            (.completed, .live, 0),
+            (.completed, .live, 1),
         ]
 
         for (index, testCase) in cases.enumerated() {
@@ -872,6 +872,95 @@ final class RaceRepositoryCoreTests: XCTestCase {
         XCTAssertEqual(visibleCancellations, 0)
     }
 
+    func testReplacingPrefetchScopeCancelsFlightAfterVisibleDemandIsCancelled() async {
+        let formerlyVisible = RaceFixtures.race(
+            id: "prefetch-formerly-visible",
+            round: 1,
+            status: .upcoming,
+            startOffset: 3_600
+        )
+        let staleNeighbor = RaceFixtures.race(
+            id: "prefetch-former-neighbor",
+            round: 2,
+            status: .upcoming,
+            startOffset: 7_200
+        )
+        let active = RaceFixtures.race(
+            id: "prefetch-new-active",
+            round: 3,
+            status: .upcoming,
+            startOffset: 10_800
+        )
+        let next = RaceFixtures.race(
+            id: "prefetch-new-next",
+            round: 4,
+            status: .upcoming,
+            startOffset: 14_400
+        )
+        let races = [formerlyVisible, staleNeighbor, active, next]
+        let api = CancellableDetailAPIClientSpy(
+            payloads: races.reduce(into: [:]) {
+                $0["/api/races/\($1.id)"] = makeDetailPayload(race: $1)
+            }
+        )
+        let events = RepositoryEventProbe()
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed,
+            onEvent: { event in await events.record(event) }
+        )
+        let visiblePath = "/api/races/\(formerlyVisible.id)"
+        let stalePath = "/api/races/\(staleNeighbor.id)"
+        let activePath = "/api/races/\(active.id)"
+        let nextPath = "/api/races/\(next.id)"
+
+        let firstPrefetch = Task {
+            await repository.replaceDetailPrefetch(
+                ids: [formerlyVisible.id, staleNeighbor.id]
+            )
+        }
+        await api.waitForCalls(to: visiblePath, count: 1)
+        await api.waitForCalls(to: stalePath, count: 1)
+
+        let visibleDetail = Task {
+            try await repository.refreshDetail(
+                id: formerlyVisible.id,
+                policy: .force
+            )
+        }
+        await events.waitForDetailJoins(id: formerlyVisible.id, count: 1)
+        visibleDetail.cancel()
+
+        let replacement = Task {
+            await repository.replaceDetailPrefetch(ids: [active.id, next.id])
+        }
+        await api.waitForCancellations(to: stalePath, count: 1)
+        await api.waitForCalls(to: activePath, count: 1)
+        await api.waitForCalls(to: nextPath, count: 1)
+        await api.waitForCancellations(to: visiblePath, count: 1)
+
+        let visibleCancellations = await api.cancellations(to: visiblePath)
+        XCTAssertEqual(
+            visibleCancellations,
+            1,
+            "a cancelled visible waiter must not permanently promote its old prefetch flight"
+        )
+        let pendingRequestCount = await api.pendingRequestCount()
+        XCTAssertEqual(
+            pendingRequestCount,
+            2,
+            "only the active race and its next neighbor may remain in flight"
+        )
+
+        await api.releaseRequests(to: visiblePath)
+        await api.releaseRequests(to: activePath)
+        await api.releaseRequests(to: nextPath)
+        _ = try? await visibleDetail.value
+        await replacement.value
+        await firstPrefetch.value
+    }
+
     func testCancelledPrefetchCannotPublishAfterNewerVisibleSameIDFlight() async throws {
         let race = RaceFixtures.race(
             id: "prefetch-same-id",
@@ -1140,6 +1229,10 @@ private actor CancellableDetailAPIClientSpy: APIRequesting {
 
     func cancellations(to path: String) -> Int {
         cancellationCounts[path, default: 0]
+    }
+
+    func pendingRequestCount() -> Int {
+        pendingRequests.count
     }
 
     private func cancelRequest(id: Int) {

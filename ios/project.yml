@@ -94,6 +94,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.fxracing.app.uitests
         GENERATE_INFOPLIST_FILE: YES
+      configs:
+        Performance:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: FX_PERF_HARNESS
 
 schemes:
   FXRacing:
@@ -106,7 +109,6 @@ schemes:
       config: Debug
       targets:
         - FXRacingTests
-        - FXRacingUITests
     profile:
       config: Release
     analyze:
@@ -122,8 +124,9 @@ schemes:
       config: Performance
     test:
       config: Performance
+      debugEnabled: false
+      disableMainThreadChecker: true
       targets:
-        - FXRacingTests
         - FXRacingUITests
     profile:
       config: Performance

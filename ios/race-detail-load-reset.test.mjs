@@ -6,8 +6,12 @@ const source = await readFile(
   new URL("./FXRacing/Features/Races/RaceDetailViewModel.swift", import.meta.url),
   "utf8",
 )
-const viewSource = await readFile(
-  new URL("./FXRacing/Features/Races/RaceDetailView.swift", import.meta.url),
+const deckSource = await readFile(
+  new URL("./FXRacing/Features/Races/RaceDeckView.swift", import.meta.url),
+  "utf8",
+)
+const pastCardSource = await readFile(
+  new URL("./FXRacing/Features/Races/PastRaceCard.swift", import.meta.url),
   "utf8",
 )
 
@@ -72,13 +76,62 @@ test("loading and saving expose explicit non-blocking state", () => {
   assert.match(source, /func refresh\(/)
 })
 
-test("the open detail sheet observes shared local sync transitions", () => {
+test("the selected race observes local sync and renders server-owned scoring", () => {
   assert.match(source, /func reconcileLocalState\(/)
-  assert.match(viewSource, /onChange\(of: observedGuestRecord\)/)
-  assert.match(viewSource, /onChange\(of: observedAccountRecord\)/)
-  assert.match(viewSource, /viewModel\.reconcileLocalState\(/)
-  assert.match(
-    viewSource,
-    /viewModel\.selectedWinnerID\s*\?\?\s*viewModel\.serverPick\?\.winnerDriverId/,
+  assert.match(deckSource, /onChange\(of: observedGuestRecord\)/)
+  assert.match(deckSource, /onChange\(of: observedAccountRecord\)/)
+  assert.match(deckSource, /scopedSelectedDetail\?\.reconcileLocalState\(/)
+  assert.match(pastCardSource, /serverPick\?\.scoreBreakdown/)
+  assert.match(pastCardSource, /breakdown\?\.dnfBonus/)
+  assert.doesNotMatch(pastCardSource, /results\.first[\s\S]*status\s*==\s*\.dnf/)
+})
+
+test("past races separate retained device drafts from official scoring", () => {
+  assert.match(source, /var unsubmittedDeviceDraft:\s*PickSelection\?/)
+  assert.match(pastCardSource, /Device draft — not submitted/)
+
+  const draftSection = pastCardSource.slice(
+    pastCardSource.indexOf("private func deviceDraft"),
+    pastCardSource.indexOf("private var loadingScore"),
   )
+  assert.match(draftSection, /unsubmittedDeviceDraft/)
+  assert.doesNotMatch(draftSection, /scoreBreakdown|points:/)
+})
+
+test("race-detail models are isolated by private session scope", () => {
+  assert.match(deckSource, /privateScopeID/)
+  assert.match(deckSource, /selectedDetailScopeID/)
+  assert.match(deckSource, /viewModel\.detailViewModel\(\s*for:\s*race,\s*privateScopeID:/)
+  assert.match(deckSource, /viewModel\.existingDetailViewModel\(\s*for:\s*race\.id,\s*privateScopeID:/)
+})
+
+test("session-scope observation cannot clear the replacement detail task", () => {
+  const start = deckSource.indexOf(".onChange(of: privateScopeID)")
+  const end = deckSource.indexOf(".onChange(of: viewModel.transitionedRaceID)", start)
+  const scopeChange = deckSource.slice(start, end)
+
+  assert.notEqual(start, -1)
+  assert.notEqual(end, -1)
+  assert.match(scopeChange, /isShowingPicker = false/)
+  assert.doesNotMatch(scopeChange, /selectedDetail\?\.cancelLoad\(\)/)
+  assert.doesNotMatch(scopeChange, /selectedDetail = nil/)
+  assert.doesNotMatch(scopeChange, /viewModel\.setPrivateScope/)
+})
+
+test("foreground refresh replaces detail hydration without a cancellation gap", () => {
+  const start = deckSource.indexOf("private func refreshSelectedDetail()")
+  const end = deckSource.indexOf("private func refreshSelectedDetailNow()", start)
+  const refresh = deckSource.slice(start, end)
+
+  assert.notEqual(start, -1)
+  assert.notEqual(end, -1)
+  assert.match(refresh, /await detail\.refresh\(/)
+  assert.doesNotMatch(refresh, /detail\.cancelLoad\(\)/)
+})
+
+test("swiping away cancels obsolete selected-detail hydration", () => {
+  assert.match(source, /func cancelLoad\(\)/)
+  assert.match(deckSource, /currentDetail\.cancelLoad\(\)/)
+  assert.match(deckSource, /selectedDetail\?\.cancelLoad\(\)/)
+  assert.match(deckSource, /detail\.race\.id == selectedRaceID/)
 })

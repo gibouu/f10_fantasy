@@ -42,7 +42,7 @@ actor RaceRepository: RaceRepositoryProtocol {
         let token: UInt64
         let epoch: UInt64
         let task: Task<RaceDetailSnapshot, Error>
-        var isPrefetchOnly: Bool
+        var visibleWaiterCount: Int
     }
 
     private struct DetailEpochBarrier: Sendable {
@@ -191,9 +191,9 @@ actor RaceRepository: RaceRepositoryProtocol {
         }
         try ensureCurrent(demand: demand, id: id)
 
-        if let task = currentDetailFlight(id: id, demand: demand) {
+        if let task = acquireCurrentDetailFlight(id: id, demand: demand) {
             await onEvent?(.joinedDetailFlight(id))
-            return try await task.task.value
+            return try await awaitDetailFlight(task, id: id, demand: demand)
         }
 
         var cached: RaceDetailSnapshot?
@@ -208,9 +208,9 @@ actor RaceRepository: RaceRepositoryProtocol {
         }
         try ensureCurrent(demand: demand, id: id)
 
-        if let task = currentDetailFlight(id: id, demand: demand) {
+        if let task = acquireCurrentDetailFlight(id: id, demand: demand) {
             await onEvent?(.joinedDetailFlight(id))
-            return try await task.task.value
+            return try await awaitDetailFlight(task, id: id, demand: demand)
         }
 
         if cached != nil {
@@ -220,9 +220,9 @@ actor RaceRepository: RaceRepositoryProtocol {
                     throw APIError.notFound
                 }
                 try ensureCurrent(demand: demand, id: id)
-                if let task = currentDetailFlight(id: id, demand: demand) {
+                if let task = acquireCurrentDetailFlight(id: id, demand: demand) {
                     await onEvent?(.joinedDetailFlight(id))
-                    return try await task.task.value
+                    return try await awaitDetailFlight(task, id: id, demand: demand)
                 }
                 cached = details[id]
             }
@@ -240,14 +240,15 @@ actor RaceRepository: RaceRepositoryProtocol {
         let task = Task {
             try await self.fetchAndPublishDetail(id: id, token: token, epoch: epoch)
         }
-        detailTasks[id] = DetailFlight(
+        let flight = DetailFlight(
             token: token,
             epoch: epoch,
             task: task,
-            isPrefetchOnly: demand.isPrefetch
+            visibleWaiterCount: demand.isPrefetch ? 0 : 1
         )
+        detailTasks[id] = flight
         await onEvent?(.startedDetailFlight(id))
-        return try await task.value
+        return try await awaitDetailFlight(flight, id: id, demand: demand)
     }
 
     func prefetchDetail(ids: [String]) async {
@@ -272,7 +273,9 @@ actor RaceRepository: RaceRepositoryProtocol {
         prefetchScopeIDs = nextScope
 
         for id in removedIDs {
-            guard let flight = detailTasks[id], flight.isPrefetchOnly else { continue }
+            guard let flight = detailTasks[id], flight.visibleWaiterCount == 0 else {
+                continue
+            }
             flight.task.cancel()
             detailTasks[id] = nil
         }
@@ -399,7 +402,7 @@ actor RaceRepository: RaceRepositoryProtocol {
         return snapshot
     }
 
-    private func currentDetailFlight(
+    private func acquireCurrentDetailFlight(
         id: String,
         demand: DetailDemand
     ) -> DetailFlight? {
@@ -412,11 +415,47 @@ actor RaceRepository: RaceRepositoryProtocol {
             return nil
         }
 
-        if case .visible = demand, flight.isPrefetchOnly {
-            flight.isPrefetchOnly = false
+        if case .visible = demand {
+            flight.visibleWaiterCount += 1
             detailTasks[id] = flight
         }
         return flight
+    }
+
+    private func awaitDetailFlight(
+        _ flight: DetailFlight,
+        id: String,
+        demand: DetailDemand
+    ) async throws -> RaceDetailSnapshot {
+        guard case .visible = demand else {
+            return try await flight.task.value
+        }
+
+        return try await withTaskCancellationHandler {
+            try await flight.task.value
+        } onCancel: {
+            Task {
+                await self.releaseVisibleDetailDemand(
+                    id: id,
+                    token: flight.token
+                )
+            }
+        }
+    }
+
+    private func releaseVisibleDetailDemand(id: String, token: UInt64) {
+        guard var flight = detailTasks[id],
+              flight.token == token,
+              flight.visibleWaiterCount > 0
+        else { return }
+
+        flight.visibleWaiterCount -= 1
+        if flight.visibleWaiterCount == 0, !prefetchScopeIDs.contains(id) {
+            flight.task.cancel()
+            detailTasks[id] = nil
+        } else {
+            detailTasks[id] = flight
+        }
     }
 
     private func ensureCurrent(demand: DetailDemand, id: String) throws {
@@ -480,8 +519,11 @@ actor RaceRepository: RaceRepositoryProtocol {
             return false
         }
 
-        let status = list?.races.first { $0.id == snapshot.race.id }?.status
-            ?? snapshot.race.status
+        let listStatus = list?.races.first { $0.id == snapshot.race.id }?.status
+        if let listStatus, listStatus != snapshot.race.status {
+            return false
+        }
+        let status = listStatus ?? snapshot.race.status
         let lifetime: TimeInterval = switch status {
         case .upcoming:
             300

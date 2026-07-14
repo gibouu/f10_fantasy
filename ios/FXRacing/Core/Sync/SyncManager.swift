@@ -11,14 +11,27 @@ enum PickSyncResult: Sendable {
 /// Serializes each owner/race outbox record through one revision-checked worker.
 @MainActor
 final class SyncManager {
+    struct SessionLease: Equatable, Sendable {
+        fileprivate let id: UUID
+        let userID: String
+        fileprivate let token: String
+    }
+
     private struct Worker {
         let token: UUID
+        let sessionID: UUID?
         let task: Task<PickSyncResult, Never>
     }
 
     private struct RaceLane {
         let token: UUID
+        let sessionID: UUID?
         let task: Task<Void, Never>
+    }
+
+    private enum AuthoritativePickResult {
+        case resolved(Pick?)
+        case unauthorized
     }
 
     private let api: any APIRequesting
@@ -26,6 +39,9 @@ final class SyncManager {
     private var workers: [LocalPickRecordID: Worker] = [:]
     private var raceLanes: [String: RaceLane] = [:]
     private var latestExplicitRevision: [LocalPickRecordID: UInt64] = [:]
+    private var activeSession: SessionLease?
+    private var unauthorizedHandler: ((String) -> Void)?
+    private var requiresActiveSession = false
 
     init(
         api: any APIRequesting = APIClient(),
@@ -35,6 +51,62 @@ final class SyncManager {
         self.clock = clock
     }
 
+    func setUnauthorizedHandler(_ handler: @escaping (String) -> Void) {
+        unauthorizedHandler = handler
+        requiresActiveSession = true
+    }
+
+    /// Central entry point for private requests that receive a 401. The auth
+    /// owner validates the rejected token before changing the active session.
+    func reportUnauthorized(rejectedToken: String) {
+        unauthorizedHandler?(rejectedToken)
+    }
+
+    func beginSession(
+        currentUserID: String,
+        token: String,
+        localPickStore: LocalPickStore
+    ) -> SessionLease {
+        invalidateSession(localPickStore: localPickStore)
+        let lease = SessionLease(
+            id: UUID(),
+            userID: currentUserID,
+            token: token
+        )
+        activeSession = lease
+        return lease
+    }
+
+    func invalidateSession(localPickStore: LocalPickStore?) {
+        guard let sessionID = activeSession?.id else { return }
+
+        let staleWorkers = workers.filter {
+            $0.value.sessionID == sessionID
+        }
+        for (id, worker) in staleWorkers {
+            worker.task.cancel()
+            if let record = localPickStore?.record(id: id),
+               case .syncing(let revision, _) = record.syncState {
+                _ = localPickStore?.transition(
+                    id: id,
+                    revision: revision,
+                    to: .queued
+                )
+            }
+            workers[id] = nil
+            latestExplicitRevision[id] = nil
+        }
+
+        let staleLanes = raceLanes.filter {
+            $0.value.sessionID == sessionID
+        }
+        for (raceID, lane) in staleLanes {
+            lane.task.cancel()
+            raceLanes[raceID] = nil
+        }
+        activeSession = nil
+    }
+
     func submitExplicit(
         id: LocalPickRecordID,
         revision: UInt64,
@@ -42,6 +114,13 @@ final class SyncManager {
         token: String,
         localPickStore: LocalPickStore
     ) async -> PickSyncResult {
+        let sessionLease = activeLease(
+            currentUserID: currentUserID,
+            token: token
+        )
+        guard !requiresActiveSession || sessionLease != nil else {
+            return .queued
+        }
         guard case .user(let ownerID) = id.owner,
               ownerID == currentUserID,
               let record = localPickStore.record(id: id),
@@ -58,7 +137,8 @@ final class SyncManager {
             currentUserID: currentUserID,
             token: token,
             localPickStore: localPickStore,
-            races: []
+            races: [],
+            sessionLease: sessionLease
         )
     }
 
@@ -66,15 +146,25 @@ final class SyncManager {
         currentUserID: String,
         token: String,
         localPickStore: LocalPickStore,
-        races: [Race] = []
+        races: [Race] = [],
+        sessionLease: SessionLease? = nil
     ) async {
-        for record in localPickStore.queuedRecords(currentUserID: currentUserID) {
+        guard isCurrent(sessionLease) else { return }
+        let records = localPickStore.retryableRecords(
+            currentUserID: currentUserID
+        ).filter { record in
+            guard case .syncing = record.syncState else { return true }
+            return workers[record.id] == nil
+        }
+        for record in records {
+            guard isCurrent(sessionLease) else { return }
             let result = await runOrJoin(
                 id: record.id,
                 currentUserID: currentUserID,
                 token: token,
                 localPickStore: localPickStore,
-                races: races
+                races: races,
+                sessionLease: sessionLease
             )
             if case .unauthorized = result {
                 return
@@ -87,8 +177,10 @@ final class SyncManager {
         currentUserID: String,
         token: String,
         localPickStore: LocalPickStore,
-        races: [Race]
+        races: [Race],
+        sessionLease: SessionLease? = nil
     ) async -> PickSyncResult {
+        guard isCurrent(sessionLease) else { return .queued }
         if let worker = workers[id] {
             return await worker.task.value
         }
@@ -98,23 +190,34 @@ final class SyncManager {
         let workerToken = UUID()
         let task = Task { @MainActor [weak self] in
             await previousLane?.value
-            guard let self else { return PickSyncResult.queued }
+            guard let self, self.isCurrent(sessionLease) else {
+                return PickSyncResult.queued
+            }
             let result = await self.runWorker(
                 id: id,
                 currentUserID: currentUserID,
                 token: token,
                 localPickStore: localPickStore,
-                races: races
+                races: races,
+                sessionLease: sessionLease
             )
             self.finishWorker(id: id, token: workerToken)
             return result
         }
-        workers[id] = Worker(token: workerToken, task: task)
+        workers[id] = Worker(
+            token: workerToken,
+            sessionID: sessionLease?.id,
+            task: task
+        )
         let laneTask = Task { @MainActor [weak self] in
             _ = await task.value
             self?.finishRaceLane(raceID: id.raceID, token: laneToken)
         }
-        raceLanes[id.raceID] = RaceLane(token: laneToken, task: laneTask)
+        raceLanes[id.raceID] = RaceLane(
+            token: laneToken,
+            sessionID: sessionLease?.id,
+            task: laneTask
+        )
         return await task.value
     }
 
@@ -134,9 +237,11 @@ final class SyncManager {
         currentUserID: String,
         token: String,
         localPickStore: LocalPickStore,
-        races: [Race]
+        races: [Race],
+        sessionLease: SessionLease?
     ) async -> PickSyncResult {
         while true {
+            guard isCurrent(sessionLease) else { return .queued }
             guard let record = localPickStore.record(id: id),
                   isEligible(record.id.owner, currentUserID: currentUserID),
                   isProcessable(record.syncState, revision: record.revision)
@@ -145,7 +250,8 @@ final class SyncManager {
             if discardSupersededGuest(
                 record,
                 currentUserID: currentUserID,
-                localPickStore: localPickStore
+                localPickStore: localPickStore,
+                sessionLease: sessionLease
             ) {
                 return .queued
             }
@@ -159,6 +265,7 @@ final class SyncManager {
                     : .authenticatedRetry
 
             if record.syncState == .queued {
+                guard isCurrent(sessionLease) else { return .queued }
                 guard localPickStore.transition(
                     id: id,
                     revision: revision,
@@ -174,15 +281,18 @@ final class SyncManager {
                         id: id,
                         revision: revision,
                         localPickStore: localPickStore,
-                        success: .expired(nil)
+                        success: .expired(nil),
+                        sessionLease: sessionLease
                     )
                 }
 
                 do {
+                    guard isCurrent(sessionLease) else { return .queued }
                     let response: PickResponse = try await api.request(
                         .pickForRace(raceId: id.raceID),
                         token: token
                     )
+                    guard isCurrent(sessionLease) else { return .queued }
                     if shouldFollowNewerExplicitRevision(
                         id: id,
                         capturedRevision: revision,
@@ -199,8 +309,22 @@ final class SyncManager {
                     if discardSupersededGuest(
                         record,
                         currentUserID: currentUserID,
-                        localPickStore: localPickStore
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
                     ) {
+                        return .queued
+                    }
+
+                    guard localPickStore.preserveAuthoritative(
+                        response.pick,
+                        for: .user(currentUserID)
+                    ) else {
+                        queueCapturedRevision(
+                            id: id,
+                            revision: revision,
+                            localPickStore: localPickStore,
+                            sessionLease: sessionLease
+                        )
                         return .queued
                     }
 
@@ -211,7 +335,8 @@ final class SyncManager {
                             revision: revision,
                             localPickStore: localPickStore,
                             success: .saved(response.pick),
-                            confirmedUserID: currentUserID
+                            confirmedUserID: currentUserID,
+                            sessionLease: sessionLease
                         )
                     }
 
@@ -224,19 +349,25 @@ final class SyncManager {
                             id: id,
                             revision: revision,
                             localPickStore: localPickStore,
-                            success: .conflict(response.pick)
+                            success: .conflict(response.pick),
+                            sessionLease: sessionLease
                         )
                     }
                 } catch APIError.notFound {
+                    guard isCurrent(sessionLease) else { return .queued }
                     // A missing server pick is the only automatic path to POST.
                 } catch APIError.unauthorized {
+                    guard isCurrent(sessionLease) else { return .queued }
                     queueCapturedRevision(
                         id: id,
                         revision: revision,
-                        localPickStore: localPickStore
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
                     )
+                    reportUnauthorized(rejectedToken: token)
                     return .unauthorized
                 } catch APIError.serverError(let code, _) where code == 423 {
+                    guard isCurrent(sessionLease) else { return .queued }
                     if shouldFollowNewerExplicitRevision(
                         id: id,
                         capturedRevision: revision,
@@ -248,11 +379,13 @@ final class SyncManager {
                         queueCapturedRevision(
                             id: id,
                             revision: revision,
-                            localPickStore: localPickStore
+                            localPickStore: localPickStore,
+                            sessionLease: sessionLease
                         )
                         return .queued
                     }
                 } catch {
+                    guard isCurrent(sessionLease) else { return .queued }
                     if shouldFollowNewerExplicitRevision(
                         id: id,
                         capturedRevision: revision,
@@ -264,7 +397,8 @@ final class SyncManager {
                         queueCapturedRevision(
                             id: id,
                             revision: revision,
-                            localPickStore: localPickStore
+                            localPickStore: localPickStore,
+                            sessionLease: sessionLease
                         )
                         return .queued
                     }
@@ -286,12 +420,14 @@ final class SyncManager {
             if discardSupersededGuest(
                 record,
                 currentUserID: currentUserID,
-                localPickStore: localPickStore
+                localPickStore: localPickStore,
+                sessionLease: sessionLease
             ) {
                 return .queued
             }
 
             do {
+                guard isCurrent(sessionLease) else { return .queued }
                 let response: PickResponse = try await api.request(
                     .submitPick(
                         raceId: id.raceID,
@@ -301,6 +437,7 @@ final class SyncManager {
                     ),
                     token: token
                 )
+                guard isCurrent(sessionLease) else { return .queued }
                 if shouldFollowNewerExplicitRevision(
                     id: id,
                     capturedRevision: revision,
@@ -308,22 +445,68 @@ final class SyncManager {
                 ) {
                     continue
                 }
+                guard localPickStore.preserveAuthoritative(
+                    response.pick,
+                    for: .user(currentUserID)
+                ) else {
+                    queueCapturedRevision(
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
+                    )
+                    return .queued
+                }
                 return terminalResult(
                     .confirmed,
                     id: id,
                     revision: revision,
                     localPickStore: localPickStore,
                     success: .saved(response.pick),
-                    confirmedUserID: currentUserID
+                    confirmedUserID: currentUserID,
+                    sessionLease: sessionLease
                 )
             } catch APIError.unauthorized {
+                guard isCurrent(sessionLease) else { return .queued }
                 queueCapturedRevision(
                     id: id,
                     revision: revision,
-                    localPickStore: localPickStore
+                    localPickStore: localPickStore,
+                    sessionLease: sessionLease
                 )
+                reportUnauthorized(rejectedToken: token)
                 return .unauthorized
             } catch APIError.serverError(let code, _) where code == 423 {
+                guard isCurrent(sessionLease) else { return .queued }
+                if shouldFollowNewerExplicitRevision(
+                    id: id,
+                    capturedRevision: revision,
+                    localPickStore: localPickStore
+                ) {
+                    continue
+                }
+                let authoritativeResult = await fetchAuthoritativePick(
+                    raceID: id.raceID,
+                    currentUserID: currentUserID,
+                    token: token,
+                    localPickStore: localPickStore,
+                    sessionLease: sessionLease
+                )
+                guard isCurrent(sessionLease) else { return .queued }
+                let authoritativePick: Pick?
+                switch authoritativeResult {
+                case .resolved(let pick):
+                    authoritativePick = pick
+                case .unauthorized:
+                    queueCapturedRevision(
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
+                    )
+                    reportUnauthorized(rejectedToken: token)
+                    return .unauthorized
+                }
                 if shouldFollowNewerExplicitRevision(
                     id: id,
                     capturedRevision: revision,
@@ -336,9 +519,11 @@ final class SyncManager {
                     id: id,
                     revision: revision,
                     localPickStore: localPickStore,
-                    success: .expired(nil)
+                    success: .expired(authoritativePick),
+                    sessionLease: sessionLease
                 )
             } catch {
+                guard isCurrent(sessionLease) else { return .queued }
                 if shouldFollowNewerExplicitRevision(
                     id: id,
                     capturedRevision: revision,
@@ -349,7 +534,8 @@ final class SyncManager {
                 queueCapturedRevision(
                     id: id,
                     revision: revision,
-                    localPickStore: localPickStore
+                    localPickStore: localPickStore,
+                    sessionLease: sessionLease
                 )
                 return .queued
             }
@@ -362,8 +548,10 @@ final class SyncManager {
         revision: UInt64,
         localPickStore: LocalPickStore,
         success: PickSyncResult,
-        confirmedUserID: String? = nil
+        confirmedUserID: String? = nil,
+        sessionLease: SessionLease?
     ) -> PickSyncResult {
+        guard isCurrent(sessionLease) else { return .queued }
         if state == .confirmed,
            id.owner == .guest,
            let confirmedUserID,
@@ -386,7 +574,8 @@ final class SyncManager {
                     queueCapturedRevision(
                         id: id,
                         revision: revision,
-                        localPickStore: localPickStore
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
                     )
                     return .queued
                 }
@@ -400,7 +589,8 @@ final class SyncManager {
             queueCapturedRevision(
                 id: id,
                 revision: revision,
-                localPickStore: localPickStore
+                localPickStore: localPickStore,
+                sessionLease: sessionLease
             )
             return .queued
         }
@@ -410,8 +600,10 @@ final class SyncManager {
     private func queueCapturedRevision(
         id: LocalPickRecordID,
         revision: UInt64,
-        localPickStore: LocalPickStore
+        localPickStore: LocalPickStore,
+        sessionLease: SessionLease?
     ) {
+        guard isCurrent(sessionLease) else { return }
         guard let record = localPickStore.record(id: id),
               record.revision == revision,
               case .syncing = record.syncState
@@ -419,11 +611,39 @@ final class SyncManager {
         _ = localPickStore.transition(id: id, revision: revision, to: .queued)
     }
 
+    private func fetchAuthoritativePick(
+        raceID: String,
+        currentUserID: String,
+        token: String,
+        localPickStore: LocalPickStore,
+        sessionLease: SessionLease?
+    ) async -> AuthoritativePickResult {
+        guard isCurrent(sessionLease) else { return .resolved(nil) }
+        do {
+            let response: PickResponse = try await api.request(
+                .pickForRace(raceId: raceID),
+                token: token
+            )
+            guard isCurrent(sessionLease) else { return .resolved(nil) }
+            guard localPickStore.preserveAuthoritative(
+                response.pick,
+                for: .user(currentUserID)
+            ) else { return .resolved(nil) }
+            return .resolved(response.pick)
+        } catch APIError.unauthorized {
+            return .unauthorized
+        } catch {
+            return .resolved(nil)
+        }
+    }
+
     private func discardSupersededGuest(
         _ guestRecord: LocalPickRecord,
         currentUserID: String,
-        localPickStore: LocalPickStore
+        localPickStore: LocalPickStore,
+        sessionLease: SessionLease?
     ) -> Bool {
+        guard isCurrent(sessionLease) else { return false }
         guard guestRecord.id.owner == .guest,
               let currentGuest = localPickStore.record(id: guestRecord.id),
               currentGuest.revision == guestRecord.revision,
@@ -472,11 +692,32 @@ final class SyncManager {
         }
     }
 
+    private func isCurrent(
+        _ sessionLease: SessionLease?
+    ) -> Bool {
+        guard let sessionLease else { return !requiresActiveSession }
+        return !Task.isCancelled
+            && activeSession == sessionLease
+    }
+
+    private func activeLease(
+        currentUserID: String,
+        token: String
+    ) -> SessionLease? {
+        guard let activeSession,
+              activeSession.userID == currentUserID,
+              activeSession.token == token
+        else { return nil }
+        return activeSession
+    }
+
     private func isProcessable(
         _ state: LocalPickSyncState,
         revision: UInt64
     ) -> Bool {
         switch state {
+        case .reviewRequired:
+            return false
         case .queued:
             return true
         case .syncing(let stateRevision, _):

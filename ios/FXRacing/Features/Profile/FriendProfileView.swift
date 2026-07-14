@@ -103,9 +103,12 @@ struct FriendProfileView: View {
     private func avatarView(_ user: ProfileUser) -> some View {
         if let teamSlug = user.favoriteTeamSlug,
            let logoUrl = "/teamlogos/\(teamSlug).webp" as String? {
-            AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + logoUrl)) { img in
-                img.resizable().scaledToFit().padding(6)
-            } placeholder: {
+            FXRemoteImage(
+                url: URL(string: Config.apiBaseURL.absoluteString + logoUrl),
+                width: 38,
+                height: 38,
+                contentMode: .fit
+            ) {
                 ProgressView()
             }
             .frame(width: 50, height: 50)

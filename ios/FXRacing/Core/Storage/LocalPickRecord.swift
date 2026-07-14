@@ -30,11 +30,21 @@ enum PickSyncMode: String, Codable, Equatable, Sendable {
 }
 
 enum LocalPickSyncState: Codable, Equatable, Sendable {
+    case reviewRequired
     case queued
     case syncing(revision: UInt64, mode: PickSyncMode)
     case confirmed
     case conflict(PickConflictReason)
     case expired
+}
+
+enum LegacyPickRecoveryResult: Equatable, Sendable {
+    case recovered(LocalPickRecord)
+    case destinationOccupied(LocalPickRecord)
+    case notFound
+    case locked
+    case invalidOwner
+    case persistenceFailed
 }
 
 struct LocalPickRecord: Codable, Equatable, Sendable, Identifiable {

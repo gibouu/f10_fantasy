@@ -16,7 +16,7 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertTrue(requests.isEmpty)
     }
 
-    func testRestore200AuthenticatesBeforeResumingEligibleQueues() async throws {
+    func testRestore200AuthenticatesBeforeQueue401InvalidatesSession() async throws {
         let context = makeDefaults()
         defer { context.cleanUp() }
         let user = makeUser()
@@ -46,7 +46,9 @@ final class AuthManagerTests: XCTestCase {
 
         await api.releaseRequests(to: "/api/picks")
         await restore.value
-        XCTAssertEqual(tokenStore.operations, [.load])
+        XCTAssertEqual(manager.state, .unauthenticated)
+        XCTAssertNil(tokenStore.token)
+        XCTAssertEqual(tokenStore.operations, [.load, .load, .delete])
     }
 
     func testRestore401DeletesTokenAndPreservesLocalRecords() async throws {
@@ -131,7 +133,9 @@ final class AuthManagerTests: XCTestCase {
                 .failure(.networkFailed(AuthManagerTestError.offline)),
                 .json(user),
             ],
-            "GET /api/picks": [.failure(.unauthorized)],
+            "GET /api/picks": [
+                .failure(.networkFailed(AuthManagerTestError.offline)),
+            ],
         ])
         let tokenStore = TokenStoreSpy(token: "token-a")
         let manager = makeManager(
@@ -156,13 +160,15 @@ final class AuthManagerTests: XCTestCase {
         XCTAssertEqual(tokenStore.operations, [.load, .load])
     }
 
-    func testForegroundAuthenticatedResumesWithoutAnotherMeRequest() async throws {
+    func testForegroundAuthenticatedRevalidatesBeforeResumingEligibleQueues() async throws {
         let context = makeDefaults()
         defer { context.cleanUp() }
         let user = makeUser()
         let api = GatedAPIClientSpy(responses: [
-            "GET /api/users/me": [.json(user)],
-            "GET /api/picks": [.failure(.unauthorized)],
+            "GET /api/users/me": [.json(user), .json(user)],
+            "GET /api/picks": [
+                .failure(.networkFailed(AuthManagerTestError.offline)),
+            ],
         ])
         let tokenStore = TokenStoreSpy(token: "token-a")
         let manager = makeManager(
@@ -179,9 +185,62 @@ final class AuthManagerTests: XCTestCase {
         let pickCalls = await api.calls(to: "/api/picks")
 
         XCTAssertEqual(manager.state, .authenticated(user))
-        XCTAssertEqual(meCalls, 1)
+        XCTAssertEqual(meCalls, 2)
         XCTAssertEqual(pickCalls, 1)
         XCTAssertEqual(tokenStore.operations, [.load, .load])
+    }
+
+    func testForeground401DeletesTokenAndSignsOut() async {
+        let user = makeUser()
+        let api = GatedAPIClientSpy(responses: [
+            "GET /api/users/me": [
+                .json(user),
+                .failure(.unauthorized),
+            ],
+        ])
+        let tokenStore = TokenStoreSpy(token: "revoked-token")
+        let manager = makeManager(api: api, tokenStore: tokenStore)
+
+        await manager.restoreSession()
+        XCTAssertEqual(manager.state, .authenticated(user))
+
+        await manager.handleForeground()
+        let meCalls = await api.calls(to: "/api/users/me")
+
+        XCTAssertEqual(manager.state, .unauthenticated)
+        XCTAssertNil(tokenStore.token)
+        XCTAssertEqual(tokenStore.operations, [.load, .load, .delete])
+        XCTAssertEqual(meCalls, 2)
+    }
+
+    func testForegroundNetworkAndServerFailuresKeepCachedAccountAndToken() async {
+        let failures: [APIError] = [
+            .networkFailed(AuthManagerTestError.offline),
+            .serverError(503, "maintenance"),
+        ]
+
+        for (index, failure) in failures.enumerated() {
+            let user = makeUser(id: "cached-user-\(index)")
+            let token = "retained-token-\(index)"
+            let api = GatedAPIClientSpy(responses: [
+                "GET /api/users/me": [
+                    .json(user),
+                    .failure(failure),
+                ],
+            ])
+            let tokenStore = TokenStoreSpy(token: token)
+            let manager = makeManager(api: api, tokenStore: tokenStore)
+
+            await manager.restoreSession()
+            await manager.handleForeground()
+            let meCalls = await api.calls(to: "/api/users/me")
+
+            XCTAssertEqual(manager.state, .authenticated(user))
+            XCTAssertEqual(manager.authenticatedUser, user)
+            XCTAssertEqual(tokenStore.token, token)
+            XCTAssertEqual(tokenStore.operations, [.load, .load])
+            XCTAssertEqual(meCalls, 2)
+        }
     }
 
     func testSuccessfulExchangeStoresTokenWhenMeFallbackFails() async throws {
@@ -208,6 +267,57 @@ final class AuthManagerTests: XCTestCase {
         )
         XCTAssertNil(requests.first?.token)
         XCTAssertEqual(requests.last?.token, "exchange-token")
+    }
+
+    func testSignInWithApple401FromMeDeletesIssuedTokenAndSignsOut() async {
+        let api = GatedAPIClientSpy(responses: [
+            "POST /api/auth/mobile/exchange": [
+                .data(exchangeData(
+                    token: "revoked-exchange-token",
+                    userID: "exchange-user",
+                    username: "rookie"
+                )),
+            ],
+            "GET /api/users/me": [.failure(.unauthorized)],
+        ])
+        let tokenStore = TokenStoreSpy()
+        let manager = makeManager(api: api, tokenStore: tokenStore)
+
+        await assertUnauthorized {
+            try await manager.signInWithApple(idToken: "apple-id-token")
+        }
+        let meCalls = await api.calls(to: "/api/users/me")
+
+        XCTAssertEqual(manager.state, .unauthenticated)
+        XCTAssertNil(manager.authenticatedUser)
+        XCTAssertNil(tokenStore.token)
+        XCTAssertEqual(
+            tokenStore.operations,
+            [.save("revoked-exchange-token"), .delete]
+        )
+        XCTAssertEqual(meCalls, 1)
+    }
+
+    func testSuccessfulExchangeKeepsIssuedTokenWhenMeServerFails() async throws {
+        let api = GatedAPIClientSpy(responses: [
+            "POST /api/auth/mobile/exchange": [
+                .data(exchangeData(
+                    token: "exchange-token",
+                    userID: "exchange-user",
+                    username: "rookie"
+                )),
+            ],
+            "GET /api/users/me": [.failure(.serverError(503, "maintenance"))],
+        ])
+        let tokenStore = TokenStoreSpy()
+        let manager = makeManager(api: api, tokenStore: tokenStore)
+
+        try await manager.signInWithApple(idToken: "apple-id-token")
+
+        XCTAssertEqual(manager.authenticatedUser?.id, "exchange-user")
+        XCTAssertEqual(manager.authenticatedUser?.publicUsername, "rookie")
+        XCTAssertEqual(tokenStore.token, "exchange-token")
+        XCTAssertEqual(tokenStore.operations, [.save("exchange-token")])
     }
 
     func testSignOutDeletesInjectedTokenWithoutRemovingDrafts() async throws {
@@ -350,6 +460,207 @@ final class AuthManagerTests: XCTestCase {
         )
     }
 
+    func testGuestMigrationFromPreviousAccountCannotContinueAfterAccountSwitch() async throws {
+        let context = makeDefaults()
+        defer { context.cleanUp() }
+        let userA = makeUser(id: "user-a")
+        let userB = makeUser(id: "user-b")
+        let guest = try saveRecord(in: context.store, owner: .guest)
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/auth/mobile/exchange": [
+                    .data(exchangeData(
+                        token: "token-a",
+                        userID: userA.id,
+                        username: userA.publicUsername
+                    )),
+                    .data(exchangeData(
+                        token: "token-b",
+                        userID: userB.id,
+                        username: userB.publicUsername
+                    )),
+                ],
+                "GET /api/users/me": [.json(userA), .json(userB)],
+                "GET /api/picks": [.failure(.notFound), .failure(.notFound)],
+                "POST /api/picks": [
+                    .json(PickResponse(pick: pick(for: guest))),
+                ],
+            ],
+            gatedKeys: ["GET /api/picks", "POST /api/picks"]
+        )
+        let tokenStore = TokenStoreSpy()
+        let manager = makeManager(
+            api: api,
+            tokenStore: tokenStore,
+            localPickStore: context.store
+        )
+
+        try await manager.signInWithApple(idToken: "apple-a")
+        _ = await api.waitForRequest(to: "/api/picks", ordinal: 1)
+
+        manager.signOut()
+        try await manager.signInWithApple(idToken: "apple-b")
+        await api.releaseRequests(to: "/api/picks")
+
+        let postID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 1
+        )
+        let pickRequests = await api.recordedRequests().filter {
+            $0.path == "/api/picks"
+        }
+        XCTAssertEqual(
+            pickRequests.filter { $0.method == "GET" }.map(\.token),
+            ["token-a", "token-b"]
+        )
+        XCTAssertEqual(
+            pickRequests.filter { $0.method == "POST" }.map(\.token),
+            ["token-b"]
+        )
+
+        await api.releaseRequest(id: postID)
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(manager.state, .authenticated(userB))
+        XCTAssertNil(
+            context.store.record(for: guest.id.raceID, owner: .user(userA.id))
+        )
+        XCTAssertEqual(
+            context.store.record(for: guest.id.raceID, owner: .user(userB.id))?.syncState,
+            .confirmed
+        )
+        XCTAssertEqual(
+            context.store.record(id: guest.id)?.syncState,
+            .confirmed
+        )
+    }
+
+    func testStaleUnauthorizedReportCannotSignOutNewerAccount() async throws {
+        let userA = makeUser(id: "user-a")
+        let userB = makeUser(id: "user-b")
+        let api = GatedAPIClientSpy(responses: [
+            "POST /api/auth/mobile/exchange": [
+                .data(exchangeData(
+                    token: "token-a",
+                    userID: userA.id,
+                    username: userA.publicUsername
+                )),
+                .data(exchangeData(
+                    token: "token-b",
+                    userID: userB.id,
+                    username: userB.publicUsername
+                )),
+            ],
+            "GET /api/users/me": [.json(userA), .json(userB)],
+        ])
+        let tokenStore = TokenStoreSpy()
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        let manager = AuthManager(
+            api: api,
+            tokenStore: tokenStore,
+            syncManager: syncManager
+        )
+
+        try await manager.signInWithApple(idToken: "apple-a")
+        try await manager.signInWithApple(idToken: "apple-b")
+
+        syncManager.reportUnauthorized(rejectedToken: "token-a")
+
+        XCTAssertEqual(manager.state, .authenticated(userB))
+        XCTAssertEqual(tokenStore.token, "token-b")
+
+        syncManager.reportUnauthorized(rejectedToken: "token-b")
+
+        XCTAssertEqual(manager.state, .unauthenticated)
+        XCTAssertNil(tokenStore.token)
+    }
+
+    func testExplicitSaveFromPreviousAccountCannotPersistAfterAccountSwitch() async throws {
+        let context = makeDefaults()
+        defer { context.cleanUp() }
+        let userA = makeUser(id: "user-a")
+        let userB = makeUser(id: "user-b")
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/auth/mobile/exchange": [
+                    .data(exchangeData(
+                        token: "token-a",
+                        userID: userA.id,
+                        username: userA.publicUsername
+                    )),
+                    .data(exchangeData(
+                        token: "token-b",
+                        userID: userB.id,
+                        username: userB.publicUsername
+                    )),
+                ],
+                "GET /api/users/me": [.json(userA), .json(userB)],
+                "POST /api/picks": [
+                    .json(PickResponse(pick: Pick(
+                        id: "server-a",
+                        raceId: RaceFixtures.liveSpa.id,
+                        tenthPlaceDriverId: "piastri",
+                        winnerDriverId: "norris",
+                        dnfDriverId: "leclerc",
+                        lockedAt: nil,
+                        scoreBreakdown: nil
+                    ))),
+                ],
+            ],
+            gatedKeys: ["POST /api/picks"]
+        )
+        let tokenStore = TokenStoreSpy()
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        let manager = AuthManager(
+            api: api,
+            tokenStore: tokenStore,
+            syncManager: syncManager
+        )
+        manager.localPickStore = context.store
+
+        try await manager.signInWithApple(idToken: "apple-a")
+        let accountRecord = try saveRecord(
+            in: context.store,
+            owner: .user(userA.id)
+        )
+        let submission = Task {
+            await syncManager.submitExplicit(
+                id: accountRecord.id,
+                revision: accountRecord.revision,
+                currentUserID: userA.id,
+                token: "token-a",
+                localPickStore: context.store
+            )
+        }
+        let postID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 1
+        )
+
+        manager.signOut()
+        try await manager.signInWithApple(idToken: "apple-b")
+        await api.releaseRequest(id: postID)
+
+        guard case .queued = await submission.value else {
+            return XCTFail("The stale account save must return to the queue")
+        }
+        XCTAssertEqual(manager.state, .authenticated(userB))
+        XCTAssertEqual(
+            context.store.record(id: accountRecord.id)?.syncState,
+            .queued
+        )
+        XCTAssertNil(
+            context.store.authoritativePick(
+                for: accountRecord.id.raceID,
+                owner: .user(userA.id)
+            )
+        )
+    }
+
     private func makeManager(
         api: GatedAPIClientSpy,
         tokenStore: TokenStoreSpy,
@@ -390,6 +701,18 @@ final class AuthManagerTests: XCTestCase {
             """
             {"accessToken":"\(token)","userId":"\(userID)","usernameSet":true,"publicUsername":\(usernameValue)}
             """.utf8
+        )
+    }
+
+    private func pick(for record: LocalPickRecord) -> Pick {
+        Pick(
+            id: "server-\(record.id.raceID)",
+            raceId: record.id.raceID,
+            tenthPlaceDriverId: record.selection.tenthPlaceDriverID,
+            winnerDriverId: record.selection.winnerDriverID,
+            dnfDriverId: record.selection.dnfDriverID,
+            lockedAt: nil,
+            scoreBreakdown: nil
         )
     }
 

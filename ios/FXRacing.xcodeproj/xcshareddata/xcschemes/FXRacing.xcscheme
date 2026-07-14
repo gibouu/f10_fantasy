@@ -50,17 +50,6 @@
                ReferencedContainer = "container:FXRacing.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "EB60030C0693E5C23116968E"
-               BuildableName = "FXRacingUITests.xctest"
-               BlueprintName = "FXRacingUITests"
-               ReferencedContainer = "container:FXRacing.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

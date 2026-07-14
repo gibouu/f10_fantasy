@@ -164,6 +164,7 @@ actor FXImagePipeline {
     private let decodedCache = NSCache<FXImageCacheKey, FXDecodedImageCacheEntry>()
 
     private var inFlight: [FXImageRequest: InFlight] = [:]
+    private var prefetchOwnerID: UUID?
     private var prefetchScopeID: UUID?
     private var prefetchQueue: [FXImageRequest] = []
     private var nextPrefetchIndex = 0
@@ -210,6 +211,25 @@ actor FXImagePipeline {
     }
 
     func replacePrefetchScope(with requests: [FXImageRequest]) {
+        prefetchOwnerID = nil
+        installPrefetchScope(requests)
+    }
+
+    func replacePrefetchScope(
+        with requests: [FXImageRequest],
+        ownerID: UUID
+    ) {
+        prefetchOwnerID = ownerID
+        installPrefetchScope(requests)
+    }
+
+    func clearPrefetchScope(ownerID: UUID) {
+        guard prefetchOwnerID == ownerID else { return }
+        prefetchOwnerID = nil
+        installPrefetchScope([])
+    }
+
+    private func installPrefetchScope(_ requests: [FXImageRequest]) {
         var seen = Set<FXImageRequest>()
         let nextQueue = requests.filter { seen.insert($0).inserted }
         let nextScopeID = nextQueue.isEmpty ? nil : UUID()

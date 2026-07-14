@@ -701,6 +701,13 @@ final class SyncManagerTests: XCTestCase {
                 .conflict(testCase.1)
             )
             XCTAssertEqual(context.store.record(id: record.id)?.selection, record.selection)
+            XCTAssertEqual(
+                context.store.authoritativePick(
+                    for: record.id.raceID,
+                    owner: .user("user-a")
+                )?.id,
+                "server-\(index)"
+            )
             let postCalls = await api.calls(method: "POST", to: "/api/picks")
             XCTAssertEqual(postCalls, 0)
         }
@@ -727,12 +734,24 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .confirmed)
     }
 
-    func testAutomatic404Post423ExpiresCapturedRevision() async throws {
+    func testAutomatic404Post423ReconcilesAuthorityAndExpiresCapturedRevision() async throws {
         let context = makeContext()
         defer { context.cleanUp() }
         let record = try saveRecord(in: context.store, owner: .user("user-a"))
+        let authoritative = pick(
+            raceID: record.id.raceID,
+            selection: PickSelection(
+                winnerDriverID: "piastri",
+                tenthPlaceDriverID: "leclerc",
+                dnfDriverID: "norris"
+            ),
+            id: "server-after-lock"
+        )
         let api = GatedAPIClientSpy(responses: [
-            "GET /api/picks": [.failure(.notFound)],
+            "GET /api/picks": [
+                .failure(.notFound),
+                .json(PickResponse(pick: authoritative)),
+            ],
             "POST /api/picks": [.failure(.serverError(423, "Locked"))],
         ])
         let manager = SyncManager(api: api, clock: TestClock.fixed)
@@ -744,8 +763,15 @@ final class SyncManagerTests: XCTestCase {
         )
 
         let methods = await api.recordedRequests().map(\.method)
-        XCTAssertEqual(methods, ["GET", "POST"])
+        XCTAssertEqual(methods, ["GET", "POST", "GET"])
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .expired)
+        XCTAssertEqual(
+            context.store.authoritativePick(
+                for: record.id.raceID,
+                owner: .user("user-a")
+            )?.id,
+            authoritative.id
+        )
     }
 
     func testAutomatic401QueuesCurrentRevisionAndStopsBatch() async throws {
@@ -860,6 +886,57 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertNotEqual(store.record(id: record.id)?.syncState, .confirmed)
     }
 
+    func testConfirmationPersistenceFailureRetriesInProcessAfterStorageRecovers() async throws {
+        let persistence = ToggleablePickPersistence()
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        let record = try saveRecord(in: store, owner: .user("user-a"))
+        let acceptedPick = pick(for: record)
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/picks": [.json(PickResponse(pick: acceptedPick))],
+                "GET /api/picks": [.json(PickResponse(pick: acceptedPick))],
+            ],
+            gatedKeys: ["POST /api/picks"]
+        )
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        let submission = Task {
+            await manager.submitExplicit(
+                id: record.id,
+                revision: record.revision,
+                currentUserID: "user-a",
+                token: "token-a",
+                localPickStore: store
+            )
+        }
+        let requestID = await api.waitForRequest(
+            method: "POST",
+            to: "/api/picks",
+            ordinal: 1
+        )
+        persistence.rejectsWrites = true
+        await api.releaseRequest(id: requestID)
+        assertQueued(await submission.value)
+        XCTAssertEqual(
+            store.record(id: record.id)?.syncState,
+            .syncing(revision: record.revision, mode: .direct)
+        )
+
+        persistence.rejectsWrites = false
+        await manager.resumeEligiblePicks(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(store.record(id: record.id)?.syncState, .confirmed)
+        let methods = await api.recordedRequests().map(\.method)
+        XCTAssertEqual(methods, ["POST", "GET"])
+    }
+
     func testExpiryPersistenceFailureNeverReturnsExpired() async throws {
         let persistence = ToggleablePickPersistence()
         let store = LocalPickStore(
@@ -920,12 +997,56 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .queued)
     }
 
-    func testDirect423ExpiresExactRevisionAndRaisesNotice() async throws {
+    func testDirect423FollowUp401QueuesDraftAndReportsRejectedSession() async throws {
         let context = makeContext()
         defer { context.cleanUp() }
         let record = try saveRecord(in: context.store, owner: .user("user-a"))
         let api = GatedAPIClientSpy(responses: [
             "POST /api/picks": [.failure(.serverError(423, "Locked"))],
+            "GET /api/picks": [.failure(.unauthorized)],
+        ])
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+        var rejectedToken: String?
+        manager.setUnauthorizedHandler { rejectedToken = $0 }
+        _ = manager.beginSession(
+            currentUserID: "user-a",
+            token: "expired-token",
+            localPickStore: context.store
+        )
+
+        let result = await manager.submitExplicit(
+            id: record.id,
+            revision: record.revision,
+            currentUserID: "user-a",
+            token: "expired-token",
+            localPickStore: context.store
+        )
+
+        guard case .unauthorized = result else {
+            return XCTFail("Expected unauthorized")
+        }
+        XCTAssertEqual(rejectedToken, "expired-token")
+        XCTAssertEqual(context.store.record(id: record.id)?.syncState, .queued)
+        let methods = await api.recordedRequests().map(\.method)
+        XCTAssertEqual(methods, ["POST", "GET"])
+    }
+
+    func testDirect423ReconcilesAuthorityWithoutRaisingMigrationNotice() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let record = try saveRecord(in: context.store, owner: .user("user-a"))
+        let authoritative = pick(
+            raceID: record.id.raceID,
+            selection: PickSelection(
+                winnerDriverID: "piastri",
+                tenthPlaceDriverID: "leclerc",
+                dnfDriverID: "norris"
+            ),
+            id: "locked-server-pick"
+        )
+        let api = GatedAPIClientSpy(responses: [
+            "POST /api/picks": [.failure(.serverError(423, "Locked"))],
+            "GET /api/picks": [.json(PickResponse(pick: authoritative))],
         ])
         let manager = SyncManager(api: api, clock: TestClock.fixed)
 
@@ -937,9 +1058,21 @@ final class SyncManagerTests: XCTestCase {
             localPickStore: context.store
         )
 
-        guard case .expired = result else { return XCTFail("Expected expired") }
+        guard case .expired(let pick) = result else {
+            return XCTFail("Expected expired")
+        }
+        XCTAssertEqual(pick?.id, authoritative.id)
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .expired)
-        XCTAssertEqual(context.store.expiredMigrationNoticeCount, 1)
+        XCTAssertEqual(
+            context.store.authoritativePick(
+                for: record.id.raceID,
+                owner: .user("user-a")
+            )?.id,
+            authoritative.id
+        )
+        XCTAssertEqual(context.store.expiredMigrationNoticeCount, 0)
+        let methods = await api.recordedRequests().map(\.method)
+        XCTAssertEqual(methods, ["POST", "GET"])
     }
 
     func testKnownLockedRaceExpiresWithoutRequest() async throws {

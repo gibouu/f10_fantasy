@@ -57,12 +57,48 @@ extension UserDefaults: LocalPickPersisting {
     }
 }
 
+private struct LocalAuthoritativePickRecord: Codable {
+    let id: LocalPickRecordID
+    let pick: Pick
+}
+
 private struct LocalPickEnvelopeV2: Codable {
     static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     let nextRevision: UInt64
     let records: [LocalPickRecord]
+    let authoritativePicks: [LocalAuthoritativePickRecord]
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case nextRevision
+        case records
+        case authoritativePicks
+    }
+
+    init(
+        schemaVersion: Int,
+        nextRevision: UInt64,
+        records: [LocalPickRecord],
+        authoritativePicks: [LocalAuthoritativePickRecord]
+    ) {
+        self.schemaVersion = schemaVersion
+        self.nextRevision = nextRevision
+        self.records = records
+        self.authoritativePicks = authoritativePicks
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        nextRevision = try container.decode(UInt64.self, forKey: .nextRevision)
+        records = try container.decode([LocalPickRecord].self, forKey: .records)
+        authoritativePicks = try container.decodeIfPresent(
+            [LocalAuthoritativePickRecord].self,
+            forKey: .authoritativePicks
+        ) ?? []
+    }
 }
 
 /// Owner-scoped, revision-checked local pick persistence.
@@ -76,6 +112,7 @@ final class LocalPickStore {
     private let persistence: any LocalPickPersisting
     private let clock: any ClockProviding
     private var records: [LocalPickRecordID: LocalPickRecord] = [:]
+    private var authoritativePicks: [LocalPickRecordID: Pick] = [:]
     private var nextRevision: UInt64 = 1
     private var canPersistV2 = true
     private(set) var expiredMigrationNoticeCount = 0
@@ -115,10 +152,38 @@ final class LocalPickStore {
         return record
     }
 
+    func authoritativePick(
+        for raceID: String,
+        owner: PickOwnerScope
+    ) -> Pick? {
+        guard case .user = owner else { return nil }
+        return authoritativePicks[
+            LocalPickRecordID(owner: owner, raceID: raceID)
+        ]
+    }
+
     func queuedRecords(currentUserID: String?) -> [LocalPickRecord] {
         records.values
             .filter { record in
                 record.syncState == .queued
+                    && isEligibleOwner(record.id.owner, currentUserID: currentUserID)
+            }
+            .sorted { $0.revision < $1.revision }
+    }
+
+    /// Includes persisted in-flight records whose rollback could not be
+    /// written, allowing the current process to recover without a relaunch.
+    func retryableRecords(currentUserID: String?) -> [LocalPickRecord] {
+        records.values
+            .filter { record in
+                let isRetryable: Bool
+                switch record.syncState {
+                case .queued, .syncing:
+                    isRetryable = true
+                case .reviewRequired, .confirmed, .conflict, .expired:
+                    isRetryable = false
+                }
+                return isRetryable
                     && isEligibleOwner(record.id.owner, currentUserID: currentUserID)
             }
             .sorted { $0.revision < $1.revision }
@@ -141,6 +206,81 @@ final class LocalPickStore {
     // MARK: - Owner-scoped mutations
 
     @discardableResult
+    func preserveAuthoritative(
+        _ pick: Pick,
+        for owner: PickOwnerScope
+    ) -> Bool {
+        guard case .user = owner else { return false }
+        let id = LocalPickRecordID(owner: owner, raceID: pick.raceId)
+        let previous = authoritativePicks[id]
+        authoritativePicks[id] = pick
+        guard persistV2() else {
+            authoritativePicks[id] = previous
+            return false
+        }
+        return true
+    }
+
+    @discardableResult
+    func clearAuthoritativePick(
+        for raceID: String,
+        owner: PickOwnerScope
+    ) -> Bool {
+        guard case .user = owner else { return false }
+        let id = LocalPickRecordID(owner: owner, raceID: raceID)
+        guard let removed = authoritativePicks.removeValue(forKey: id) else {
+            return true
+        }
+        guard persistV2() else {
+            authoritativePicks[id] = removed
+            return false
+        }
+        return true
+    }
+
+    func recoverLegacyConflict(
+        for race: Race,
+        owner: PickOwnerScope,
+        now: Date? = nil
+    ) -> LegacyPickRecoveryResult {
+        guard owner != .legacyAmbiguous else { return .invalidOwner }
+        guard let legacy = legacyConflict(for: race.id) else { return .notFound }
+        let savedAt = now ?? clock.now()
+        guard savedAt < race.lockCutoffUtc else { return .locked }
+
+        let destinationID = LocalPickRecordID(owner: owner, raceID: race.id)
+        if let existing = records[destinationID] {
+            return .destinationOccupied(existing)
+        }
+
+        let previousNextRevision = nextRevision
+        let revision = previousNextRevision
+        let (incrementedRevision, overflow) = revision.addingReportingOverflow(1)
+        guard revision > 0, !overflow, incrementedRevision < .max else {
+            return .persistenceFailed
+        }
+
+        let recovered = LocalPickRecord(
+            id: destinationID,
+            selection: legacy.selection,
+            savedAt: savedAt,
+            revision: revision,
+            syncState: .reviewRequired
+        )
+        nextRevision = incrementedRevision
+        records[destinationID] = recovered
+        records[legacy.id] = nil
+
+        guard persistV2() else {
+            nextRevision = previousNextRevision
+            records[destinationID] = nil
+            records[legacy.id] = legacy
+            return .persistenceFailed
+        }
+        return .recovered(recovered)
+    }
+
+    @discardableResult
     func save(
         selection: PickSelection,
         race: Race,
@@ -159,6 +299,8 @@ final class LocalPickStore {
         let id = LocalPickRecordID(owner: owner, raceID: race.id)
         if let existing = records[id], existing.selection == selection {
             switch existing.syncState {
+            case .reviewRequired:
+                break
             case .conflict, .expired:
                 break
             case .queued, .syncing:
@@ -175,6 +317,37 @@ final class LocalPickStore {
             selection: selection,
             savedAt: savedAt,
             syncState: .queued
+        )
+    }
+
+    /// Moves a captured dirty guest draft into the signed-in account outbox.
+    /// Both mutations share one persisted envelope so the guest draft remains
+    /// recoverable if the account write fails.
+    func saveSupersedingGuestDraft(
+        selection: PickSelection,
+        race: Race,
+        owner: PickOwnerScope,
+        guestRevision: UInt64,
+        now: Date? = nil
+    ) -> LocalPickSaveResult {
+        guard case .user = owner else { return .invalidOwner }
+        let savedAt = now ?? clock.now()
+        guard savedAt < race.lockCutoffUtc else { return .locked }
+
+        let guestID = LocalPickRecordID(owner: .guest, raceID: race.id)
+        guard let guestRecord = records[guestID],
+              guestRecord.revision == guestRevision
+        else { return .persistenceFailed }
+        guard guestRecord.syncState != .confirmed else {
+            return .persistenceFailed
+        }
+
+        return storeNewRecord(
+            id: LocalPickRecordID(owner: owner, raceID: race.id),
+            selection: selection,
+            savedAt: savedAt,
+            syncState: .queued,
+            removing: guestRecord
         )
     }
 
@@ -210,9 +383,14 @@ final class LocalPickStore {
         id: LocalPickRecordID,
         selection: PickSelection,
         savedAt: Date,
-        syncState: LocalPickSyncState
+        syncState: LocalPickSyncState,
+        removing removedRecord: LocalPickRecord? = nil
     ) -> LocalPickSaveResult {
         let previousRecord = records[id]
+        if let removedRecord,
+           records[removedRecord.id] != removedRecord {
+            return .persistenceFailed
+        }
         let previousNextRevision = nextRevision
         let revision = previousNextRevision
         let (incrementedRevision, overflow) = previousNextRevision.addingReportingOverflow(1)
@@ -231,12 +409,18 @@ final class LocalPickStore {
             syncState: syncState
         )
         records[id] = record
+        if let removedRecord {
+            records[removedRecord.id] = nil
+        }
         guard persistV2() else {
             nextRevision = previousNextRevision
             if let previousRecord {
                 records[id] = previousRecord
             } else {
                 records[id] = nil
+            }
+            if let removedRecord {
+                records[removedRecord.id] = removedRecord
             }
             return .persistenceFailed
         }
@@ -253,7 +437,7 @@ final class LocalPickStore {
             return false
         }
         switch record.syncState {
-        case .confirmed, .conflict, .expired:
+        case .reviewRequired, .confirmed, .conflict, .expired:
             return false
         case .queued, .syncing:
             break
@@ -264,14 +448,20 @@ final class LocalPickStore {
         }
 
         let previousRecord = record
-        let newlyExpired = syncState == .expired
+        let raisesMigrationExpiryNotice: Bool
+        if syncState == .expired,
+           case .syncing(_, .guestMigration) = record.syncState {
+            raisesMigrationExpiryNotice = true
+        } else {
+            raisesMigrationExpiryNotice = false
+        }
         record.syncState = syncState
         records[id] = record
         guard persistV2() else {
             records[id] = previousRecord
             return false
         }
-        if newlyExpired {
+        if raisesMigrationExpiryNotice {
             expiredMigrationNoticeCount += 1
         }
         return true
@@ -387,6 +577,9 @@ final class LocalPickStore {
             for record in envelope.records {
                 records[record.id] = record
             }
+            for record in envelope.authoritativePicks {
+                authoritativePicks[record.id] = record.pick
+            }
             nextRevision = envelope.nextRevision
 
             var normalizedSyncing = false
@@ -480,6 +673,14 @@ final class LocalPickStore {
             highestRevision = max(highestRevision, record.revision)
         }
 
+        var authoritativeIDs = Set<LocalPickRecordID>()
+        for record in envelope.authoritativePicks {
+            guard case .user = record.id.owner,
+                  record.id.raceID == record.pick.raceId,
+                  authoritativeIDs.insert(record.id).inserted
+            else { return false }
+        }
+
         return envelope.nextRevision > highestRevision
     }
 
@@ -489,7 +690,16 @@ final class LocalPickStore {
         let envelope = LocalPickEnvelopeV2(
             schemaVersion: LocalPickEnvelopeV2.currentSchemaVersion,
             nextRevision: nextRevision,
-            records: records.values.sorted { $0.revision < $1.revision }
+            records: records.values.sorted { $0.revision < $1.revision },
+            authoritativePicks: authoritativePicks.map {
+                LocalAuthoritativePickRecord(id: $0.key, pick: $0.value)
+            }.sorted {
+                if $0.id.raceID == $1.id.raceID {
+                    return String(describing: $0.id.owner)
+                        < String(describing: $1.id.owner)
+                }
+                return $0.id.raceID < $1.id.raceID
+            }
         )
         guard isValid(envelope) else { return false }
         guard let data = try? JSONEncoder().encode(envelope) else {

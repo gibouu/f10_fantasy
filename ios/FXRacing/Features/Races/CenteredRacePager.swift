@@ -24,6 +24,8 @@ struct RacePagerGeometry: Equatable, Sendable {
 
 struct CenteredRacePager<Item: Identifiable, Content: View>: View
 where Item.ID: Hashable {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let items: [Item]
     @Binding var selection: Item.ID?
     private let content: (Item) -> Content
@@ -113,8 +115,12 @@ where Item.ID: Hashable {
             return
         }
 
-        withAnimation(.snappy) {
+        if reduceMotion {
             selection = items[nextIndex].id
+        } else {
+            withAnimation(.snappy) {
+                selection = items[nextIndex].id
+            }
         }
     }
 }

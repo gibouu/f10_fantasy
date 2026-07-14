@@ -6,6 +6,7 @@ struct SkeletonView: View {
     let height: CGFloat
     let cornerRadius: CGFloat
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = 0
 
     init(width: CGFloat? = nil, height: CGFloat = 16, cornerRadius: CGFloat = 6) {
@@ -15,14 +16,22 @@ struct SkeletonView: View {
     }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius)
-            .fill(shimmer)
-            .frame(width: width, height: height)
-            .onAppear {
-                withAnimation(
-                    .linear(duration: 1.4).repeatForever(autoreverses: false)
-                ) { phase = 1 }
+        Group {
+            if reduceMotion {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.secondary.opacity(0.16))
+            } else {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(shimmer)
+                    .onAppear {
+                        phase = 0
+                        withAnimation(
+                            .linear(duration: 1.4).repeatForever(autoreverses: false)
+                        ) { phase = 1 }
+                    }
             }
+        }
+        .frame(width: width, height: height)
     }
 
     private var shimmer: LinearGradient {

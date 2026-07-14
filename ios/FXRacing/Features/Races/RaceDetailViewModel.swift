@@ -2,10 +2,12 @@ import Foundation
 
 enum PickSubmissionState: Equatable {
     case idle
+    case reviewRequired
     case savingLocally
     case savedOnDevice
     case syncing
     case savedToAccount
+    case missingFromAccount
     case conflict
     case expired
 }
@@ -27,10 +29,33 @@ final class RaceDetailViewModel {
     private(set) var isLoading = false
     private(set) var loadErrorMessage: String?
     private(set) var submissionErrorMessage: String?
+    private(set) var hasRecoverableDevicePick = false
 
     var selectedWinner: Driver? { resolve(selectedWinnerID) }
     var selectedP10: Driver? { resolve(selectedP10ID) }
     var selectedDNF: Driver? { resolve(selectedDNFID) }
+    var officialWinner: Driver? { resolve(serverPick?.winnerDriverId) }
+    var officialP10: Driver? { resolve(serverPick?.tenthPlaceDriverId) }
+    var officialDNF: Driver? { resolve(serverPick?.dnfDriverId) }
+
+    var unsubmittedDeviceDraft: PickSelection? {
+        guard isPickLocked,
+              isLocalOnly,
+              let selectedWinnerID,
+              let selectedP10ID,
+              let selectedDNFID
+        else { return nil }
+
+        return PickSelection(
+            winnerDriverID: selectedWinnerID,
+            tenthPlaceDriverID: selectedP10ID,
+            dnfDriverID: selectedDNFID
+        )
+    }
+
+    var isPickLocked: Bool {
+        clock.now() >= race.lockCutoffUtc || serverPick?.lockedAt != nil
+    }
 
     var isSubmitting: Bool {
         submissionState == .savingLocally || submissionState == .syncing
@@ -42,7 +67,8 @@ final class RaceDetailViewModel {
 
     var isLocalOnly: Bool {
         switch submissionState {
-        case .savedOnDevice, .syncing, .conflict, .expired:
+        case .reviewRequired, .savedOnDevice, .syncing, .missingFromAccount,
+             .conflict, .expired:
             return true
         case .idle, .savingLocally, .savedToAccount:
             return false
@@ -54,7 +80,7 @@ final class RaceDetailViewModel {
     }
 
     var canSave: Bool {
-        guard clock.now() < race.lockCutoffUtc,
+        guard !isPickLocked,
               let selectedWinner,
               let selectedP10,
               let selectedDNF
@@ -89,6 +115,7 @@ final class RaceDetailViewModel {
     private enum PrivatePickOutcome: Sendable {
         case success(Pick)
         case missing
+        case unauthorized(String)
         case unavailable
     }
 
@@ -116,6 +143,7 @@ final class RaceDetailViewModel {
     private var activeScope: SessionScope?
     private var hasLoaded = false
     private var hasUnsavedEdits = false
+    private var requiresAccountRepair = false
     private var lastObservedVisibleRecord: LocalPickRecord?
     private var loadFlight: LoadFlight?
 
@@ -138,7 +166,12 @@ final class RaceDetailViewModel {
     /// the user's in-progress three-pick draft.
     func updateSummary(_ summary: Race) {
         guard summary.id == raceID else { return }
+        let transitionedToCompleted = race.status != .completed
+            && summary.status == .completed
         race = summary
+        if transitionedToCompleted {
+            hasLoaded = false
+        }
     }
 
     // MARK: - Load
@@ -163,7 +196,8 @@ final class RaceDetailViewModel {
                 scope: scope,
                 localPickStore: localPickStore
             )
-            if currentVisibleRecord != lastObservedVisibleRecord {
+            if currentVisibleRecord != lastObservedVisibleRecord
+                || (currentVisibleRecord == nil && serverPick != nil) {
                 hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
             }
             return
@@ -197,12 +231,24 @@ final class RaceDetailViewModel {
     ) {
         let scope = sessionScope(token: token, userID: userID)
         guard activeScope == scope else { return }
+        refreshStoredAuthority(scope: scope, localPickStore: localPickStore)
+        hasRecoverableDevicePick = localPickStore.legacyConflict(for: raceID) != nil
         let currentVisibleRecord = visibleRecord(
             scope: scope,
             localPickStore: localPickStore
         )
         guard currentVisibleRecord != lastObservedVisibleRecord else { return }
         hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+    }
+
+    /// Invalidates view-owned hydration when a swipe, account change, or
+    /// navigation removes this detail from the screen.
+    func cancelLoad() {
+        guard loadFlight != nil else { return }
+        loadFlight?.task.cancel()
+        loadGeneration &+= 1
+        loadFlight = nil
+        isLoading = false
     }
 
     private func startLoad(
@@ -259,7 +305,6 @@ final class RaceDetailViewModel {
         let authenticatedUserID = scope.userID
         let shouldRequestPrivatePick = authenticatedUserID != nil
             && token != nil
-            && !hasDirtyVisibleDraft(scope: scope, localPickStore: localPickStore)
         let capturedVisibleRecord = visibleRecord(
             scope: scope,
             localPickStore: localPickStore
@@ -290,6 +335,8 @@ final class RaceDetailViewModel {
                         return .privatePick(.success(response.pick))
                     } catch APIError.notFound {
                         return .privatePick(.missing)
+                    } catch APIError.unauthorized {
+                        return .privatePick(.unauthorized(token))
                     } catch {
                         return .privatePick(.unavailable)
                     }
@@ -392,7 +439,8 @@ final class RaceDetailViewModel {
         generation: UInt64
     ) {
         guard generation == loadGeneration, snapshot.race.id == raceID else { return }
-        race = snapshot.race
+        // Timing, status, and lock rules come from the current list summary.
+        // A still-fresh detail cache must only contribute per-race payloads.
         entrants = snapshot.entrants
         results = snapshot.results
         qualifyingResults = snapshot.qualifyingResults
@@ -421,11 +469,12 @@ final class RaceDetailViewModel {
         capturedDraftGeneration: UInt64,
         capturedVisibleRecord: LocalPickRecord?
     ) {
-        guard generation == loadGeneration,
-              activeScope == scope,
-              capturedDraftGeneration == draftGeneration,
-              !hasUnsavedEdits
-        else { return }
+        guard generation == loadGeneration, activeScope == scope else { return }
+
+        if case .unauthorized(let rejectedToken) = outcome {
+            syncManager.reportUnauthorized(rejectedToken: rejectedToken)
+            return
+        }
 
         let currentVisibleRecord = visibleRecord(
             scope: scope,
@@ -435,13 +484,23 @@ final class RaceDetailViewModel {
             hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
             return
         }
-        guard !hasDirtyVisibleDraft(
-            scope: scope,
-            localPickStore: localPickStore
-        ) else { return }
 
         switch outcome {
         case .success(let pick):
+            if case .user(let userID) = scope {
+                _ = localPickStore.preserveAuthoritative(
+                    pick,
+                    for: .user(userID)
+                )
+            }
+            serverPick = pick
+            guard capturedDraftGeneration == draftGeneration,
+                  !hasUnsavedEdits,
+                  !hasDirtyVisibleDraft(
+                      scope: scope,
+                      localPickStore: localPickStore
+                  )
+            else { return }
             let selection = PickSelection(
                 winnerDriverID: pick.winnerDriverId,
                 tenthPlaceDriverID: pick.tenthPlaceDriverId,
@@ -463,7 +522,6 @@ final class RaceDetailViewModel {
                     break
                 }
             }
-            serverPick = pick
             (
                 selectedWinnerID,
                 selectedP10ID,
@@ -475,15 +533,51 @@ final class RaceDetailViewModel {
             )
             submissionState = .savedToAccount
             submissionErrorMessage = nil
+            requiresAccountRepair = false
         case .missing:
             serverPick = nil
-            if visibleRecord(scope: scope, localPickStore: localPickStore) != nil {
-                hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            if case .user(let userID) = scope {
+                _ = localPickStore.clearAuthoritativePick(
+                    for: raceID,
+                    owner: .user(userID)
+                )
+            }
+            guard capturedDraftGeneration == draftGeneration,
+                  !hasUnsavedEdits,
+                  !hasDirtyVisibleDraft(
+                      scope: scope,
+                      localPickStore: localPickStore
+                  )
+            else { return }
+            if let record = visibleRecord(
+                scope: scope,
+                localPickStore: localPickStore
+            ) {
+                lastObservedVisibleRecord = record
+                (
+                    selectedWinnerID,
+                    selectedP10ID,
+                    selectedDNFID
+                ) = (
+                    record.selection.winnerDriverID,
+                    record.selection.tenthPlaceDriverID,
+                    record.selection.dnfDriverID
+                )
+                if case .user = scope, record.syncState == .confirmed {
+                    requiresAccountRepair = true
+                    submissionState = .missingFromAccount
+                    submissionErrorMessage = "This device pick is not on your account. Save it again to repair."
+                } else {
+                    applyHydratedSubmissionState(record.syncState, scope: scope)
+                }
             } else {
                 (selectedWinnerID, selectedP10ID, selectedDNFID) = (nil, nil, nil)
                 submissionState = .idle
                 submissionErrorMessage = nil
+                requiresAccountRepair = false
             }
+        case .unauthorized:
+            break
         case .unavailable:
             break
         }
@@ -499,11 +593,12 @@ final class RaceDetailViewModel {
 
     // MARK: - Selection
 
-    func select(driver: Driver, for slot: PickSlot) {
-        guard clock.now() < race.lockCutoffUtc else {
+    @discardableResult
+    func select(driver: Driver, for slot: PickSlot) -> Bool {
+        guard !isPickLocked else {
             submissionErrorMessage = "This race is now locked — picks can no longer be changed."
             Haptics.locked()
-            return
+            return false
         }
 
         switch slot {
@@ -518,6 +613,45 @@ final class RaceDetailViewModel {
         hasUnsavedEdits = true
         submissionState = .idle
         submissionErrorMessage = nil
+        return true
+    }
+
+    func reviewLegacyDevicePick(
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore
+    ) {
+        let scope = sessionScope(token: token, userID: userID)
+        if let activeScope, activeScope != scope {
+            switchScope(
+                to: scope,
+                localPickStore: localPickStore,
+                invalidatingLoad: true
+            )
+        } else {
+            activeScope = scope
+        }
+
+        switch localPickStore.recoverLegacyConflict(
+            for: race,
+            owner: scope.owner,
+            now: clock.now()
+        ) {
+        case .recovered:
+            hasUnsavedEdits = false
+            lastObservedVisibleRecord = nil
+            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            submissionErrorMessage = "Review these device picks, then save when they look right."
+        case .destinationOccupied:
+            submissionErrorMessage = "A newer device pick already exists for this race."
+        case .locked:
+            submissionErrorMessage = "This saved device pick can no longer be claimed because the race is locked."
+            Haptics.locked()
+        case .invalidOwner, .notFound:
+            hasRecoverableDevicePick = false
+        case .persistenceFailed:
+            submissionErrorMessage = "The device pick could not be recovered. Please try again."
+        }
     }
 
     // MARK: - Submit
@@ -525,7 +659,8 @@ final class RaceDetailViewModel {
     func submit(
         token: String?,
         userID: String?,
-        localPickStore: LocalPickStore
+        localPickStore: LocalPickStore,
+        onLocalSavePublished: () -> Void = {}
     ) async {
         guard canSave,
               let selectedWinnerID,
@@ -557,27 +692,41 @@ final class RaceDetailViewModel {
             tenthPlaceDriverID: selectedP10ID,
             dnfDriverID: selectedDNFID
         )
-        let visibleBeforeSave = visibleRecord(
-            scope: scope,
-            localPickStore: localPickStore
-        )
-        let supersedesDirtyGuest = visibleBeforeSave?.id.owner == .guest
-            && visibleBeforeSave.map { isDirty($0.syncState) } == true
+        let dirtyGuestDraft: LocalPickRecord? = localPickStore.record(
+            for: raceID,
+            owner: .guest
+        ).flatMap { record in
+            guard isDirty(record.syncState)
+            else { return nil }
+            return record
+        }
         draftGeneration &+= 1
         let capturedDraftGeneration = draftGeneration
         let priorState = submissionState
         submissionState = .savingLocally
         submissionErrorMessage = nil
 
-        let saveResult = localPickStore.save(
-            selection: selection,
-            race: race,
-            owner: scope.owner,
-            now: clock.now(),
-            forceNewRevision: supersedesDirtyGuest || (serverPick.map {
-                !matches($0, selection: selection)
-            } ?? false)
-        )
+        let saveResult: LocalPickSaveResult
+        if let dirtyGuestDraft, case .user = scope {
+            saveResult = localPickStore.saveSupersedingGuestDraft(
+                selection: selection,
+                race: race,
+                owner: scope.owner,
+                guestRevision: dirtyGuestDraft.revision,
+                now: clock.now()
+            )
+        } else {
+            saveResult = localPickStore.save(
+                selection: selection,
+                race: race,
+                owner: scope.owner,
+                now: clock.now(),
+                forceNewRevision: requiresAccountRepair
+                    || (serverPick.map {
+                        !matches($0, selection: selection)
+                    } ?? false)
+            )
+        }
 
         let record: LocalPickRecord
         switch saveResult {
@@ -595,23 +744,27 @@ final class RaceDetailViewModel {
         }
 
         hasUnsavedEdits = false
+        requiresAccountRepair = false
         lastObservedVisibleRecord = record
 
         guard case .user(let currentUserID) = scope,
               let token
         else {
             submissionState = .savedOnDevice
+            onLocalSavePublished()
             Haptics.success()
             return
         }
 
         if record.syncState == .confirmed {
             submissionState = .savedToAccount
+            onLocalSavePublished()
             Haptics.success()
             return
         }
 
         submissionState = .savedOnDevice
+        onLocalSavePublished()
         await Task.yield()
         guard activeScope == scope,
               capturedDraftGeneration == draftGeneration,
@@ -633,6 +786,8 @@ final class RaceDetailViewModel {
         }
 
         submissionState = .syncing
+        let serverAcknowledgementInterval = FXPerformance.begin(.serverAcknowledgement)
+        defer { serverAcknowledgementInterval.abandon() }
         let result = await syncManager.submitExplicit(
             id: record.id,
             revision: record.revision,
@@ -657,13 +812,23 @@ final class RaceDetailViewModel {
         lastObservedVisibleRecord = currentRecord
 
         let resultPick: Pick?
+        let receivedAuthoritativeAcknowledgement: Bool
         switch result {
         case .saved(let pick), .conflict(let pick?), .expired(let pick?):
             resultPick = pick
+            receivedAuthoritativeAcknowledgement = true
         case .conflict(nil), .expired(nil), .queued, .unauthorized:
             resultPick = nil
+            receivedAuthoritativeAcknowledgement = false
         }
-        if applyTerminalState(from: currentRecord, serverPick: resultPick) {
+        let didApplyTerminalState = applyTerminalState(
+            from: currentRecord,
+            serverPick: resultPick
+        )
+        if didApplyTerminalState {
+            if receivedAuthoritativeAcknowledgement {
+                serverAcknowledgementInterval.end()
+            }
             return
         }
 
@@ -692,12 +857,11 @@ final class RaceDetailViewModel {
         serverPick returnedPick: Pick?
     ) -> Bool {
         switch record.syncState {
+        case .reviewRequired:
+            return false
         case .confirmed:
             if let returnedPick {
                 serverPick = returnedPick
-            } else if let serverPick,
-                      !matches(serverPick, selection: record.selection) {
-                self.serverPick = nil
             }
             submissionState = .savedToAccount
             submissionErrorMessage = nil
@@ -737,11 +901,14 @@ final class RaceDetailViewModel {
             )
         } else {
             activeScope = scope
+            refreshStoredAuthority(scope: scope, localPickStore: localPickStore)
+            hasRecoverableDevicePick = localPickStore.legacyConflict(for: raceID) != nil
             let currentVisibleRecord = visibleRecord(
                 scope: scope,
                 localPickStore: localPickStore
             )
-            if currentVisibleRecord != lastObservedVisibleRecord {
+            if currentVisibleRecord != lastObservedVisibleRecord
+                || (currentVisibleRecord == nil && serverPick != nil) {
                 hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
             }
         }
@@ -762,12 +929,15 @@ final class RaceDetailViewModel {
         draftGeneration &+= 1
         hasLoaded = false
         hasUnsavedEdits = false
+        requiresAccountRepair = false
         lastObservedVisibleRecord = nil
         serverPick = nil
         (selectedWinnerID, selectedP10ID, selectedDNFID) = (nil, nil, nil)
         submissionState = .idle
         loadErrorMessage = nil
         submissionErrorMessage = nil
+        refreshStoredAuthority(scope: scope, localPickStore: localPickStore)
+        hasRecoverableDevicePick = localPickStore.legacyConflict(for: raceID) != nil
         hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
     }
 
@@ -776,13 +946,27 @@ final class RaceDetailViewModel {
         localPickStore: LocalPickStore
     ) {
         guard !hasUnsavedEdits else { return }
+        refreshStoredAuthority(scope: scope, localPickStore: localPickStore)
+        hasRecoverableDevicePick = localPickStore.legacyConflict(for: raceID) != nil
         let record = visibleRecord(
             scope: scope,
             localPickStore: localPickStore
         )
         lastObservedVisibleRecord = record
         guard let record else {
-            if serverPick == nil {
+            if case .user = scope, let serverPick {
+                (
+                    selectedWinnerID,
+                    selectedP10ID,
+                    selectedDNFID
+                ) = (
+                    serverPick.winnerDriverId,
+                    serverPick.tenthPlaceDriverId,
+                    serverPick.dnfDriverId
+                )
+                submissionState = .savedToAccount
+                submissionErrorMessage = nil
+            } else {
                 submissionState = .idle
             }
             return
@@ -801,11 +985,6 @@ final class RaceDetailViewModel {
             record.syncState,
             scope: scope
         )
-        if record.syncState == .confirmed,
-           let serverPick,
-           !matches(serverPick, selection: record.selection) {
-            self.serverPick = nil
-        }
     }
 
     private func visibleRecord(
@@ -850,7 +1029,7 @@ final class RaceDetailViewModel {
         switch state {
         case .confirmed:
             return false
-        case .queued, .syncing, .conflict, .expired:
+        case .reviewRequired, .queued, .syncing, .conflict, .expired:
             return true
         }
     }
@@ -859,6 +1038,8 @@ final class RaceDetailViewModel {
         for localState: LocalPickSyncState
     ) -> PickSubmissionState {
         switch localState {
+        case .reviewRequired:
+            return .reviewRequired
         case .queued:
             return .savedOnDevice
         case .syncing:
@@ -878,6 +1059,8 @@ final class RaceDetailViewModel {
     ) {
         submissionState = submissionState(for: localState)
         switch localState {
+        case .reviewRequired:
+            submissionErrorMessage = "Review these device picks, then save when they look right."
         case .queued:
             if case .user = scope {
                 submissionErrorMessage = "Saved on this device — will sync when your account is available."
@@ -896,6 +1079,19 @@ final class RaceDetailViewModel {
     private func sessionScope(token: String?, userID: String?) -> SessionScope {
         guard token != nil, let userID else { return .device }
         return .user(userID)
+    }
+
+    private func refreshStoredAuthority(
+        scope: SessionScope,
+        localPickStore: LocalPickStore
+    ) {
+        guard case .user(let userID) = scope,
+              let pick = localPickStore.authoritativePick(
+                  for: raceID,
+                  owner: .user(userID)
+              )
+        else { return }
+        serverPick = pick
     }
 
     private func resolve(_ driverID: String?) -> Driver? {

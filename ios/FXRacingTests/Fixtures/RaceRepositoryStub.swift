@@ -14,12 +14,9 @@ actor RaceRepositoryStub: RaceRepositoryProtocol {
     }
 
     private var list: RaceListSnapshot?
+    private let details: [String: RaceDetailSnapshot]
     private let refreshOutcomes: [RefreshOutcome]
     private let gatedRefreshIndices: Set<Int>
-    private let gatesCachedList: Bool
-    private var isCachedListReleased = false
-    private var cachedListGates: [CheckedContinuation<Void, Never>] = []
-    private var cachedListWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
     private var releasedRefreshIndices: Set<Int> = []
     private var refreshGates: [Int: CheckedContinuation<Void, Never>] = [:]
     private var refreshWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
@@ -27,30 +24,20 @@ actor RaceRepositoryStub: RaceRepositoryProtocol {
 
     private(set) var refreshPolicies: [RaceFetchPolicy] = []
     private(set) var prefetchedIDs: [[String]] = []
-    private(set) var cachedListCallCount = 0
 
     init(
         list: RaceListSnapshot?,
+        details: [String: RaceDetailSnapshot] = [:],
         refreshOutcomes: [RefreshOutcome] = [],
-        gatedRefreshIndices: Set<Int> = [],
-        gatesCachedList: Bool = false
+        gatedRefreshIndices: Set<Int> = []
     ) {
         self.list = list
+        self.details = details
         self.refreshOutcomes = refreshOutcomes
         self.gatedRefreshIndices = gatedRefreshIndices
-        self.gatesCachedList = gatesCachedList
     }
 
-    func cachedList() async -> RaceListSnapshot? {
-        cachedListCallCount += 1
-        resumeCachedListWaiters()
-        if gatesCachedList, !isCachedListReleased {
-            await withCheckedContinuation { continuation in
-                cachedListGates.append(continuation)
-            }
-        }
-        return list
-    }
+    func cachedList() async -> RaceListSnapshot? { list }
 
     func refreshList(policy: RaceFetchPolicy) async throws -> RaceListSnapshot {
         let index = refreshPolicies.count
@@ -82,12 +69,13 @@ actor RaceRepositoryStub: RaceRepositoryProtocol {
         }
     }
 
-    func cachedDetail(id: String) async -> RaceDetailSnapshot? { nil }
+    func cachedDetail(id: String) async -> RaceDetailSnapshot? { details[id] }
 
     func refreshDetail(
         id: String,
         policy: RaceFetchPolicy
     ) async throws -> RaceDetailSnapshot {
+        if let detail = details[id] { return detail }
         throw APIError.notFound
     }
 
@@ -108,20 +96,6 @@ actor RaceRepositoryStub: RaceRepositoryProtocol {
         refreshGates.removeValue(forKey: index)?.resume()
     }
 
-    func waitForCachedListCalls(_ count: Int) async {
-        guard cachedListCallCount < count else { return }
-        await withCheckedContinuation { continuation in
-            cachedListWaiters.append((count, continuation))
-        }
-    }
-
-    func releaseCachedList() {
-        isCachedListReleased = true
-        let gates = cachedListGates
-        cachedListGates.removeAll()
-        gates.forEach { $0.resume() }
-    }
-
     func waitForPrefetchCalls(_ count: Int) async {
         guard prefetchedIDs.count < count else { return }
         await withCheckedContinuation { continuation in
@@ -132,12 +106,6 @@ actor RaceRepositoryStub: RaceRepositoryProtocol {
     private func resumeRefreshWaiters() {
         let ready = refreshWaiters.filter { refreshPolicies.count >= $0.0 }
         refreshWaiters.removeAll { refreshPolicies.count >= $0.0 }
-        ready.forEach { $0.1.resume() }
-    }
-
-    private func resumeCachedListWaiters() {
-        let ready = cachedListWaiters.filter { cachedListCallCount >= $0.0 }
-        cachedListWaiters.removeAll { cachedListCallCount >= $0.0 }
         ready.forEach { $0.1.resume() }
     }
 

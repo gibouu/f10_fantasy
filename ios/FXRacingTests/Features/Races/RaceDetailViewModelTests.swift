@@ -14,6 +14,41 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.submissionState, .idle)
     }
 
+    func testCancelLoadRejectsLatePublicAndPrivateHydration() async {
+        let api = GatedAPIClientSpy(
+            responses: [
+                detailKey: [.json(makePayload(entrants: refreshedDrivers))],
+                pickKey: [.json(PickResponse(pick: serverPick))],
+            ],
+            gatedKeys: [detailKey, pickKey]
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed
+        )
+        let viewModel = makeViewModel(api: api, repository: repository)
+        let store = makeStore()
+        let load = Task {
+            await viewModel.loadIfNeeded(
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            )
+        }
+        await api.waitForCalls(to: detailPath, count: 1)
+        await api.waitForCalls(to: pickPath, count: 1)
+
+        viewModel.cancelLoad()
+
+        XCTAssertFalse(viewModel.isLoading)
+        await api.releaseRequests(to: detailPath)
+        await api.releaseRequests(to: pickPath)
+        await load.value
+        XCTAssertTrue(viewModel.entrants.isEmpty)
+        XCTAssertNil(viewModel.serverPick)
+    }
+
     func testCachedDetailPublishesWhilePublicAndPrivateRequestsRunConcurrently() async throws {
         let cached = makeDetail(
             savedAt: RaceFixtures.now.addingTimeInterval(-301),
@@ -148,6 +183,29 @@ final class RaceDetailViewModelTests: XCTestCase {
         assertDeviceSelection(on: viewModel)
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
         XCTAssertNil(viewModel.loadErrorMessage)
+    }
+
+    func testPrivate401PreservesDirtyDraftAndReportsRejectedToken() async throws {
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.failure(.unauthorized)]]
+        )
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        var rejectedTokens: [String] = []
+        syncManager.setUnauthorizedHandler { rejectedTokens.append($0) }
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        let store = makeStore()
+        let record = try saveRecord(in: store, owner: .user("user-a"))
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(store.record(id: record.id)?.syncState, .queued)
+        assertDeviceSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .savedOnDevice)
+        XCTAssertEqual(rejectedTokens, ["token-a"])
     }
 
     func testPublicFailureRetainsCachedDetailAndExposesRetryError() async {
@@ -319,7 +377,7 @@ final class RaceDetailViewModelTests: XCTestCase {
         assertDeviceSelection(on: viewModel)
     }
 
-    func testObservedConfirmedRevisionClearsAMismatchedOlderServerPick() async {
+    func testObservedConfirmedRevisionKeepsSeparateServerAuthority() async {
         let api = GatedAPIClientSpy(
             responses: [pickKey: [.json(PickResponse(pick: serverPick))]]
         )
@@ -352,7 +410,8 @@ final class RaceDetailViewModelTests: XCTestCase {
 
         assertAlternateSelection(on: viewModel)
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
-        XCTAssertNil(viewModel.serverPick)
+        XCTAssertEqual(viewModel.serverPick?.id, serverPick.id)
+        XCTAssertEqual(viewModel.officialWinner?.id, serverPick.winnerDriverId)
     }
 
     func testStalePrivatePickCannotReplaceANewerExternallyConfirmedRevision() async throws {
@@ -720,6 +779,339 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(pickCalls, 1)
     }
 
+    func testCompletionSummaryTransitionForcesFreshPublicAndPrivateDetail() async throws {
+        let liveRace = RaceFixtures.race(
+            id: raceID,
+            round: 2,
+            status: .live,
+            startOffset: 0
+        )
+        let completedRace = RaceFixtures.race(
+            id: raceID,
+            round: 2,
+            status: .completed,
+            startOffset: 0
+        )
+        let livePick = makePick(id: "live-pick")
+        let completedPick = makePick(
+            id: "completed-pick",
+            lockedAt: RaceFixtures.now
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET /api/races": [
+                    .json(RaceListPayload(races: [liveRace], season: RaceFixtures.season2026)),
+                    .json(RaceListPayload(races: [completedRace], season: RaceFixtures.season2026)),
+                ],
+                detailKey: [
+                    .json(
+                        RaceDetailPayload(
+                            race: liveRace,
+                            entrants: drivers,
+                            results: [],
+                            qualifyingResults: []
+                        )
+                    ),
+                    .json(
+                        RaceDetailPayload(
+                            race: completedRace,
+                            entrants: refreshedDrivers,
+                            results: [],
+                            qualifyingResults: []
+                        )
+                    ),
+                ],
+                pickKey: [
+                    .json(PickResponse(pick: livePick)),
+                    .json(PickResponse(pick: completedPick)),
+                ],
+            ]
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed
+        )
+        let viewModel = RaceDetailViewModel(
+            summary: liveRace,
+            repository: repository,
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        let store = makeStore()
+
+        _ = try await repository.refreshList(policy: .force)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        XCTAssertEqual(viewModel.serverPick?.id, livePick.id)
+        XCTAssertEqual(viewModel.entrants.map(\.code), drivers.map(\.code))
+
+        _ = try await repository.refreshList(policy: .force)
+        viewModel.updateSummary(completedRace)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        let detailCalls = await api.calls(to: detailPath)
+        let pickCalls = await api.calls(to: pickPath)
+        XCTAssertEqual(detailCalls, 2)
+        XCTAssertEqual(pickCalls, 2)
+        XCTAssertEqual(viewModel.race.status, .completed)
+        XCTAssertEqual(viewModel.entrants.map(\.code), refreshedDrivers.map(\.code))
+        XCTAssertEqual(viewModel.serverPick?.id, completedPick.id)
+    }
+
+    func testCachedDetailCannotUndoSameStatusListCutoffCorrection() async {
+        let staleRace = RaceFixtures.upcoming
+        let correctedRace = Race(
+            id: staleRace.id,
+            seasonId: staleRace.seasonId,
+            round: staleRace.round,
+            name: staleRace.name,
+            circuitName: staleRace.circuitName,
+            country: staleRace.country,
+            type: staleRace.type,
+            scheduledStartUtc: staleRace.scheduledStartUtc.addingTimeInterval(3_600),
+            lockCutoffUtc: staleRace.lockCutoffUtc.addingTimeInterval(3_600),
+            status: staleRace.status,
+            qualifyingStartUtc: staleRace.qualifyingStartUtc?.addingTimeInterval(3_600)
+        )
+        let cachedDetail = RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: staleRace,
+            entrants: drivers,
+            results: [],
+            qualifyingResults: []
+        )
+        let api = GatedAPIClientSpy(responses: [:])
+        let viewModel = RaceDetailViewModel(
+            summary: staleRace,
+            repository: ImmediateRaceRepository(detail: cachedDetail),
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        viewModel.updateSummary(correctedRace)
+
+        await viewModel.loadIfNeeded(
+            token: nil,
+            userID: nil,
+            localPickStore: makeStore()
+        )
+
+        XCTAssertEqual(viewModel.race.scheduledStartUtc, correctedRace.scheduledStartUtc)
+        XCTAssertEqual(viewModel.race.lockCutoffUtc, correctedRace.lockCutoffUtc)
+        XCTAssertEqual(viewModel.race.qualifyingStartUtc, correctedRace.qualifyingStartUtc)
+        XCTAssertEqual(viewModel.entrants.map(\.id), drivers.map(\.id))
+    }
+
+    func testCompletedRaceRefreshesScoredAuthorityForEveryPersistedDirtyState() async throws {
+        let completedRace = RaceFixtures.race(
+            id: raceID,
+            round: 2,
+            status: .completed,
+            startOffset: -3_600
+        )
+        let completedDetail = RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: completedRace,
+            entrants: drivers,
+            results: [],
+            qualifyingResults: []
+        )
+        let cachedAuthority = makePick(id: "cached-unscored")
+        let scoredAuthority = makePick(
+            id: "fresh-scored",
+            scoreBreakdown: ScoreBreakdown(
+                tenthPlaceScore: 25,
+                winnerBonus: 5,
+                dnfBonus: 3,
+                totalScore: 33
+            )
+        )
+        let states: [(String, LocalPickSyncState)] = [
+            ("queued", .queued),
+            ("conflict", .conflict(.accountPickFound)),
+            ("expired", .expired),
+        ]
+
+        for (name, state) in states {
+            let store = makeStore()
+            let record = try saveRecord(in: store, owner: .user("user-a"))
+            if state != .queued {
+                XCTAssertTrue(
+                    store.transition(
+                        id: record.id,
+                        revision: record.revision,
+                        to: state
+                    ),
+                    name
+                )
+            }
+            XCTAssertTrue(
+                store.preserveAuthoritative(
+                    cachedAuthority,
+                    for: .user("user-a")
+                ),
+                name
+            )
+            let api = GatedAPIClientSpy(
+                responses: [
+                    pickKey: [.json(PickResponse(pick: scoredAuthority))],
+                ]
+            )
+            let viewModel = RaceDetailViewModel(
+                summary: completedRace,
+                repository: ImmediateRaceRepository(detail: completedDetail),
+                api: api,
+                syncManager: SyncManager(api: api, clock: TestClock.fixed),
+                clock: TestClock.fixed
+            )
+
+            await viewModel.loadIfNeeded(
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            )
+
+            XCTAssertEqual(
+                viewModel.serverPick?.scoreBreakdown?.totalScore,
+                33,
+                name
+            )
+            XCTAssertEqual(viewModel.selectedWinnerID, selection.winnerDriverID, name)
+            XCTAssertEqual(viewModel.selectedP10ID, selection.tenthPlaceDriverID, name)
+            XCTAssertEqual(viewModel.selectedDNFID, selection.dnfDriverID, name)
+            let pickCalls = await api.calls(to: pickPath)
+            XCTAssertEqual(pickCalls, 1, name)
+        }
+    }
+
+    func testCompletedRaceRefreshesScoredAuthorityWithoutReplacingUnsavedSelection() async {
+        let completedRace = RaceFixtures.race(
+            id: raceID,
+            round: 2,
+            status: .completed,
+            startOffset: -3_600
+        )
+        let completedDetail = RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: completedRace,
+            entrants: drivers,
+            results: [],
+            qualifyingResults: []
+        )
+        let cachedAuthority = makePick(id: "cached-unscored")
+        let scoredAuthority = makePick(
+            id: "fresh-scored",
+            scoreBreakdown: ScoreBreakdown(
+                tenthPlaceScore: 25,
+                winnerBonus: 5,
+                dnfBonus: 3,
+                totalScore: 33
+            )
+        )
+        let store = makeStore()
+        XCTAssertTrue(
+            store.preserveAuthoritative(
+                cachedAuthority,
+                for: .user("user-a")
+            )
+        )
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: scoredAuthority))]]
+        )
+        let viewModel = RaceDetailViewModel(
+            summary: RaceFixtures.upcoming,
+            repository: ImmediateRaceRepository(detail: completedDetail),
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        selectCompleteDraft(on: viewModel)
+        viewModel.updateSummary(completedRace)
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(viewModel.serverPick?.scoreBreakdown?.totalScore, 33)
+        XCTAssertEqual(viewModel.selectedWinnerID, selection.winnerDriverID)
+        XCTAssertEqual(viewModel.selectedP10ID, selection.tenthPlaceDriverID)
+        XCTAssertEqual(viewModel.selectedDNFID, selection.dnfDriverID)
+        let pickCalls = await api.calls(to: pickPath)
+        XCTAssertEqual(pickCalls, 1)
+    }
+
+    func testCompletedRaceExposesExpiredLocalSelectionOnlyAsUnsubmittedDeviceDraft() async throws {
+        let completedRace = RaceFixtures.race(
+            id: raceID,
+            round: 2,
+            status: .completed,
+            startOffset: -3_600
+        )
+        let completedDetail = RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: completedRace,
+            entrants: drivers,
+            results: [],
+            qualifyingResults: []
+        )
+        let scoredAuthority = makePick(
+            id: "official-scored-pick",
+            winner: alternateSelection.winnerDriverID,
+            p10: alternateSelection.tenthPlaceDriverID,
+            dnf: alternateSelection.dnfDriverID,
+            scoreBreakdown: ScoreBreakdown(
+                tenthPlaceScore: 25,
+                winnerBonus: 5,
+                dnfBonus: 3,
+                totalScore: 33
+            )
+        )
+        let store = makeStore()
+        let deviceRecord = try saveRecord(in: store, owner: .user("user-a"))
+        XCTAssertTrue(store.transition(
+            id: deviceRecord.id,
+            revision: deviceRecord.revision,
+            to: .expired
+        ))
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: scoredAuthority))]]
+        )
+        let viewModel = RaceDetailViewModel(
+            summary: completedRace,
+            repository: ImmediateRaceRepository(detail: completedDetail),
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(viewModel.unsubmittedDeviceDraft, selection)
+        XCTAssertEqual(viewModel.serverPick?.id, scoredAuthority.id)
+        XCTAssertEqual(viewModel.serverPick?.scoreBreakdown?.totalScore, 33)
+        XCTAssertEqual(viewModel.officialWinner?.id, alternateSelection.winnerDriverID)
+        XCTAssertEqual(viewModel.selectedWinnerID, selection.winnerDriverID)
+    }
+
     func testForcedRefreshPrivateFailureDoesNotRevertToStaleConfirmedLocalIDs() async throws {
         let api = GatedAPIClientSpy(
             responses: [
@@ -803,6 +1195,45 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
     }
 
+    func testOnlineAccountPickRestoresFromAuthoritativeCacheForOfflineColdViewModel() async {
+        let store = makeStore()
+        let onlineAPI = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: serverPick))]]
+        )
+        let onlineViewModel = makeViewModel(api: onlineAPI)
+
+        await onlineViewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertNil(store.record(for: raceID, owner: .user("user-a")))
+        XCTAssertEqual(
+            store.authoritativePick(
+                for: raceID,
+                owner: .user("user-a")
+            )?.id,
+            serverPick.id
+        )
+
+        let offlineAPI = GatedAPIClientSpy(
+            responses: [pickKey: [.failure(.serverError(503, "offline"))]]
+        )
+        let offlineViewModel = makeViewModel(api: offlineAPI)
+        await offlineViewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(offlineViewModel.serverPick?.id, serverPick.id)
+        XCTAssertEqual(offlineViewModel.selectedWinnerID, serverPick.winnerDriverId)
+        XCTAssertEqual(offlineViewModel.selectedP10ID, serverPick.tenthPlaceDriverId)
+        XCTAssertEqual(offlineViewModel.selectedDNFID, serverPick.dnfDriverId)
+        XCTAssertEqual(offlineViewModel.submissionState, .savedToAccount)
+    }
+
     func testResubmitForcesANewRevisionAfterServerBaselineCacheFailure() async throws {
         let savedDevicePick = makePick(id: "saved-after-retry")
         let api = GatedAPIClientSpy(
@@ -846,13 +1277,15 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
     }
 
-    func testPrivate404RehydratesTheReconciledConfirmedLocalSelection() async throws {
+    func testPrivate404KeepsDeviceSelectionButRequiresExplicitAccountRepair() async throws {
+        let repairedPick = makePick(id: "repaired-account-pick")
         let api = GatedAPIClientSpy(
             responses: [
                 pickKey: [
                     .json(PickResponse(pick: serverPick)),
                     .failure(.notFound),
                 ],
+                "POST /api/picks": [.json(PickResponse(pick: repairedPick))],
             ]
         )
         let viewModel = makeViewModel(api: api)
@@ -877,7 +1310,29 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedWinnerID, serverPick.winnerDriverId)
         XCTAssertEqual(viewModel.selectedP10ID, serverPick.tenthPlaceDriverId)
         XCTAssertEqual(viewModel.selectedDNFID, serverPick.dnfDriverId)
+        XCTAssertEqual(viewModel.submissionState, .missingFromAccount)
+
+        let missingRevision = try XCTUnwrap(
+            store.record(for: raceID, owner: .user("user-a"))?.revision
+        )
+        await viewModel.submit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertGreaterThan(
+            store.record(for: raceID, owner: .user("user-a"))?.revision ?? 0,
+            missingRevision
+        )
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.syncState,
+            .confirmed
+        )
+        XCTAssertEqual(viewModel.serverPick?.id, repairedPick.id)
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+        let methods = await api.recordedRequests().map(\.method)
+        XCTAssertEqual(methods, ["GET", "GET", "POST"])
     }
 
     func testAuthoritativePrivate404ClearsOnlyAStaleServerOnlyPick() async {
@@ -954,6 +1409,48 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(store.record(id: id)?.syncState, .confirmed)
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
         XCTAssertEqual(viewModel.serverPick?.id, responsePick.id)
+    }
+
+    func testLocalSaveCallbackPublishesBeforeGatedAccountRequestCompletes() async {
+        let responsePick = makePick(id: "saved-after-local-publication")
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/picks": [.json(PickResponse(pick: responsePick))],
+            ],
+            gatedKeys: ["POST /api/picks"]
+        )
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        await loadAndSelectCompleteDraft(
+            on: viewModel,
+            token: "token-a",
+            userID: "user-a",
+            store: store
+        )
+        var callbackState: PickSubmissionState?
+
+        let save = Task {
+            await viewModel.submit(
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store,
+                onLocalSavePublished: {
+                    callbackState = viewModel.submissionState
+                }
+            )
+        }
+        let requestID = await api.waitForRequest(
+            method: "POST",
+            to: pickPath,
+            ordinal: 1
+        )
+
+        XCTAssertEqual(callbackState, .savedOnDevice)
+        XCTAssertEqual(viewModel.submissionState, .syncing)
+
+        await api.releaseRequest(id: requestID)
+        await save.value
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
     }
 
     func testRepeatedSaveWhilePOSTIsInFlightKeepsOneRevisionAndRequest() async throws {
@@ -1085,7 +1582,7 @@ final class RaceDetailViewModelTests: XCTestCase {
 
     func testUnchangedConfirmedSubmitStaysSavedWithoutPOST() async throws {
         let api = GatedAPIClientSpy(
-            responses: [pickKey: [.failure(.notFound)]]
+            responses: [pickKey: [.failure(.serverError(503, "unavailable"))]]
         )
         let viewModel = makeViewModel(api: api)
         let store = makeStore()
@@ -1154,6 +1651,30 @@ final class RaceDetailViewModelTests: XCTestCase {
         duplicateViewModel.select(driver: DriverFixtures.norris, for: .p10)
         duplicateViewModel.select(driver: DriverFixtures.norris, for: .dnf)
         XCTAssertFalse(duplicateViewModel.canSave)
+    }
+
+    func testServerLockedPickRejectsSelectionWithoutAdvancingTheDraft() async {
+        let lockedPick = makePick(
+            id: "locked",
+            lockedAt: RaceFixtures.now.addingTimeInterval(-1)
+        )
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: lockedPick))]]
+        )
+        let viewModel = makeViewModel(api: api)
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: makeStore()
+        )
+
+        XCTAssertTrue(viewModel.isPickLocked)
+        XCTAssertFalse(
+            viewModel.select(driver: DriverFixtures.piastri, for: .winner)
+        )
+        XCTAssertEqual(viewModel.selectedWinnerID, lockedPick.winnerDriverId)
+        XCTAssertFalse(viewModel.canSave)
     }
 
     func testExternalNewerRevisionDuringPOSTDoesNotLeaveViewModelSyncing() async {
@@ -1242,7 +1763,7 @@ final class RaceDetailViewModelTests: XCTestCase {
         assertAlternateSelection(on: viewModel)
         XCTAssertEqual(viewModel.submissionState, .savedOnDevice)
         let pickCalls = await api.calls(to: pickPath)
-        XCTAssertEqual(pickCalls, 0)
+        XCTAssertEqual(pickCalls, 1)
 
         XCTAssertTrue(
             store.transition(
@@ -1268,7 +1789,12 @@ final class RaceDetailViewModelTests: XCTestCase {
             dnf: alternateSelection.dnfDriverID
         )
         let api = GatedAPIClientSpy(
-            responses: [pickKey: [.json(PickResponse(pick: migratedPick))]]
+            responses: [
+                pickKey: [
+                    .failure(.notFound),
+                    .json(PickResponse(pick: migratedPick)),
+                ],
+            ]
         )
         let viewModel = makeViewModel(api: api)
         let store = makeStore()
@@ -1333,7 +1859,8 @@ final class RaceDetailViewModelTests: XCTestCase {
             localPickStore: store
         )
         assertDeviceSelection(on: accountBViewModel)
-        XCTAssertEqual(accountBViewModel.submissionState, .savedToAccount)
+        XCTAssertEqual(accountBViewModel.submissionState, .missingFromAccount)
+        XCTAssertNil(accountBViewModel.serverPick)
     }
 
     func testExplicitOldAccountSelectionSupersedesDirtyGuestMigration() async throws {
@@ -1458,8 +1985,303 @@ final class RaceDetailViewModelTests: XCTestCase {
         assertDeviceSelection(on: viewModel)
         XCTAssertEqual(viewModel.submissionState, .conflict)
         XCTAssertEqual(store.record(id: record.id)?.syncState, .conflict(.accountPickFound))
+        XCTAssertEqual(viewModel.serverPick?.id, serverPick.id)
+        XCTAssertEqual(
+            store.authoritativePick(for: raceID, owner: .user("user-a"))?.id,
+            serverPick.id
+        )
         let pickCalls = await api.calls(to: pickPath)
-        XCTAssertEqual(pickCalls, 0)
+        XCTAssertEqual(pickCalls, 1)
+    }
+
+    func testScopedAuthorityDrivesOfficialRowsWhileConflictDraftStaysEditable() async throws {
+        let refreshedAuthority = makePick(
+            id: "refreshed-authority",
+            scoreBreakdown: ScoreBreakdown(
+                tenthPlaceScore: 25,
+                winnerBonus: 5,
+                dnfBonus: 3,
+                totalScore: 33
+            )
+        )
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: refreshedAuthority))]]
+        )
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        let record = try saveRecord(in: store, owner: .user("user-a"))
+        XCTAssertTrue(store.transition(
+            id: record.id,
+            revision: record.revision,
+            to: .conflict(.accountPickFound)
+        ))
+        XCTAssertTrue(store.preserveAuthoritative(serverPick, for: .user("user-a")))
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        assertDeviceSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .conflict)
+        XCTAssertEqual(viewModel.serverPick?.id, refreshedAuthority.id)
+        XCTAssertEqual(viewModel.officialWinner?.id, refreshedAuthority.winnerDriverId)
+        XCTAssertEqual(viewModel.officialP10?.id, refreshedAuthority.tenthPlaceDriverId)
+        XCTAssertEqual(viewModel.officialDNF?.id, refreshedAuthority.dnfDriverId)
+        XCTAssertEqual(viewModel.serverPick?.scoreBreakdown?.totalScore, 33)
+        XCTAssertEqual(viewModel.selectedWinner?.id, selection.winnerDriverID)
+        let pickCalls = await api.calls(to: pickPath)
+        XCTAssertEqual(pickCalls, 1)
+
+        await viewModel.loadIfNeeded(
+            token: "token-b",
+            userID: "user-b",
+            localPickStore: store,
+            force: true
+        )
+        XCTAssertNil(viewModel.serverPick)
+        XCTAssertNil(viewModel.officialWinner)
+    }
+
+    func testExplicitAccountSaveWithoutMigrationWorkerSupersedesQueuedGuestDraft() async throws {
+        let acceptedPick = makePick(
+            id: "accepted-guest-draft",
+            winner: alternateSelection.winnerDriverID,
+            p10: alternateSelection.tenthPlaceDriverID,
+            dnf: alternateSelection.dnfDriverID
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                pickKey: [.failure(.notFound)],
+                "POST /api/picks": [.json(PickResponse(pick: acceptedPick))],
+            ]
+        )
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        let guestRecord = try saveRecord(
+            in: store,
+            owner: .guest,
+            selection: alternateSelection
+        )
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        assertAlternateSelection(on: viewModel)
+
+        await viewModel.submit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        viewModel.reconcileLocalState(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertNil(store.record(id: guestRecord.id))
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.selection,
+            alternateSelection
+        )
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.syncState,
+            .confirmed
+        )
+        assertAlternateSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+    }
+
+    func testExplicitDirtyAccountSaveAlsoSupersedesHiddenDirtyGuestDraft() async throws {
+        let acceptedPick = makePick(id: "accepted-account-draft")
+        let api = GatedAPIClientSpy(
+            responses: [
+                pickKey: [.failure(.notFound)],
+                "POST /api/picks": [.json(PickResponse(pick: acceptedPick))],
+            ]
+        )
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        let accountRecord = try saveRecord(
+            in: store,
+            owner: .user("user-a")
+        )
+        let guestRecord = try saveRecord(
+            in: store,
+            owner: .guest,
+            selection: alternateSelection
+        )
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        assertDeviceSelection(on: viewModel)
+
+        await viewModel.submit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        viewModel.reconcileLocalState(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertNil(store.record(id: guestRecord.id))
+        XCTAssertEqual(store.record(id: accountRecord.id)?.selection, selection)
+        XCTAssertEqual(store.record(id: accountRecord.id)?.syncState, .confirmed)
+        assertDeviceSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+    }
+
+    func testExplicitSaveSettlesGuestServerWinsConflictIntoCurrentAccount() async throws {
+        let acceptedPick = makePick(
+            id: "accepted-device-review",
+            winner: selection.winnerDriverID,
+            p10: selection.tenthPlaceDriverID,
+            dnf: selection.dnfDriverID
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                pickKey: [.json(PickResponse(pick: serverPick))],
+                "POST /api/picks": [.json(PickResponse(pick: acceptedPick))],
+            ]
+        )
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        let guestRecord = try saveRecord(in: store, owner: .guest)
+        XCTAssertTrue(
+            store.transition(
+                id: guestRecord.id,
+                revision: guestRecord.revision,
+                to: .conflict(.serverWins)
+            )
+        )
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        assertDeviceSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .conflict)
+
+        await viewModel.submit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        viewModel.reconcileLocalState(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertNil(store.record(id: guestRecord.id))
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.selection,
+            selection
+        )
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.syncState,
+            .confirmed
+        )
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+        XCTAssertNil(viewModel.submissionErrorMessage)
+    }
+
+    func testFailedExplicitGuestConflictReviewKeepsGuestAndDoesNotPublishAccountDraft() async throws {
+        let persistence = MemoryPickPersistence()
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        let guestRecord = try saveRecord(in: store, owner: .guest)
+        XCTAssertTrue(
+            store.transition(
+                id: guestRecord.id,
+                revision: guestRecord.revision,
+                to: .conflict(.serverWins)
+            )
+        )
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: serverPick))]]
+        )
+        let viewModel = makeViewModel(api: api)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        persistence.rejectsWrites = true
+
+        await viewModel.submit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(store.record(id: guestRecord.id)?.syncState, .conflict(.serverWins))
+        XCTAssertNil(store.record(for: raceID, owner: .user("user-a")))
+        XCTAssertEqual(viewModel.submissionState, .conflict)
+        XCTAssertNotNil(viewModel.submissionErrorMessage)
+        let postCalls = await api.calls(method: "POST", to: pickPath)
+        XCTAssertEqual(postCalls, 0)
+    }
+
+    func testLegacyConflictRequiresReviewAndCopiesWithoutAutomaticUpload() async throws {
+        let persistence = MemoryPickPersistence()
+        let legacy = LegacyLocalPickV1(
+            raceId: raceID,
+            winnerId: selection.winnerDriverID,
+            p10Id: selection.tenthPlaceDriverID,
+            dnfId: selection.dnfDriverID,
+            savedAt: RaceFixtures.now,
+            synced: false
+        )
+        persistence.setData(
+            try JSONEncoder().encode([raceID: legacy]),
+            forKey: "localPicks_v1"
+        )
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        let api = GatedAPIClientSpy(responses: [:])
+        let viewModel = makeViewModel(api: api)
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        XCTAssertTrue(viewModel.hasRecoverableDevicePick)
+        XCTAssertNil(viewModel.selectedWinnerID)
+
+        viewModel.reviewLegacyDevicePick(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertFalse(viewModel.hasRecoverableDevicePick)
+        assertDeviceSelection(on: viewModel)
+        XCTAssertEqual(viewModel.submissionState, .reviewRequired)
+        XCTAssertEqual(
+            store.record(for: raceID, owner: .user("user-a"))?.syncState,
+            .reviewRequired
+        )
+        XCTAssertNil(store.legacyConflict(for: raceID))
+        XCTAssertTrue(store.queuedRecords(currentUserID: "user-a").isEmpty)
+        let requests = await api.recordedRequests()
+        XCTAssertFalse(requests.contains { $0.method == "POST" })
     }
 
     func testAuthenticatedExplicit423MarksCurrentRevisionExpired() async {
@@ -1492,8 +2314,16 @@ final class RaceDetailViewModelTests: XCTestCase {
         let api = GatedAPIClientSpy(
             responses: ["POST /api/picks": [.failure(.unauthorized)]]
         )
-        let viewModel = makeViewModel(api: api)
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        var rejectedTokens: [String] = []
+        syncManager.setUnauthorizedHandler { rejectedTokens.append($0) }
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
         let store = makeStore()
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "expired-token",
+            localPickStore: store
+        )
         await loadAndSelectCompleteDraft(
             on: viewModel,
             token: "expired-token",
@@ -1510,6 +2340,7 @@ final class RaceDetailViewModelTests: XCTestCase {
         let id = LocalPickRecordID(owner: .user("user-a"), raceID: raceID)
         XCTAssertEqual(store.record(id: id)?.syncState, .queued)
         XCTAssertEqual(viewModel.submissionState, .savedOnDevice)
+        XCTAssertEqual(rejectedTokens, ["expired-token"])
     }
 
     func testGuestSaveIsLocalOnlyAndNeverCallsPrivateAPI() async throws {
@@ -1628,7 +2459,9 @@ final class RaceDetailViewModelTests: XCTestCase {
         id: String,
         winner: String = "norris",
         p10: String = "piastri",
-        dnf: String = "leclerc"
+        dnf: String = "leclerc",
+        lockedAt: Date? = nil,
+        scoreBreakdown: ScoreBreakdown? = nil
     ) -> Pick {
         Pick(
             id: id,
@@ -1636,8 +2469,8 @@ final class RaceDetailViewModelTests: XCTestCase {
             tenthPlaceDriverId: p10,
             winnerDriverId: winner,
             dnfDriverId: dnf,
-            lockedAt: nil,
-            scoreBreakdown: nil
+            lockedAt: lockedAt,
+            scoreBreakdown: scoreBreakdown
         )
     }
 

@@ -20,17 +20,15 @@ struct DriverBubbleView: View {
 
             if let driver {
                 if let url = driver.photoFullURL {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: size, height: size)
-                                .clipShape(Circle())
-                        } else {
-                            codeLabel(driver)
-                        }
+                    FXRemoteImage(
+                        url: url,
+                        width: size,
+                        height: size,
+                        contentMode: .fill
+                    ) {
+                        codeLabel(driver)
                     }
+                    .clipShape(Circle())
                 } else {
                     codeLabel(driver)
                 }
@@ -67,16 +65,16 @@ struct SlotDriverBubble: View {
                 .overlay(Circle().stroke(teamColor, lineWidth: 2))
 
             if let url = photoURL {
-                AsyncImage(url: url) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFill()
-                            .frame(width: size, height: size)
-                            .clipShape(Circle())
-                    } else {
-                        Text(code)
-                            .font(.system(size: size * 0.28, weight: .black))
-                    }
+                FXRemoteImage(
+                    url: url,
+                    width: size,
+                    height: size,
+                    contentMode: .fill
+                ) {
+                    Text(code)
+                        .font(.system(size: size * 0.28, weight: .black))
                 }
+                .clipShape(Circle())
             } else {
                 Text(code)
                     .font(.system(size: size * 0.28, weight: .black))

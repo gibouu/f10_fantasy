@@ -39,6 +39,9 @@ final class AuthManager {
         self.api = api
         self.tokenStore = tokenStore
         self.syncManager = syncManager
+        syncManager.setUnauthorizedHandler { [weak self] rejectedToken in
+            self?.invalidateIfCurrent(rejectedToken: rejectedToken)
+        }
     }
 
     // Injected at launch — set before restoreSession() is called.
@@ -86,17 +89,35 @@ final class AuthManager {
             await restoreSession(races: races)
         case .unauthenticated:
             return
-        case .authenticated(let user):
+        case .authenticated(let cachedUser):
             guard let token = tokenStore.loadToken() else {
                 _ = advanceSessionGeneration()
                 state = .unauthenticated
                 return
             }
-            await resumeEligiblePicks(
-                userID: user.id,
-                token: token,
-                races: races
-            )
+            let generation = sessionGeneration
+            do {
+                let user: User = try await api.request(.me, token: token)
+                guard isCurrent(generation) else { return }
+                state = .authenticated(user)
+                await resumeEligiblePicks(
+                    userID: user.id,
+                    token: token,
+                    races: races
+                )
+            } catch APIError.unauthorized {
+                guard isCurrent(generation) else { return }
+                fxWarn(.auth, "handleForeground: token rejected (401) → clearing keychain")
+                signOut()
+            } catch {
+                guard isCurrent(generation) else { return }
+                fxWarn(.auth, "handleForeground: /me unavailable (\(error.localizedDescription)) → keeping cached account")
+                await resumeEligiblePicks(
+                    userID: cachedUser.id,
+                    token: token,
+                    races: races
+                )
+            }
         }
     }
 
@@ -113,13 +134,10 @@ final class AuthManager {
         try tokenStore.saveToken(exchange.accessToken)
         fxLog(.auth, "signInWithApple: token issued, userId=\(exchange.userId) usernameSet=\(exchange.usernameSet)")
 
-        // Sign-in succeeds the moment the exchange returns — the token is
-        // valid and saved. Try to enrich with /me, but if that call fails
-        // (e.g. transient 401 from a stale revocation snapshot, brief
-        // network blip), fall back to a User constructed from the exchange
-        // response. This guarantees the user always lands inside the app
-        // after a successful Apple authorization, instead of seeing the
-        // sign-in sheet error out post-authorization.
+        // Save the exchanged token before enriching the account with /me.
+        // Network or service failures can use the exchange response as a
+        // cached account, while an unauthorized response is authoritative
+        // and invalidates the session below.
         let user: User
         do {
             let fetchedUser: User = try await api.request(
@@ -128,6 +146,11 @@ final class AuthManager {
             )
             try requireCurrent(generation)
             user = fetchedUser
+        } catch APIError.unauthorized {
+            try requireCurrent(generation)
+            fxWarn(.auth, "signInWithApple: issued token rejected by /me (401) → clearing keychain")
+            signOut()
+            throw APIError.unauthorized
         } catch {
             try requireCurrent(generation)
             fxWarn(.auth, "signInWithApple: /me failed (\(error.localizedDescription)) — proceeding with exchange response")
@@ -151,11 +174,17 @@ final class AuthManager {
         // Migrate any guest picks in the background — don't block sign-in completion
         // so the caller can dismiss sheets / transition views before migration finishes.
         if let store = localPickStore {
+            let sessionLease = syncManager.beginSession(
+                currentUserID: user.id,
+                token: exchange.accessToken,
+                localPickStore: store
+            )
             Task {
                 await syncManager.resumeEligiblePicks(
                     currentUserID: user.id,
                     token: exchange.accessToken,
-                    localPickStore: store
+                    localPickStore: store,
+                    sessionLease: sessionLease
                 )
             }
         }
@@ -264,6 +293,7 @@ final class AuthManager {
     }
 
     private func advanceSessionGeneration() -> UUID {
+        syncManager.invalidateSession(localPickStore: localPickStore)
         let generation = UUID()
         sessionGeneration = generation
         return generation
@@ -284,17 +314,30 @@ final class AuthManager {
         else { throw CancellationError() }
     }
 
+    private func invalidateIfCurrent(rejectedToken: String) {
+        guard case .authenticated = state,
+              tokenStore.loadToken() == rejectedToken
+        else { return }
+        signOut()
+    }
+
     private func resumeEligiblePicks(
         userID: String,
         token: String,
         races: [Race]
     ) async {
         guard let localPickStore else { return }
+        let sessionLease = syncManager.beginSession(
+            currentUserID: userID,
+            token: token,
+            localPickStore: localPickStore
+        )
         await syncManager.resumeEligiblePicks(
             currentUserID: userID,
             token: token,
             localPickStore: localPickStore,
-            races: races
+            races: races,
+            sessionLease: sessionLease
         )
     }
 }

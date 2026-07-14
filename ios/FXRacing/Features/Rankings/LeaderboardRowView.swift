@@ -41,9 +41,12 @@ struct LeaderboardRowView: View {
     private var teamAvatar: some View {
         if let logoUrl = row.teamLogoUrl,
            let color = row.teamColor.flatMap({ Color(hex: $0) }) {
-            AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + logoUrl)) { img in
-                img.resizable().scaledToFit().padding(5)
-            } placeholder: {
+            FXRemoteImage(
+                url: URL(string: Config.apiBaseURL.absoluteString + logoUrl),
+                width: 26,
+                height: 26,
+                contentMode: .fit
+            ) {
                 ProgressView()
             }
             .frame(width: 36, height: 36)

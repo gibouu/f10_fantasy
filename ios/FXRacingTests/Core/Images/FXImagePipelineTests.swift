@@ -277,6 +277,37 @@ final class FXImagePipelineTests: XCTestCase {
         await pipeline.waitForPrefetchToFinish()
     }
 
+    func testStaleOwnerCannotClearIncomingViewPrefetchScope() async {
+        let loader = ControlledImageDataLoader(data: onePixelPNG)
+        let pipeline = makePipeline(loader: loader)
+        let outgoingOwner = UUID()
+        let incomingOwner = UUID()
+        let outgoing = makeRequest(
+            url: URL(string: "https://example.test/outgoing.png")!
+        )
+        let incoming = makeRequest(
+            url: URL(string: "https://example.test/incoming.png")!
+        )
+
+        await pipeline.replacePrefetchScope(
+            with: [outgoing],
+            ownerID: outgoingOwner
+        )
+        await loader.waitForStarts(1)
+        await pipeline.replacePrefetchScope(
+            with: [incoming],
+            ownerID: incomingOwner
+        )
+        await loader.waitForStarts(2)
+
+        await pipeline.clearPrefetchScope(ownerID: outgoingOwner)
+
+        let incomingCancellationCount = await loader.cancellationCount(for: incoming.url)
+        XCTAssertEqual(incomingCancellationCount, 0)
+        await loader.finishAll()
+        await pipeline.waitForPrefetchToFinish()
+    }
+
     func testReplacingPrefetchScopeKeepsOverlappingLoad() async {
         let loader = ControlledImageDataLoader(data: onePixelPNG)
         let pipeline = makePipeline(loader: loader)

@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PROJECT="$ROOT_DIR/ios/FXRacing.xcodeproj"
+SCHEME="FXRacingPerformance"
+DERIVED_DATA="/private/tmp/f10-performance"
+WARMUPS=3
+SAMPLES=30
+UDID=""
+SCENARIO=""
+OUTPUT_DIR=""
+SKIP_BUILD=0
+
+usage() {
+  echo "Usage: scripts/ios-performance --udid <simulator-udid> --scenario <name> [--output <dir>] [--warmups <count>] [--samples <count>] [--skip-build]"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --udid)
+      UDID="${2:-}"
+      shift 2
+      ;;
+    --scenario)
+      SCENARIO="${2:-}"
+      shift 2
+      ;;
+    --output)
+      OUTPUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --warmups)
+      WARMUPS="${2:-}"
+      shift 2
+      ;;
+    --samples)
+      SAMPLES="${2:-}"
+      shift 2
+      ;;
+    --skip-build)
+      SKIP_BUILD=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$UDID" || -z "$SCENARIO" ]]; then
+  usage >&2
+  exit 2
+fi
+
+if ! [[ "$WARMUPS" =~ ^[0-9]+$ && "$SAMPLES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Warmups must be zero or greater and samples must be greater than zero." >&2
+  exit 2
+fi
+
+case "$SCENARIO" in
+  shell) TEST_METHODS=("testShellPerformance") ;;
+  cached-launch) TEST_METHODS=("testCachedLaunchPerformance") ;;
+  empty) TEST_METHODS=("testEmptyLaunchPerformance") ;;
+  offline) TEST_METHODS=("testOfflineLaunchPerformance") ;;
+  image) TEST_METHODS=("testImageLaunchPerformance") ;;
+  race-swipe) TEST_METHODS=("testRaceSwipePerformance") ;;
+  driver-sheet) TEST_METHODS=("testDriverSheetPerformance") ;;
+  schedule-sheet) TEST_METHODS=("testScheduleSheetPerformance") ;;
+  local-save)
+    TEST_METHODS=(
+      "testLocalSaveDiagnosticPerformance"
+      "testLocalSavePerformance"
+    )
+    ;;
+  *)
+    echo "Unsupported scenario: $SCENARIO" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -z "$OUTPUT_DIR" ]]; then
+  TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+  OUTPUT_DIR="$ROOT_DIR/artifacts/ios-performance/$TIMESTAMP/$SCENARIO"
+fi
+
+mkdir -p "$OUTPUT_DIR"
+RESULT_BUNDLE="$OUTPUT_DIR/$SCENARIO.xcresult"
+RAW_JSON="$OUTPUT_DIR/raw.json"
+METRICS_JSON="$OUTPUT_DIR/metrics.json"
+ATTACHMENTS_DIR="$OUTPUT_DIR/attachments"
+
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  xcodebuild -quiet \
+    -project "$PROJECT" \
+    -scheme "$SCHEME" \
+    -configuration Performance \
+    -destination "platform=iOS Simulator,id=$UDID" \
+    -derivedDataPath "$DERIVED_DATA" \
+    CODE_SIGNING_ALLOWED=NO \
+    build-for-testing
+fi
+
+case "$SCENARIO" in
+  shell|cached-launch|offline)
+    APP_BUNDLE="$DERIVED_DATA/Build/Products/Performance-iphonesimulator/FXRacing.app"
+    if [[ ! -d "$APP_BUNDLE" ]]; then
+      echo "Performance app was not found. Run without --skip-build first." >&2
+      exit 1
+    fi
+
+    set +e
+    node "$ROOT_DIR/scripts/ios-performance-clean-launch.mjs" \
+      --udid "$UDID" \
+      --scenario "$SCENARIO" \
+      --app "$APP_BUNDLE" \
+      --output "$OUTPUT_DIR" \
+      --warmups "$WARMUPS" \
+      --samples "$SAMPLES"
+    CLEAN_LAUNCH_STATUS=$?
+    set -e
+    echo "Artifacts: $OUTPUT_DIR"
+    exit "$CLEAN_LAUNCH_STATUS"
+    ;;
+esac
+
+XCTESTRUN_SOURCE="$(
+  find "$DERIVED_DATA/Build/Products" -maxdepth 1 -type f \
+    -name 'FXRacingPerformance_*.xctestrun' \
+    ! -name '*-run.xctestrun' -print -quit
+)"
+if [[ -z "$XCTESTRUN_SOURCE" ]]; then
+  echo "Performance .xctestrun file was not found. Run without --skip-build first." >&2
+  exit 1
+fi
+
+RUN_XCTESTRUN="${XCTESTRUN_SOURCE%.xctestrun}-$SCENARIO-run.xctestrun"
+cp "$XCTESTRUN_SOURCE" "$RUN_XCTESTRUN"
+plutil -replace FXRacingUITests.UITargetAppPerformanceAntipatternCheckerEnabled \
+  -bool false "$RUN_XCTESTRUN"
+plutil -insert FXRacingUITests.UITargetAppMainThreadCheckerEnabled \
+  -bool false "$RUN_XCTESTRUN"
+plutil -insert FXRacingUITests.EnvironmentVariables.FX_PERFORMANCE_WARMUPS \
+  -string "$WARMUPS" "$RUN_XCTESTRUN"
+plutil -insert FXRacingUITests.EnvironmentVariables.FX_PERFORMANCE_SAMPLES \
+  -string "$SAMPLES" "$RUN_XCTESTRUN"
+
+xcrun simctl terminate "$UDID" com.fxracing.app >/dev/null 2>&1 || true
+xcrun simctl uninstall "$UDID" com.fxracing.app >/dev/null 2>&1 || true
+
+set +e
+ONLY_TESTING_ARGS=()
+for TEST_METHOD in "${TEST_METHODS[@]}"; do
+  ONLY_TESTING_ARGS+=(
+    "-only-testing:FXRacingUITests/FXRacingPerformanceTests/$TEST_METHOD"
+  )
+done
+xcodebuild -quiet \
+  -xctestrun "$RUN_XCTESTRUN" \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -resultBundlePath "$RESULT_BUNDLE" \
+  test-without-building \
+  "${ONLY_TESTING_ARGS[@]}"
+TEST_STATUS=$?
+set -e
+
+if [[ ! -f "$RAW_JSON" ]]; then
+  mkdir -p "$ATTACHMENTS_DIR"
+  xcrun xcresulttool export attachments \
+    --path "$RESULT_BUNDLE" \
+    --output-path "$ATTACHMENTS_DIR" >/dev/null
+  ATTACHMENT="$(node -e '
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const [manifestPath, attachmentsDirectory] = process.argv.slice(1);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const attachment = manifest
+      .flatMap((entry) => entry.attachments ?? [])
+      .find((entry) =>
+        entry.exportedFileName?.endsWith(".json")
+          && entry.suggestedHumanReadableName?.includes("-raw")
+      );
+    if (attachment) {
+      process.stdout.write(path.join(attachmentsDirectory, attachment.exportedFileName));
+    }
+  ' "$ATTACHMENTS_DIR/manifest.json" "$ATTACHMENTS_DIR")"
+  if [[ -n "$ATTACHMENT" ]]; then
+    cp "$ATTACHMENT" "$RAW_JSON"
+  fi
+fi
+
+if [[ -f "$RAW_JSON" ]]; then
+  if ! xcrun xcresulttool get test-results metrics \
+    --path "$RESULT_BUNDLE" > "$METRICS_JSON"; then
+    echo "Performance signpost metrics could not be exported." >&2
+    TEST_STATUS=1
+  else
+    set +e
+    node "$ROOT_DIR/scripts/ios-performance-report.mjs" \
+      "$RAW_JSON" "$METRICS_JSON" "$SCENARIO" "$SAMPLES"
+    REPORT_STATUS=$?
+    set -e
+    if [[ "$TEST_STATUS" -eq 0 && "$REPORT_STATUS" -ne 0 ]]; then
+      TEST_STATUS="$REPORT_STATUS"
+    fi
+  fi
+else
+  echo "Performance raw JSON was not exported." >&2
+  TEST_STATUS=1
+fi
+
+echo "Artifacts: $OUTPUT_DIR"
+exit "$TEST_STATUS"

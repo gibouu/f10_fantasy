@@ -1081,6 +1081,149 @@ final class LocalPickStoreTests: XCTestCase {
         XCTAssertEqual(store.record(for: "spa", owner: .user("a")), account)
     }
 
+    func testAuthoritativePicksArePersistedAndStrictlyAccountScoped() throws {
+        let context = makeDefaults()
+        defer { context.cleanUp() }
+        let store = LocalPickStore(defaults: context.defaults, clock: TestClock.fixed)
+        let pick = Pick(
+            id: "server-spa",
+            raceId: "spa",
+            tenthPlaceDriverId: "piastri",
+            winnerDriverId: "norris",
+            dnfDriverId: "leclerc",
+            lockedAt: RaceFixtures.now,
+            scoreBreakdown: nil
+        )
+
+        XCTAssertTrue(store.preserveAuthoritative(pick, for: .user("a")))
+        XCTAssertEqual(
+            store.authoritativePick(for: "spa", owner: .user("a"))?.id,
+            pick.id
+        )
+        XCTAssertNil(store.authoritativePick(for: "spa", owner: .user("b")))
+        XCTAssertNil(store.authoritativePick(for: "spa", owner: .guest))
+        XCTAssertFalse(store.preserveAuthoritative(pick, for: .guest))
+
+        let reloaded = LocalPickStore(defaults: context.defaults, clock: TestClock.fixed)
+        XCTAssertEqual(
+            reloaded.authoritativePick(for: "spa", owner: .user("a"))?.id,
+            pick.id
+        )
+        XCTAssertNil(reloaded.authoritativePick(for: "spa", owner: .user("b")))
+    }
+
+    func testLegacyRecoveryCopiesIntoDormantDraftAndOnlyRemovesLegacyAfterPersistence() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let legacy = LegacyLocalPickV1(
+            raceId: RaceFixtures.liveSpa.id,
+            winnerId: selection.winnerDriverID,
+            p10Id: selection.tenthPlaceDriverID,
+            dnfId: selection.dnfDriverID,
+            savedAt: RaceFixtures.now,
+            synced: false
+        )
+        persistence.seed(
+            try JSONEncoder().encode([RaceFixtures.liveSpa.id: legacy]),
+            forKey: "localPicks_v1"
+        )
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        XCTAssertNotNil(store.legacyConflict(for: RaceFixtures.liveSpa.id))
+
+        persistence.rejectsWrites = true
+        XCTAssertEqual(
+            store.recoverLegacyConflict(
+                for: RaceFixtures.liveSpa,
+                owner: .user("a"),
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertNotNil(store.legacyConflict(for: RaceFixtures.liveSpa.id))
+        XCTAssertNil(store.record(for: RaceFixtures.liveSpa.id, owner: .user("a")))
+
+        persistence.rejectsWrites = false
+        let recovered = store.recoverLegacyConflict(
+            for: RaceFixtures.liveSpa,
+            owner: .user("a"),
+            now: RaceFixtures.now
+        )
+        guard case .recovered(let record) = recovered else {
+            return XCTFail("Expected the legacy selection to become a review draft")
+        }
+        XCTAssertEqual(record.selection, selection)
+        XCTAssertEqual(record.syncState, .reviewRequired)
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.liveSpa.id))
+        XCTAssertTrue(store.queuedRecords(currentUserID: "a").isEmpty)
+
+        let reloaded = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        XCTAssertEqual(
+            reloaded.record(for: RaceFixtures.liveSpa.id, owner: .user("a"))?.syncState,
+            .reviewRequired
+        )
+        XCTAssertNil(reloaded.legacyConflict(for: RaceFixtures.liveSpa.id))
+    }
+
+    func testOnlyGuestMigrationExpiryRaisesOfflineMigrationNotice() throws {
+        let context = makeDefaults()
+        defer { context.cleanUp() }
+        let store = LocalPickStore(defaults: context.defaults, clock: TestClock.fixed)
+        let direct = try saveRecord(
+            in: store,
+            race: RaceFixtures.liveSpa,
+            owner: .user("direct")
+        )
+        let retry = try saveRecord(
+            in: store,
+            race: makeUnlockedRace(id: "retry", round: 2),
+            owner: .user("retry")
+        )
+        let migration = try saveRecord(
+            in: store,
+            race: makeUnlockedRace(id: "migration", round: 3),
+            owner: .guest
+        )
+
+        XCTAssertTrue(store.transition(
+            id: direct.id,
+            revision: direct.revision,
+            to: .syncing(revision: direct.revision, mode: .direct)
+        ))
+        XCTAssertTrue(store.transition(
+            id: direct.id,
+            revision: direct.revision,
+            to: .expired
+        ))
+        XCTAssertTrue(store.transition(
+            id: retry.id,
+            revision: retry.revision,
+            to: .syncing(revision: retry.revision, mode: .authenticatedRetry)
+        ))
+        XCTAssertTrue(store.transition(
+            id: retry.id,
+            revision: retry.revision,
+            to: .expired
+        ))
+        XCTAssertEqual(store.expiredMigrationNoticeCount, 0)
+
+        XCTAssertTrue(store.transition(
+            id: migration.id,
+            revision: migration.revision,
+            to: .syncing(revision: migration.revision, mode: .guestMigration)
+        ))
+        XCTAssertTrue(store.transition(
+            id: migration.id,
+            revision: migration.revision,
+            to: .expired
+        ))
+        XCTAssertEqual(store.expiredMigrationNoticeCount, 1)
+    }
+
     private var selection: PickSelection {
         PickSelection(
             winnerDriverID: "norris",

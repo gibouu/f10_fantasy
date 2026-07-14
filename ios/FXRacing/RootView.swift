@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct RootView: View {
-    let raceDetailViewModelFactory: RaceDetailViewModelFactory
+    let raceDeckViewModel: RaceDeckViewModel
+    let leaderboardAPI: any APIRequesting
+    let launchToShellInterval: FXPerformanceSpan
     @Environment(AuthManager.self) private var authManager
     @Environment(LocalPickStore.self) private var localPickStore
     @Environment(TutorialStore.self) private var tutorialStore
@@ -29,29 +31,16 @@ struct RootView: View {
     }
 
     var body: some View {
-        Group {
-            switch authManager.state {
-            case .unknown:
-                // Keychain check in progress — blank to avoid flicker
-                Color(uiColor: .systemBackground).ignoresSafeArea()
-
-            case .unauthenticated:
-                // Guest mode — full app accessible, sign-in is contextual
-                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
-
-            case .accountUnavailable:
-                // Keep public race content available while account restoration retries.
-                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
-
-            case .authenticated(let user) where !user.usernameSet:
-                // Newly signed-in user has not set a username yet
-                UsernamePickerView()
-
-            case .authenticated:
-                MainTabView(raceDetailViewModelFactory: raceDetailViewModelFactory)
-            }
-        }
+        MainShellView(
+            raceDeckViewModel: raceDeckViewModel,
+            leaderboardAPI: leaderboardAPI,
+            launchToShellInterval: launchToShellInterval
+        )
         .preferredColorScheme(preferredColorScheme)
+        .fullScreenCover(isPresented: usernameSetupRequired) {
+            UsernamePickerView()
+                .interactiveDismissDisabled()
+        }
         .onChange(of: authManager.isAuthenticated) { _, isAuth in
             if isAuth { tutorialStore.markAllSeen() }
         }
@@ -68,32 +57,16 @@ struct RootView: View {
             Text(expiredPickAlertMessage)
         }
     }
-}
 
-// MARK: - Main tab shell
-
-struct MainTabView: View {
-    let raceDetailViewModelFactory: RaceDetailViewModelFactory
-
-    var body: some View {
-        TabView {
-            NavigationStack {
-                RacesListView(
-                    raceDetailViewModelFactory: raceDetailViewModelFactory
-                )
-            }
-            .tabItem { Label("Races",   systemImage: "flag.2.crossed") }
-
-            NavigationStack {
-                LeaderboardView()
-            }
-            .tabItem { Label("Ranking", systemImage: "trophy") }
-
-            NavigationStack {
-                ProfileView()
-            }
-            .tabItem { Label("Me", systemImage: "person.circle") }
-        }
-        .tint(FXTheme.Colors.accent)
+    private var usernameSetupRequired: Binding<Bool> {
+        Binding(
+            get: {
+                guard case .authenticated(let user) = authManager.state else {
+                    return false
+                }
+                return !user.usernameSet
+            },
+            set: { _ in }
+        )
     }
 }

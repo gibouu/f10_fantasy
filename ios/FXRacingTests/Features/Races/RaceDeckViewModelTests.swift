@@ -34,16 +34,36 @@ final class RaceDeckViewModelTests: XCTestCase {
     }
 
     func testConcurrentStartAndForegroundPreserveCachedPublication() async {
-        let cached = snapshot([RaceFixtures.liveSpa])
-        let refreshed = snapshot([
-            RaceFixtures.liveSpa,
-            RaceFixtures.upcomingMonza,
-        ])
-        let repository = RaceRepositoryStub(
+        let cached = RaceListSnapshot(
+            schemaVersion: RaceListSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now.addingTimeInterval(-120),
+            season: RaceFixtures.season2026,
+            races: [RaceFixtures.liveSpa]
+        )
+        let cache = MemoryRaceSnapshotCache(
             list: cached,
-            refreshOutcomes: [.snapshot(refreshed), .snapshot(refreshed)],
-            gatedRefreshIndices: [0, 1],
-            gatesCachedList: true
+            gatesListReads: true
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET /api/races": [
+                    .json(
+                        RaceListPayload(
+                            races: [
+                                RaceFixtures.liveSpa,
+                                RaceFixtures.upcomingMonza,
+                            ],
+                            season: RaceFixtures.season2026
+                        )
+                    ),
+                ],
+            ],
+            gatedKeys: ["GET /api/races"]
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: cache,
+            clock: TestClock.fixed
         )
         let viewModel = RaceDeckViewModel(
             repository: repository,
@@ -51,34 +71,29 @@ final class RaceDeckViewModelTests: XCTestCase {
         )
 
         let initialStart = Task { await viewModel.start() }
-        await repository.waitForCachedListCalls(1)
+        await cache.waitForListReads(count: 1)
         let foreground = Task { await viewModel.handleForeground() }
         await Task.yield()
 
-        let cachedCallsWhileBlocked = await repository.cachedListCallCount
-        XCTAssertEqual(cachedCallsWhileBlocked, 1)
+        let readsWhileBlocked = await cache.listReadCount
+        XCTAssertEqual(readsWhileBlocked, 1)
 
-        await repository.releaseCachedList()
-        await repository.waitForRefreshCalls(1)
+        await cache.releaseListReads()
+        await api.waitForCalls(to: "/api/races", count: 1)
 
         XCTAssertEqual(viewModel.races.map(\.id), ["spa"])
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertTrue(viewModel.isRefreshing)
 
-        await repository.releaseRefresh(at: 0)
-        await repository.waitForRefreshCalls(2)
-        await repository.releaseRefresh(at: 1)
+        await api.releaseRequests(to: "/api/races")
         await initialStart.value
         await foreground.value
 
         XCTAssertEqual(viewModel.races.map(\.id), ["spa", "monza"])
-        let finalCachedListCalls = await repository.cachedListCallCount
-        XCTAssertEqual(finalCachedListCalls, 1)
-        let policies = await repository.refreshPolicies
-        XCTAssertEqual(policies.count, 2)
-        guard case .ifStale = policies[0], case .foreground = policies[1] else {
-            return XCTFail("start and foreground should each use their intended policy once")
-        }
+        let finalReadCount = await cache.listReadCount
+        let networkCallCount = await api.calls(to: "/api/races")
+        XCTAssertEqual(finalReadCount, 1)
+        XCTAssertEqual(networkCallCount, 1)
     }
 
     func testOrderingAndDefaultSelectionsAreChronological() async {
@@ -326,6 +341,187 @@ final class RaceDeckViewModelTests: XCTestCase {
         XCTAssertEqual(lookedUpAgain.race.status, .completed)
     }
 
+    func testExistingDetailLookupNeverCreatesAnUnvisitedModel() throws {
+        let repository = RaceRepositoryStub(list: nil)
+        let api = APIClientSpy(responses: [:])
+        let factory = RaceDetailViewModelFactory(
+            repository: repository,
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        let viewModel = RaceDeckViewModel(
+            repository: repository,
+            clock: TestClock.fixed,
+            detailViewModelFactory: factory
+        )
+        viewModel.apply(snapshot([RaceFixtures.liveSpa]))
+
+        XCTAssertNil(viewModel.existingDetailViewModel(for: RaceFixtures.liveSpa.id))
+        XCTAssertEqual(viewModel.cachedDetailViewModelCount, 0)
+
+        let created = try XCTUnwrap(
+            viewModel.detailViewModel(for: RaceFixtures.liveSpa)
+        )
+
+        XCTAssertTrue(
+            created === viewModel.existingDetailViewModel(for: RaceFixtures.liveSpa.id)
+        )
+        XCTAssertEqual(viewModel.cachedDetailViewModelCount, 1)
+    }
+
+    func testDetailModelsAreEvictedWhenPrivateSessionScopeChanges() throws {
+        let repository = RaceRepositoryStub(list: nil)
+        let api = APIClientSpy(responses: [:])
+        let factory = RaceDetailViewModelFactory(
+            repository: repository,
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        let viewModel = RaceDeckViewModel(
+            repository: repository,
+            clock: TestClock.fixed,
+            detailViewModelFactory: factory
+        )
+        viewModel.apply(snapshot([RaceFixtures.liveSpa]))
+
+        let accountA = try XCTUnwrap(
+            viewModel.detailViewModel(
+                for: RaceFixtures.liveSpa,
+                privateScopeID: "user:a"
+            )
+        )
+        accountA.select(driver: DriverFixtures.norris, for: .winner)
+
+        viewModel.setPrivateScope("user:b")
+        let accountB = try XCTUnwrap(
+            viewModel.detailViewModel(
+                for: RaceFixtures.liveSpa,
+                privateScopeID: "user:b"
+            )
+        )
+
+        XCTAssertFalse(accountA === accountB)
+        XCTAssertNil(accountB.selectedWinnerID)
+        XCTAssertNil(
+            viewModel.existingDetailViewModel(
+                for: RaceFixtures.liveSpa.id,
+                privateScopeID: "user:a"
+            )
+        )
+        XCTAssertTrue(
+            accountB === viewModel.existingDetailViewModel(
+                for: RaceFixtures.liveSpa.id,
+                privateScopeID: "user:b"
+            )
+        )
+        XCTAssertEqual(viewModel.cachedDetailViewModelCount, 1)
+    }
+
+    func testImagePrefetchRequestsUseActiveAndNextEntrantsWithExactSizes() async throws {
+        let constructor = DriverConstructor(
+            id: "mclaren",
+            name: "McLaren",
+            shortName: "MCL",
+            color: "FF8700",
+            slug: "mclaren",
+            logoUrl: "https://images.example/team.png"
+        )
+        let entrant = Driver(
+            id: "norris",
+            code: "NOR",
+            firstName: "Lando",
+            lastName: "Norris",
+            number: 4,
+            photoUrl: "https://images.example/norris.png",
+            seatKey: "mclaren-1",
+            constructor: constructor
+        )
+        let activeDetail = detailSnapshot(
+            race: RaceFixtures.liveSpa,
+            entrants: [entrant]
+        )
+        let nextDetail = detailSnapshot(
+            race: RaceFixtures.upcomingMonza,
+            entrants: [entrant]
+        )
+        let repository = RaceRepositoryStub(
+            list: nil,
+            details: [
+                RaceFixtures.liveSpa.id: activeDetail,
+                RaceFixtures.upcomingMonza.id: nextDetail,
+            ]
+        )
+        let viewModel = RaceDeckViewModel(
+            repository: repository,
+            clock: TestClock.fixed
+        )
+        viewModel.apply(snapshot([RaceFixtures.liveSpa, RaceFixtures.upcomingMonza]))
+
+        let requests = await viewModel.activeImagePrefetchRequests(displayScale: 2)
+
+        XCTAssertEqual(requests.count, 2, "duplicate entrant assets should be coalesced")
+        let photo = try XCTUnwrap(
+            requests.first { $0.url.absoluteString.contains("norris") }
+        )
+        XCTAssertEqual(photo.pixelWidth, 72)
+        XCTAssertEqual(photo.pixelHeight, 72)
+        XCTAssertEqual(photo.contentMode, .fill)
+        let logo = try XCTUnwrap(
+            requests.first { $0.url.absoluteString.contains("team") }
+        )
+        XCTAssertEqual(logo.pixelWidth, 56)
+        XCTAssertEqual(logo.pixelHeight, 56)
+        XCTAssertEqual(logo.contentMode, .fit)
+    }
+
+    func testPastImagePrefetchMatchesTheCompactCardAndSkipsHiddenTeamLogos() async throws {
+        let constructor = DriverConstructor(
+            id: "mclaren",
+            name: "McLaren",
+            shortName: "MCL",
+            color: "FF8700",
+            slug: "mclaren",
+            logoUrl: "https://images.example/team.png"
+        )
+        let entrant = Driver(
+            id: "norris",
+            code: "NOR",
+            firstName: "Lando",
+            lastName: "Norris",
+            number: 4,
+            photoUrl: "https://images.example/norris.png",
+            seatKey: "mclaren-1",
+            constructor: constructor
+        )
+        let completedRace = RaceFixtures.completedSpa
+        let repository = RaceRepositoryStub(
+            list: nil,
+            details: [
+                completedRace.id: detailSnapshot(
+                    race: completedRace,
+                    entrants: [entrant]
+                ),
+            ]
+        )
+        let viewModel = RaceDeckViewModel(
+            repository: repository,
+            clock: TestClock.fixed
+        )
+        viewModel.apply(snapshot([completedRace]))
+        viewModel.setActiveSection(.past)
+
+        let requests = await viewModel.activeImagePrefetchRequests(displayScale: 2)
+
+        XCTAssertEqual(requests.count, 1)
+        let photo = try XCTUnwrap(requests.first)
+        XCTAssertTrue(photo.url.absoluteString.contains("norris"))
+        XCTAssertEqual(photo.pixelWidth, 60)
+        XCTAssertEqual(photo.pixelHeight, 60)
+        XCTAssertEqual(photo.contentMode, .fill)
+    }
+
     func testRefreshFailureWithoutContentShowsCompactRetryError() async {
         let repository = RaceRepositoryStub(
             list: nil,
@@ -456,6 +652,40 @@ final class RaceDeckViewModelTests: XCTestCase {
         XCTAssertEqual(policies.count, 1)
     }
 
+    func testStatusPollDiscoversRaceBecomingLiveAndRequestsDetailRefresh() async {
+        let upcoming = race(
+            id: RaceFixtures.liveSpa.id,
+            round: RaceFixtures.liveSpa.round,
+            status: .upcoming,
+            offset: 60
+        )
+        let repository = RaceRepositoryStub(
+            list: nil,
+            refreshOutcomes: [
+                .snapshot(snapshot([RaceFixtures.liveSpa])),
+            ]
+        )
+        let viewModel = RaceDeckViewModel(
+            repository: repository,
+            clock: TestClock.fixed
+        )
+        viewModel.apply(snapshot([upcoming]))
+
+        XCTAssertFalse(viewModel.hasLiveRace)
+        XCTAssertEqual(viewModel.liveDetailRefreshRevision, 0)
+
+        await viewModel.pollLiveRaces()
+
+        XCTAssertTrue(viewModel.hasLiveRace)
+        XCTAssertEqual(viewModel.selectedUpcomingID, RaceFixtures.liveSpa.id)
+        XCTAssertEqual(viewModel.liveDetailRefreshRevision, 1)
+        let policies = await repository.refreshPolicies
+        XCTAssertEqual(policies.count, 1)
+        guard case .foreground? = policies.first else {
+            return XCTFail("status polling should use the foreground policy")
+        }
+    }
+
     func testLateOlderRefreshCannotReplaceNewerStateOrError() async {
         let old = snapshot([RaceFixtures.liveSpa])
         let latest = snapshot([RaceFixtures.upcomingMonza])
@@ -493,6 +723,20 @@ final class RaceDeckViewModelTests: XCTestCase {
             savedAt: RaceFixtures.now,
             season: RaceFixtures.season2026,
             races: races
+        )
+    }
+
+    private func detailSnapshot(
+        race: Race,
+        entrants: [Driver]
+    ) -> RaceDetailSnapshot {
+        RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: race,
+            entrants: entrants,
+            results: [],
+            qualifyingResults: []
         )
     }
 
