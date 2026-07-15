@@ -74,3 +74,14 @@ test("edge auth config JWT callback only copies username claims from trusted use
   assert.doesNotMatch(jwtBody, /trigger/)
   assert.doesNotMatch(jwtBody, /session/)
 })
+
+test("Auth.js retired browser destinations point to landing", () => {
+  const [, pagesBody] = requireMatch(
+    edgeAuthConfigSource,
+    /pages:\s*\{([\s\S]*?)\n\s*\},/,
+    "Auth.js pages configuration",
+  )
+  assert.match(pagesBody, /signIn:\s*["']\/["']/)
+  assert.match(pagesBody, /error:\s*["']\/["']/)
+  assert.doesNotMatch(pagesBody, /\/signin/)
+})
