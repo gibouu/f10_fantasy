@@ -412,9 +412,6 @@
 
 .supportCard .supportAddress {
   margin-block: 1rem;
-}
-
-.supportAddress {
   display: inline-block;
   color: var(--ink);
   font-size: clamp(1.05rem, 4vw, 1.35rem);

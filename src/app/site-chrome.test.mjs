@@ -138,3 +138,11 @@ test("dark landing text selection keeps light foreground contrast", () => {
     /\.sitePage\s+::selection\s*{[^}]*background:\s*color-mix\(in srgb,\s*var\(--racing-red\)\s*35%,\s*var\(--canvas\)\)[^}]*color:\s*var\(--ink\)/,
   )
 })
+
+test("support address overrides the card paragraph treatment", () => {
+  const supportAddress =
+    styles.match(/\.supportCard\s+\.supportAddress\s*{([\s\S]*?)}/)?.[1] ?? ""
+
+  assert.match(supportAddress, /color:\s*var\(--ink\)/)
+  assert.match(supportAddress, /font-size:\s*clamp\(1\.05rem,\s*4vw,\s*1\.35rem\)/)
+})
