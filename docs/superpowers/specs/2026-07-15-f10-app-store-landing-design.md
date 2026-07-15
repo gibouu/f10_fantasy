@@ -3,7 +3,7 @@
 Date: 2026-07-15
 Issue: #364
 Branch: `feat/364-app-store-landing`
-Status: Visual direction approved; responsive badge placement pending explicit review
+Status: Approved for implementation, including responsive one-badge placement
 
 ## Goal
 
@@ -89,9 +89,9 @@ Apple's current [marketing guideline](https://developer.apple.com/app-store/mark
 
 The badge remains black, unmodified, unrotated, at least 40 px tall, and links to the verified product page.
 
-### Badge placement decision for review
+### Approved badge placement decision
 
-The two notes literally request a badge in both navigation and hero, while Apple's guideline says one badge per layout. The recommended implementation is the responsive one-badge compromise above. This is intentionally called out for explicit approval before implementation; the issue acceptance criteria will be clarified after that decision rather than silently overriding the notes.
+The two notes literally request a badge in both navigation and hero, while Apple's guideline says one badge per layout. The user approved the responsive one-badge compromise above on 2026-07-15; the issue acceptance criteria must reflect that approved interpretation.
 
 ## Information Architecture
 
