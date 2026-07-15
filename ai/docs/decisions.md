@@ -19,6 +19,15 @@ Do not log temporary debugging notes here.
 
 ## Entries
 
+### 2026-07-15 — iOS-first product with a static web surface
+- Status: accepted
+- Context: Gameplay is delivered by the native iOS app; maintaining a second browser product added client bundles, runtime work, dependencies, and duplicated UX without being part of the desired product direction.
+- Decision: Keep `/`, `/privacy`, and `/support` as static marketing/legal pages; redirect only the explicitly retired browser-product routes to `/`; remove browser-only route, component, provider, and reporting code. Preserve every API route, Auth.js handler/callback, scoring/cron/database service, and the driver/team assets referenced by native API responses.
+- Reason: A narrow static public surface is faster, cleaner, less costly to maintain, and directs users to the App Store while leaving native gameplay contracts unchanged.
+- Tradeoffs: Browser gameplay, profiles, leaderboards, onboarding, and sign-in UI are no longer available. The backend and database remain required for iOS, so this decision does not by itself improve native API response latency or eliminate server cost.
+- Affected areas: `src/app`, `next.config.mjs`, `src/middleware.ts`, browser-only dependencies, public driver/team assets, deployment verification.
+- Follow-up: Treat Simulator and physical-device behavior as product truth; keep the coordinate-pinned localhost companion as the annotation surface for visual review.
+
 ### 2026-07-14 — Native iOS uses cached-first race decks with scoped private authority
 - Status: accepted
 - Context: The App Store build used long race/detail navigation, repeated blocking fetches, and process-wide private detail state. The three-pick game must stay unchanged while navigation becomes Apple Sports-like and fast under swiping, relaunches, weak networks, and account changes.
@@ -65,13 +74,13 @@ Do not log temporary debugging notes here.
 - Follow-up: Consider switching to migrations when schema stabilizes.
 
 ### 2026-04-15 — Guest access for read-only routes
-- Status: accepted
+- Status: replaced by the 2026-07-15 iOS-first/static-web decision
 - Context: Many pages are useful without auth (race results, leaderboard, profiles).
 - Decision: Middleware allows unauthenticated access to `/races`, `/leaderboard`, `/profile/*`, and public API routes. Auth is required only for picking and social features.
 - Reason: Better SEO and shareability; lower barrier to entry.
 - Tradeoffs: Pages must defensively handle `userId = null`.
 - Affected areas: `src/middleware.ts`, all read-only pages.
-- Follow-up: —
+- Follow-up: Public read APIs remain guest-accessible; the retired browser product routes now redirect to `/`.
 
 ### 2026-04-15 — Scoring formula: P10 picks use explicit distance table
 - Status: accepted

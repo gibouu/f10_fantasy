@@ -10,17 +10,18 @@ Keep it concise and high-signal.
 
 ## Current Status
 - Status: active
-- Last updated: 2026-07-14
+- Last updated: 2026-07-15
 - Updated by: Codex
 - Confidence level: high
 
 ---
 
 ## High-Level Overview
-F10 Fantasy is a Formula 1 fantasy pick'em product with a Next.js web app and a native SwiftUI iOS app.
-- Users pick: race Winner, P10 finisher, DNF driver — scored per formula below.
-- Stack: Next.js 14 App Router + TypeScript, PostgreSQL + Prisma ORM, Auth.js v5 (JWT), Tailwind CSS + Radix UI
-- iOS: Swift 6 + SwiftUI, iOS 17+, with an iOS 26 Liquid Glass compatibility boundary
+FX Racing is an iOS-first Formula 1 fantasy pick'em backed by a Next.js 14 API and a static marketing/legal web surface.
+- iOS users pick: race Winner, P10 finisher, DNF driver — scored per formula below.
+- Backend stack: Next.js 14 App Router + TypeScript, PostgreSQL + Prisma ORM, Auth.js v5 (JWT)
+- Public web stack: static Next.js pages with local CSS/assets; no browser product UI, auth provider, or runtime data fetch
+- iOS stack: Swift 6 + SwiftUI, iOS 17+, with an iOS 26 Liquid Glass compatibility boundary
 - External data: OpenF1 API (race schedule, entrants, results)
 - Deployment: Vercel. Cron jobs: AWS Lambda/EventBridge -> POST to `/api/cron/*` routes.
 
@@ -29,7 +30,7 @@ F10 Fantasy is a Formula 1 fantasy pick'em product with a Next.js web app and a 
 ## Layered Structure (CRITICAL)
 
 ```
-Client Components / RSC Pages
+iOS Client / API Consumers
   → API Routes (Next.js, validation via Zod)
     → Service Layer (src/lib/services/) — all business logic
       → Pure Functions (src/lib/scoring/formula.ts) — scoring math, no DB
@@ -43,8 +44,9 @@ Client Components / RSC Pages
 
 ### Frontend
 - App root: `src/app/layout.tsx`
-- Route group — auth flows: `src/app/(auth)/`
-- Route group — main app: `src/app/(main)/`
+- Static landing: `src/app/page.tsx`
+- Static legal/support: `src/app/privacy/page.tsx`, `src/app/support/page.tsx`
+- Retired browser-product redirects: `next.config.mjs`
 
 ### Backend
 - API routes: `src/app/api/`
@@ -62,11 +64,11 @@ Client Components / RSC Pages
 ### Key Pages
 | Route | File | Notes |
 |---|---|---|
-| `/races` | `src/app/(main)/races/page.tsx` | Race list, guest-accessible; ordered by `scheduledStartUtc`, not round |
-| `/races/[raceId]` | `src/app/(main)/races/[raceId]/page.tsx` | Active: picks UI. Completed: results + scores |
-| `/leaderboard` | `src/app/(main)/leaderboard/page.tsx` | Global + Friends tabs |
-| `/profile` | `src/app/(main)/profile/page.tsx` | Auth-required, team picker |
-| `/profile/[userId]` | `src/app/(main)/profile/[userId]/page.tsx` | Public, SWR client fetch |
+| `/` | `src/app/page.tsx` | Static App Store landing page |
+| `/privacy` | `src/app/privacy/page.tsx` | Static privacy policy and terms |
+| `/support` | `src/app/support/page.tsx` | Static support page |
+
+The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onboarding/*` browser routes redirect temporarily to `/`. Their API equivalents remain available to the native app.
 
 ---
 
@@ -94,16 +96,15 @@ Client Components / RSC Pages
 ## Data Flow
 
 ### Active race pick
-1. Page (`/races/[raceId]`) server-fetches race + entrants + user pick
-2. Renders `<PickHero>` (client) with entrants
-3. User selects drivers via `DriverSheet` bottom sheet
-4. Save button → `POST /api/picks` → `createOrUpdatePick`
+1. The iOS client fetches race detail, entrants, and the current pick from the public/native API surface.
+2. The native race deck presents the three driver selections.
+3. Save submits `POST /api/picks` → `createOrUpdatePick`.
 
 ### Results (completed race)
 1. Cron: `ingest-results` → `ingestResultsForRace` → upserts `RaceResult` rows
 2. Cron: `computeAndStoreScoresForRace` → writes scores to DB
-3. Page server-fetches `getRaceResults` → builds `heroResults` (structured) + `displayResults` (flat)
-4. Renders `<HeroVisualization>` + `<PicksDisplay>` + `<RaceResultsCard>`
+3. Native API routes serialize completed results, picks, and scores.
+4. The iOS client renders the completed-race result and ranking views.
 
 ### Qualifying + Early-Bird Bonus
 1. `sync-schedule` pairs each race with the latest qualifying session before race start and stores `openf1QualifyingSessionKey` + `qualifyingStartUtc`
@@ -143,7 +144,7 @@ Client Components / RSC Pages
 ## Key Constraints
 
 - **Three parallel type systems** — Domain types (`src/types/domain.ts`), Prisma types (DB-only, never leak to client), F1 types (`src/lib/f1/types.ts`). Keep them separate.
-- **Serialization pattern** — `Date` fields cannot cross RSC/client boundary. Client components receive `Serialized*` variants with dates as ISO strings.
+- **Serialization pattern** — `Date` fields cannot cross JSON or RSC/client boundaries. API/native-facing shapes use `Serialized*` variants with dates as ISO strings.
 - **PickSet** unique on `[userId, raceId]` — one pick set per user per race
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT
 - **Race ordering is chronological** — service lists/current-race queries sort by `scheduledStartUtc`, not round number. Round labels may be manually renumbered after calendar reconciliation; cancelled rows may be parked at high round values to avoid unique-key collisions.
@@ -179,18 +180,18 @@ If `lockedSubmittedBeforeQualifying` is true, `earlyBirdBonus` duplicates the ba
 - API routes that parse JSON object bodies use `src/lib/api/request-body.js` before destructuring request data
 - API routes map thrown errors with `src/lib/api/errors.js`: allowlist domain messages, log unexpected errors, return generic 500 bodies
 - API route regressions use the handler-injection pattern documented in `ai/docs/route-testing.md`
-- `getRaceEntrants()` returns the union of `RaceEntry`, `RaceResult`, and `QualifyingResult` drivers so substitute drivers who actually drove render correctly. `resolveTeam()` + `DRIVER_PHOTOS` are injected there, never at the component level.
+- `getRaceEntrants()` returns the union of `RaceEntry`, `RaceResult`, and `QualifyingResult` drivers so substitute drivers who actually drove render correctly. `resolveTeam()` + `DRIVER_PHOTOS` are injected there, never at the consumer/UI layer.
 - Public profile pick history excludes picks attached to `CANCELLED` races. Rows remain in the DB for audit, but hidden races do not appear as dead picks.
-- Guest access: middleware allows public routes; pages handle `userId = null` gracefully
-- Client components that need data use SWR; server components use direct service calls
+- Guest access: public read APIs handle `userId = null` gracefully; static web routes do not read sessions
+- Static marketing/legal pages do not import auth, database, service, or runtime-fetch code; iOS consumes the preserved API surface
 - Zod is the validation standard at API boundaries
 
 ---
 
 ## Static Assets
 
-- Driver headshots: `public/drivers/{lastName}.png` — pre-cropped circular, use `object-center`
-- Team logos: `public/teamlogos/{slug}.webp` — white logos on team-color background
+- Driver headshots: `public/drivers/{lastName}.png` — server/native asset contract referenced by API responses; preserve independently of the retired browser UI
+- Team logos: `public/teamlogos/{slug}.webp` — server/native asset contract referenced by API responses; preserve independently of the retired browser UI
 - Two drivers have no photo (Doohan #7, Tsunoda #22) — fall back to initials on team color
 
 ---
@@ -209,6 +210,10 @@ vercel --version     # local Vercel CLI should be 54.15.0 or newer
 ---
 
 ## Update Log
+
+### 2026-07-15
+- Replaced the browser product surface with static marketing, privacy, and support pages; exact legacy browser routes redirect to the landing page
+- Removed the browser-only route/component tree while preserving APIs, Auth.js handlers/callbacks, scoring, cron, database services, and native driver/team asset contracts
 
 ### 2026-07-14
 - Replaced the native iOS race list/detail navigation with cached-first centered race decks and native sheets

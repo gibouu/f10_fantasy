@@ -504,6 +504,7 @@ git commit -m $'Retire browser routes behind the landing page\n\n— gib'
 - Delete: `src/lib/observability/report-client-error.ts`
 - Delete: `src/lib/utils.ts`
 - Delete: `src/lib/utils.test.mjs`
+- Delete: `components.json`
 - Modify: `package.json`
 - Modify: `package-lock.json`
 - Modify: `tailwind.config.ts`
@@ -548,6 +549,7 @@ const retiredEntries = [
   new URL("./error.tsx", import.meta.url),
   new URL("../lib/observability/report-client-error.ts", import.meta.url),
   new URL("../lib/utils.ts", import.meta.url),
+  new URL("../../components.json", import.meta.url),
 ]
 
 const browserOnlyDependencies = [
@@ -601,7 +603,7 @@ Expected: failures because the routes/components/dependencies still exist.
 
 - [ ] **Step 3: Delete only the audited browser files**
 
-Delete the two route groups, the complete current `src/components` tree, the custom browser error boundary/reporter, and `src/lib/utils.ts` plus its test. Do not delete the client-error API sanitizer/intake files.
+Delete the two route groups, the complete current `src/components` tree, the custom browser error boundary/reporter, `src/lib/utils.ts` plus its test, and the now-orphaned shadcn `components.json` scaffold config. Do not delete the client-error API sanitizer/intake files.
 
 Run an import audit immediately:
 
@@ -659,7 +661,7 @@ Expected: all pass; build contains no retired page routes or custom client error
 - [ ] **Step 8: Commit the cleanup**
 
 ```bash
-git add -A -- 'src/app/(main)' 'src/app/(auth)' src/components src/app/error.tsx src/lib/observability/report-client-error.ts src/lib/utils.ts src/lib/utils.test.mjs src/app/retired-browser-ui.test.mjs package.json package-lock.json tailwind.config.ts ai/docs/architecture.md ai/docs/decisions.md ai/docs/worklog.md
+git add -A -- 'src/app/(main)' 'src/app/(auth)' src/components src/app/error.tsx src/lib/observability/report-client-error.ts src/lib/utils.ts src/lib/utils.test.mjs components.json src/app/retired-browser-ui.test.mjs package.json package-lock.json tailwind.config.ts ai/docs/architecture.md ai/docs/decisions.md ai/docs/worklog.md
 git commit -m $'Remove the retired browser product UI\n\n— gib'
 ```
 
