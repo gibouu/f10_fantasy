@@ -79,6 +79,7 @@ final class MainShellUITests: XCTestCase {
         if app.state != .runningForeground {
             app.activate()
         }
+        revealHittable(p10Slot, in: app)
         XCTAssertTrue(waitUntilHittable(p10Slot))
         p10Slot.tap()
 
@@ -121,7 +122,7 @@ final class MainShellUITests: XCTestCase {
         XCTAssertTrue(antonelliForm.label.contains("DNF"))
 
         let p10Slot = app.buttons["pick-slot-spa-p10"]
-        reveal(p10Slot, bySwipingUp: deck)
+        reveal(p10Slot, bySwipingDown: deck)
         XCTAssertTrue(waitUntilHittable(p10Slot))
         p10Slot.tap()
 
@@ -177,8 +178,15 @@ final class MainShellUITests: XCTestCase {
 
     @MainActor
     private func reveal(_ element: XCUIElement, bySwipingUp scrollView: XCUIElement) {
-        for _ in 0..<4 where !element.exists {
+        for _ in 0..<4 where !element.isHittable {
             scrollView.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func reveal(_ element: XCUIElement, bySwipingDown scrollView: XCUIElement) {
+        for _ in 0..<4 where !element.isHittable {
+            scrollView.swipeDown()
         }
     }
 

@@ -112,11 +112,11 @@ final class FXRacingPerformanceTests: XCTestCase {
             }
             let start = ContinuousClock.now
             slot.tap()
-            guard self.waitUntilHittable(app.buttons["driver-leclerc"]) else {
+            guard self.waitUntilHittable(app.buttons["driver-gasly"]) else {
                 throw HarnessFailure.notReady("fixture image driver")
             }
             guard self.waitUntil(condition: {
-                self.element("driver-image-leclerc-loaded", in: app).exists
+                self.element("driver-image-gasly-loaded", in: app).exists
             }) else {
                 throw HarnessFailure.notReady("decoded fixture image")
             }
@@ -183,7 +183,7 @@ final class FXRacingPerformanceTests: XCTestCase {
             }
             let start = ContinuousClock.now
             slot.tap()
-            guard self.waitUntilHittable(app.buttons["driver-leclerc"]) else {
+            guard self.waitUntilHittable(app.buttons["driver-gasly"]) else {
                 throw HarnessFailure.notReady("Driver picker")
             }
             return self.seconds(start.duration(to: .now))
@@ -211,7 +211,7 @@ final class FXRacingPerformanceTests: XCTestCase {
                 return
             }
             app.buttons["pick-slot-spa-winner"].tap()
-            XCTAssertTrue(self.waitUntilHittable(app.buttons["driver-leclerc"]))
+            XCTAssertTrue(self.waitUntilHittable(app.buttons["driver-gasly"]))
             app.terminate()
         }
     }

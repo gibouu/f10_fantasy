@@ -332,7 +332,7 @@ test("image performance waits for decoded fixture content instead of the picker 
   )
   assert.match(
     performanceUITests,
-    /waitUntil\(condition:\s*\{[\s\S]*element\("driver-image-leclerc-loaded", in: app\)\.exists/,
+    /waitUntil\(condition:\s*\{[\s\S]*element\("driver-image-gasly-loaded", in: app\)\.exists/,
   )
 })
 
@@ -343,6 +343,11 @@ test("performance runner exports 3 warmups 30 raw samples and percentile gates",
   assert.match(performanceUITests, /waitUntilHittable/)
   assert.match(performanceUITests, /pager\.value as\? String == "Race 2 of 2"/)
   assert.match(performanceUITests, /race-detail-ready-monza/)
+  assert.match(
+    performanceUITests,
+    /func testDriverSheetPerformance\(\) throws[\s\S]*?driver-gasly[\s\S]*?measure\([\s\S]*?driver-gasly/,
+    "the full-field picker gate must wait for a driver in its initial viewport",
+  )
   assert.match(performanceUITests, /timeout: TimeInterval = 10/)
   assert.match(performanceUITests, /XCTOSSignpostMetric/)
   assert.doesNotMatch(performanceUITests, /options\.iterationCount = 1/)
