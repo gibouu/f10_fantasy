@@ -78,6 +78,7 @@ Client Components / RSC Pages
 | `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick`; profile history hides `CANCELLED` races |
 | `src/lib/services/ingestion.service.ts` | `ingestResultsForRace` → fetches OpenF1 → upserts `RaceResult` |
 | `src/lib/services/qualifying.service.ts` | `ingestQualifyingForRace`, `getQualifyingResults`, partial-row qualifying backfill |
+| `src/lib/services/driver-season-stats.ts` | Per-driver average classified finish and non-classified count from earlier completed same-season, same-type races |
 | `src/lib/services/scoring.service.ts` | `computeAndStoreScoresForRace` — requires results in DB first |
 | `src/lib/services/leaderboard.service.ts` | `getGlobalLeaderboard`, `getFriendsLeaderboard`, `getUserSeasonRank` |
 | `src/lib/services/user.service.ts` | Username, favorite team |
@@ -115,8 +116,9 @@ Client Components / RSC Pages
 2. Upcoming and Past each keep an independent centered selection; horizontal paging changes the active race instead of navigating to a new page.
 3. The selected race publishes cached public detail and the owner-scoped local draft immediately; public refresh and any authenticated server-pick request run concurrently. Obsolete work is generation guarded and canceled by lifecycle/scope ownership.
 4. Only the active race and its next neighbor may retain detail/image prefetch work. Visible-request waiter accounting demotes or cancels work after rapid swipes.
-5. P1, P10, and DNF remain the complete gameplay. The progressive driver sheet advances through all three; saves are local-first and the server remains authoritative for lock/conflict/score state.
-6. While active, the shell polls race status every 60 seconds, including before a race is live. Status publication revalidates the selected live detail; foreground public-race and account refreshes run independently.
+5. Before qualifying rows exist, Upcoming shows season form from optional race-detail entrant fields; qualifying replaces it when available. This does not load previous-race detail.
+6. P1, P10, and DNF remain the complete gameplay. The progressive driver sheet advances through all three; saves are local-first and the server remains authoritative for lock/conflict/score state.
+7. While active, the shell polls race status every 60 seconds, including before a race is live. Status publication revalidates the selected live detail; foreground public-race and account refreshes run independently.
 
 ---
 
@@ -124,7 +126,7 @@ Client Components / RSC Pages
 
 - `POST /api/picks` — submit pick (auth required)
 - `GET /api/races` — public race list
-- `GET /api/races/[id]` — public race detail, including qualifying results when present
+- `GET /api/races/[id]` — public race detail, including qualifying results and optional entrant season-form fields
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
 - `POST /api/friends` — send friend request (auth required)

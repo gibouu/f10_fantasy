@@ -46,6 +46,10 @@ export type DriverSummary = {
   photoUrl: string | null
   /** Stable constructor seat key, e.g. "ferrari:2" */
   seatKey: string | null
+  /** Average classified finish in earlier completed races of the same season/type. */
+  seasonAverageFinish?: number | null
+  /** Non-classified finishes in earlier completed races of the same season/type. */
+  seasonDnfCount?: number | null
   constructor: {
     id: string
     name: string

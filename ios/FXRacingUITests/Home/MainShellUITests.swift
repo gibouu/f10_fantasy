@@ -43,7 +43,7 @@ final class MainShellUITests: XCTestCase {
         row.tap()
 
         let done = app.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 2))
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
         done.tap()
 
         XCTAssertFalse(done.waitForExistence(timeout: 2))
@@ -83,15 +83,18 @@ final class MainShellUITests: XCTestCase {
         p10Slot.tap()
 
         let leclerc = app.buttons["driver-leclerc"]
-        XCTAssertTrue(leclerc.waitForExistence(timeout: 8))
+        revealHittable(leclerc, in: app)
+        XCTAssertTrue(leclerc.isHittable)
         leclerc.tap()
         XCTAssertTrue(app.navigationBars["Pick P10"].waitForExistence(timeout: 2))
         let hamilton = app.buttons["driver-hamilton"]
-        XCTAssertTrue(hamilton.waitForExistence(timeout: 1))
+        revealHittable(hamilton, in: app)
+        XCTAssertTrue(hamilton.isHittable)
         hamilton.tap()
         XCTAssertTrue(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
         let norris = app.buttons["driver-norris"]
-        XCTAssertTrue(norris.waitForExistence(timeout: 1))
+        revealHittable(norris, in: app)
+        XCTAssertTrue(norris.isHittable)
         norris.tap()
         app.buttons["Done"].tap()
 
@@ -100,6 +103,35 @@ final class MainShellUITests: XCTestCase {
         XCTAssertTrue(save.isEnabled)
         save.tap()
         XCTAssertTrue(app.buttons["Picks saved"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testUpcomingSeasonFormAndDriverPickerCoverTheFull2026Field() {
+        let app = launch(.gameplay)
+        let deck = element(in: app, identifier: "race-deck")
+        let seasonForm = element(in: app, identifier: "season-form-spa")
+
+        reveal(seasonForm, bySwipingUp: deck)
+        XCTAssertTrue(seasonForm.exists)
+        XCTAssertFalse(app.staticTexts["Last race"].exists)
+
+        let antonelliForm = element(in: app, identifier: "season-form-row-antonelli")
+        XCTAssertTrue(antonelliForm.exists)
+        XCTAssertTrue(antonelliForm.label.contains("average finish"))
+        XCTAssertTrue(antonelliForm.label.contains("DNF"))
+
+        let p10Slot = app.buttons["pick-slot-spa-p10"]
+        reveal(p10Slot, bySwipingUp: deck)
+        XCTAssertTrue(waitUntilHittable(p10Slot))
+        p10Slot.tap()
+
+        let perez = app.buttons["driver-perez"]
+        revealHittable(perez, in: app)
+        XCTAssertTrue(perez.isHittable)
+
+        let sainz = app.buttons["driver-sainz"]
+        revealHittable(sainz, in: app)
+        XCTAssertTrue(sainz.isHittable)
     }
 
     @MainActor
@@ -160,5 +192,12 @@ final class MainShellUITests: XCTestCase {
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func revealHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<12 where !element.isHittable {
+            app.swipeUp()
+        }
     }
 }

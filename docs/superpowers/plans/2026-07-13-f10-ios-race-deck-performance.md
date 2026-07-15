@@ -24,6 +24,19 @@
 
 ---
 
+### Task 13: Review correction amendment — 2026-07-15
+
+The Simulator review exposed three acceptance gaps. Complete these on the same issue/branch before final handoff:
+
+1. Add red regressions proving the Performance gameplay fixture exposes all 22 active 2026 entrants across 11 constructors, and that P1/P10/DNF pick rows do not opt into horizontal fixed sizing.
+2. Add red service/model tests for optional `seasonAverageFinish` and `seasonDnfCount` entrant fields. Compute them from completed, earlier races in the same season and same race type; average only classified positions, while the DNF count follows the game's existing non-classified (`DNF`/`DNS`/`DSQ`) semantics.
+3. Replace the Upcoming `.previousRace` context with `.seasonForm`. Render a compact Apple Sports-style Driver/Avg/DNF table before qualifying; qualifying rows still replace it immediately when present. Remove the obsolete previous-race view plumbing.
+4. Expand the deterministic gameplay fixture to the same 22-driver/11-team field and include varied season-form values. Keep the benchmark data deterministic and preserve every existing gameplay/scoring rule.
+5. Remove the pick-row horizontal `.fixedSize` constraint so the existing spacer pins each chevron to the card's trailing edge. Preserve the `ViewThatFits` compact fallback and accessibility reading order.
+6. Run targeted Node and XCTest/UI checks first, then the full iOS/static/type/lint/build suites. Rebuild, install, and launch the Performance gameplay app on the normal iPhone 17 Pro simulator; refresh the same coordinate-pinned localhost review companion without deleting earlier screens or notes.
+
+---
+
 ### Task 1: Native test targets and non-shipping Performance configuration
 
 **Files:**
@@ -948,8 +961,8 @@ func testPickerAdvancesWithoutDismissalAndDisablesDuplicates() {
     XCTAssertTrue(state.isPresented)
 }
 
-func testQualifyingReplacesPreviousRaceOnlyWhenRowsExist() {
-    XCTAssertEqual(RaceContextKind.resolve(section: .upcoming, qualifyingCount: 0), .previousRace)
+func testQualifyingReplacesSeasonFormOnlyWhenRowsExist() {
+    XCTAssertEqual(RaceContextKind.resolve(section: .upcoming, qualifyingCount: 0), .seasonForm)
     XCTAssertEqual(RaceContextKind.resolve(section: .upcoming, qualifyingCount: 20), .qualifying)
 }
 ```
@@ -973,7 +986,7 @@ Move the existing qualifying/result rows into focused views. Completed DNF corre
 
 - [ ] **Step 4: Implement picks-first cards and deck composition**
 
-Upcoming card order: race identity/countdown, Schedule, P1/P10/DNF, `n/3`, lock/2× state, one Save button. Past card order: race identity, total points, three scored picks. Only the active race's qualifying/results/context renders below the pager. Before qualifying rows exist, context shows the previous completed race plus already-cached user points/picks when available without adding an off-scope fetch; qualifying replaces it as soon as rows arrive. Empty sections use centered `ContentUnavailableView` equivalents.
+Upcoming card order: race identity/countdown, Schedule, P1/P10/DNF, `n/3`, lock/2× state, one Save button. Past card order: race identity, total points, three scored picks. Only the active race's qualifying/results/context renders below the pager. Before qualifying rows exist, context shows season average classified finish and DNF count for the current entrants; qualifying replaces it as soon as rows arrive. Empty sections use centered `ContentUnavailableView` equivalents.
 
 - [ ] **Step 5: Implement progressive DriverPickerSheet and Schedule sheet**
 

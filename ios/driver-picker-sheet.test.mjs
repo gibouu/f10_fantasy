@@ -49,3 +49,14 @@ test("pick rows stay visibly unavailable until driver data is ready", () => {
     /guard[\s\S]*!detail\.entrants\.isEmpty[\s\S]*else \{[\s\S]*return[\s\S]*\}/,
   );
 });
+
+test("pick row chevrons use the full available row width", () => {
+  assert.match(
+    pickPanelSource,
+    /driverIdentity\([\s\S]*Spacer\(minLength:\s*0\)[\s\S]*trailingIcon/,
+  );
+  assert.doesNotMatch(
+    pickPanelSource,
+    /\.fixedSize\(horizontal:\s*true,\s*vertical:\s*false\)/,
+  );
+});

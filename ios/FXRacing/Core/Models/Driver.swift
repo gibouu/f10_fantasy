@@ -8,7 +8,33 @@ struct Driver: Codable, Sendable, Identifiable {
     let number: Int
     let photoUrl: String?
     let seatKey: String?
+    let seasonAverageFinish: Double?
+    let seasonDnfCount: Int?
     let constructor: DriverConstructor
+
+    init(
+        id: String,
+        code: String,
+        firstName: String,
+        lastName: String,
+        number: Int,
+        photoUrl: String?,
+        seatKey: String?,
+        seasonAverageFinish: Double? = nil,
+        seasonDnfCount: Int? = nil,
+        constructor: DriverConstructor
+    ) {
+        self.id = id
+        self.code = code
+        self.firstName = firstName
+        self.lastName = lastName
+        self.number = number
+        self.photoUrl = photoUrl
+        self.seatKey = seatKey
+        self.seasonAverageFinish = seasonAverageFinish
+        self.seasonDnfCount = seasonDnfCount
+        self.constructor = constructor
+    }
 
     /// Full URL to driver headshot. Relative paths are resolved against the API base URL;
     /// absolute URLs (e.g. from external CDNs) are used as-is.

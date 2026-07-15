@@ -14,7 +14,7 @@ final class RaceContextResolverTests: XCTestCase {
         )
     }
 
-    func testUpcomingRaceFallsBackToPreviousRaceBeforeQualifying() {
+    func testUpcomingRaceShowsSeasonFormBeforeQualifying() {
         XCTAssertEqual(
             RaceContextKind.resolve(
                 section: .upcoming,
@@ -22,7 +22,7 @@ final class RaceContextResolverTests: XCTestCase {
                 hasResults: false,
                 hasScoreBreakdown: false
             ),
-            .previousRace
+            .seasonForm
         )
     }
 
@@ -56,38 +56,9 @@ final class RaceContextResolverTests: XCTestCase {
         )
     }
 
-    func testNearestEarlierCompletedRaceDoesNotSelectFutureOrCancelledRace() {
-        let selected = RaceFixtures.race(
-            id: "selected",
-            round: 6,
-            status: .upcoming,
-            startOffset: 600
-        )
-        let nearest = RaceFixtures.race(
-            id: "nearest",
-            round: 5,
-            status: .completed,
-            startOffset: 300
-        )
-        let older = RaceFixtures.race(
-            id: "older",
-            round: 4,
-            status: .completed,
-            startOffset: 100
-        )
-        let cancelled = RaceFixtures.race(
-            id: "cancelled",
-            round: 5,
-            status: .cancelled,
-            startOffset: 400
-        )
-
-        XCTAssertEqual(
-            RaceContextResolver.previousCompletedRace(
-                before: selected,
-                in: [selected, older, cancelled, nearest]
-            )?.id,
-            nearest.id
-        )
+    func testSeasonAverageFormattingUsesOneDecimalAndHandlesMissingHistory() {
+        XCTAssertEqual(DriverSeasonForm.averageText(4.75), "4.8")
+        XCTAssertEqual(DriverSeasonForm.averageText(5), "5.0")
+        XCTAssertEqual(DriverSeasonForm.averageText(nil), "—")
     }
 }

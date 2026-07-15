@@ -126,9 +126,11 @@ The picks are the visual center of gravity. The weekend timeline is not displaye
 
 Below the pager:
 
-- before qualifying data exists, show the previous completed race and the user's points/picks when available;
+- before qualifying data exists, show a compact season-form table for every eligible entrant, with their average classified finish and count of non-classified finishes for the same race type earlier in the season;
 - once qualifying data exists for the selected race, replace that context with qualifying results;
 - after the race completes, Past becomes the primary destination for its scoring breakdown.
+
+This season-form fallback supersedes the earlier previous-race proposal. It restores the user's saved 2026-07-13 visual note: previous-race data is not shown on an Upcoming race. Average finish excludes non-classified rows because those are represented separately by the DNF count; the count follows the game's existing DNF semantics (`DNF`, `DNS`, and `DSQ`). Only completed sessions before the selected race are included, and Main/Sprint samples are kept separate.
 
 ### Past content
 
@@ -148,6 +150,8 @@ The driver picker is a native `.sheet` with medium and large detents and a visib
 - If the lock cutoff passes while the sheet is open, selection and submission are refused by the existing lock checks.
 
 The sheet receives entrants and callbacks. It performs no networking.
+
+The review-only Performance fixture must contain the full active 2026 field (22 drivers across 11 constructors). A reduced benchmark subset is not acceptable for the gameplay review scenario because it hides picker completeness and scrolling defects.
 
 ### Schedule sheet
 
@@ -187,7 +191,7 @@ Add or extract these focused units:
 - `Features/Races/UpcomingRaceCard.swift`: race identity and primary pick panel.
 - `Features/Races/PastRaceCard.swift`: completed pick/score summary.
 - `Features/Races/RacePickPanel.swift`: three-slot interaction and save status.
-- `Features/Races/RaceContextView.swift`: previous-race or qualifying switch.
+- `Features/Races/RaceContextView.swift`: season-form or qualifying switch.
 - `Features/Races/RaceScheduleSheet.swift`: presentation-only schedule.
 - `Core/Races/RaceRepository.swift`: public list/detail cache and request coalescing.
 - `Core/Races/RaceSnapshotCache.swift`: versioned atomic disk persistence.
@@ -228,6 +232,8 @@ This removes the current auth → mount races → fetch races waterfall without 
 
 - `RaceListSnapshot`: schema version, save date, season, races;
 - `RaceDetailSnapshot`: schema version, save date, race, entrants, results, qualifying.
+
+Each entrant may also carry optional `seasonAverageFinish` and `seasonDnfCount` presentation statistics from the public race-detail response. Optional fields keep old cached payloads decodable and do not change entrant eligibility, pick validation, or scoring.
 
 The cache lives under the app's Caches directory, uses atomic writes, and can be discarded safely. Private server picks never enter this cache; `LocalPickStore` remains their local source.
 

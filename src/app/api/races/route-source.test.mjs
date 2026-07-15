@@ -8,3 +8,14 @@ test("race detail API lets qualifying result lookup failures surface", () => {
   assert.match(source, /await getQualifyingResults\(params\.id\)/)
   assert.doesNotMatch(source, /getQualifyingResults\(params\.id\)\.catch\(\(\) => \[\]\)/)
 })
+
+test("race detail API enriches entrants with season form without serial data waterfalls", () => {
+  assert.match(source, /import \{ getDriverSeasonStats \}/)
+  assert.match(
+    source,
+    /await Promise\.all\(\[\s*getRaceEntrants\(params\.id\),\s*getDriverSeasonStats\(\{/,
+  )
+  assert.match(source, /seasonAverageFinish:/)
+  assert.match(source, /seasonDnfCount:/)
+  assert.match(source, /entrants:\s*enrichedEntrants/)
+})

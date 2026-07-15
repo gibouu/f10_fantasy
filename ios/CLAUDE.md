@@ -46,7 +46,7 @@ ios/FXRacing/
 - Upcoming and Past are independent centered horizontal pagers. Selections are stored separately and normalized deterministically when the calendar changes.
 - `RaceDeckView` creates private detail state only for the selected race. Public detail/image prefetch may retain the selected race and its next neighbor. Schedule and driver choice use native sheets; ranking rows open `FriendProfileView` in a dismissible native sheet. None requires an outer shell `NavigationStack`.
 - Live → completed transitions move the race from Upcoming to Past without discarding a visited detail model or interrupting an unrelated Past selection.
-- Supporting previous-race context is cache-only; it must not create a hidden detail load.
+- Upcoming context uses season-form fields already carried by the selected race detail; qualifying rows replace that table as soon as they exist. It must not create a hidden previous-race detail load.
 - While the shell is active, race status polls every 60 seconds even before a race becomes live. A published live status also revalidates the selected live detail; foreground race and account refreshes run independently.
 
 ## Public race data and cancellation

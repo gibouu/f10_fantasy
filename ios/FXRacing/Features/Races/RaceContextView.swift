@@ -1,7 +1,8 @@
+import Foundation
 import SwiftUI
 
 enum RaceContextKind: Equatable, Sendable {
-    case previousRace
+    case seasonForm
     case qualifying
     case results
     case scoreSummary
@@ -15,7 +16,7 @@ enum RaceContextKind: Equatable, Sendable {
     ) -> Self {
         switch section {
         case .upcoming:
-            return hasQualifyingRows ? .qualifying : .previousRace
+            return hasQualifyingRows ? .qualifying : .seasonForm
         case .past:
             if hasResults { return .results }
             if hasQualifyingRows { return .qualifying }
@@ -25,28 +26,10 @@ enum RaceContextKind: Equatable, Sendable {
     }
 }
 
-enum RaceContextResolver {
-    static func previousCompletedRace(before race: Race, in races: [Race]) -> Race? {
-        races
-            .filter {
-                $0.status == .completed
-                    && $0.scheduledStartUtc < race.scheduledStartUtc
-            }
-            .max {
-                if $0.scheduledStartUtc == $1.scheduledStartUtc {
-                    return $0.id < $1.id
-                }
-                return $0.scheduledStartUtc < $1.scheduledStartUtc
-            }
-    }
-}
-
 struct RaceContextView: View {
     let section: RaceDeckSection
     let race: Race
     let detail: RaceDetailViewModel
-    let previousRace: Race?
-    let previousDetail: RaceDetailViewModel?
 
     private var kind: RaceContextKind {
         RaceContextKind.resolve(
@@ -63,8 +46,8 @@ struct RaceContextView: View {
                 pastContext
             } else {
                 switch kind {
-                case .previousRace:
-                    PreviousRaceContextView(race: previousRace, detail: previousDetail)
+                case .seasonForm:
+                    SeasonFormContextView(race: race, entrants: detail.entrants)
                 case .qualifying:
                     QualifyingResultsView(
                         race: race,
@@ -116,63 +99,101 @@ struct RaceContextView: View {
     }
 }
 
-private struct PreviousRaceContextView: View {
-    let race: Race?
-    let detail: RaceDetailViewModel?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Last race")
-                .font(.headline)
-
-            if let race {
-                HStack(spacing: 12) {
-                    Text(race.flagEmoji)
-                        .font(.title2)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(race.name)
-                            .font(.subheadline.weight(.semibold))
-                        Text(race.circuitName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let score = detail?.serverPick?.scoreBreakdown?.totalScore {
-                        Text("\(score) pts")
-                            .font(.system(.headline, design: .monospaced).weight(.bold))
-                            .foregroundStyle(FXTheme.Colors.gold)
-                    }
-                }
-
-                if let detail, detail.serverPick != nil {
-                    HStack(spacing: 8) {
-                        contextPick("P1", detail.officialWinner)
-                        contextPick("P10", detail.officialP10)
-                        contextPick("DNF", detail.officialDNF)
-                    }
-                }
-            } else {
-                Text("Your previous race appears here once the season is underway.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fxCardSurface(radius: FXTheme.Radius.xl)
+enum DriverSeasonForm {
+    static func averageText(_ average: Double?) -> String {
+        guard let average else { return "—" }
+        return String(
+            format: "%.1f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            average
+        )
     }
 
-    private func contextPick(_ slot: String, _ driver: Driver?) -> some View {
-        HStack(spacing: 5) {
-            Text(slot)
-                .font(.system(size: 9, weight: .black, design: .monospaced))
-                .foregroundStyle(.secondary)
-            Text(driver?.code ?? "—")
-                .font(.caption.weight(.semibold))
+    static func dnfText(_ count: Int?) -> String {
+        count.map(String.init) ?? "—"
+    }
+}
+
+private struct SeasonFormContextView: View {
+    let race: Race
+    let entrants: [Driver]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Season form")
+                    .font(.headline)
+                    .accessibilityIdentifier("season-form-\(race.id)")
+                Spacer()
+                Text(race.isSprint ? "SPRINT" : "RACE")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+
+            Divider().opacity(0.45)
+
+            HStack(spacing: 10) {
+                Text("DRIVER")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("AVG")
+                    .frame(width: 44, alignment: .trailing)
+                Text("DNF")
+                    .frame(width: 36, alignment: .trailing)
+            }
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .tracking(0.8)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+
+            ForEach(entrants) { driver in
+                driverRow(driver)
+            }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(.quaternary.opacity(0.45), in: Capsule())
+        .fxCardSurface(radius: FXTheme.Radius.xl)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func driverRow(_ driver: Driver) -> some View {
+        HStack(spacing: 10) {
+            DriverBubbleView(driver: driver, size: 28)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(driver.firstName) \(driver.lastName)")
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(driver.constructor.shortName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(DriverSeasonForm.averageText(driver.seasonAverageFinish))
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                .frame(width: 44, alignment: .trailing)
+
+            Text(DriverSeasonForm.dnfText(driver.seasonDnfCount))
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                .frame(width: 36, alignment: .trailing)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 8)
+        .background(Color.clear)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .opacity(0.3)
+                .padding(.leading, 56)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(driver.firstName) \(driver.lastName), average finish "
+                + "\(DriverSeasonForm.averageText(driver.seasonAverageFinish)), "
+                + "DNF \(DriverSeasonForm.dnfText(driver.seasonDnfCount))"
+        )
+        .accessibilityIdentifier("season-form-row-\(driver.id)")
     }
 }
 

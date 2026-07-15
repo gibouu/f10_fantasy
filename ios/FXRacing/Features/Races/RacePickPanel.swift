@@ -143,7 +143,6 @@ struct RacePickPanel: View {
                     Spacer(minLength: 0)
                     trailingIcon
                 }
-                .fixedSize(horizontal: true, vertical: false)
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {

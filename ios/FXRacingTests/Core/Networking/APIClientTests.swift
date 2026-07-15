@@ -104,7 +104,7 @@ final class APIClientTests: XCTestCase {
         let session = URLSession(
             configuration: StubURLProtocol.configuration(
                 status: 200,
-                body: #"{"race":{"id":"race","seasonId":"season-2026","round":1,"name":"Race","circuitName":"Circuit","country":"Belgium","type":"MAIN","scheduledStartUtc":"2027-01-15T08:00:00Z","lockCutoffUtc":"2027-01-15T07:58:00Z","status":"UPCOMING","qualifyingStartUtc":null},"entrants":[],"results":[],"qualifyingResults":[]}"#
+                body: #"{"race":{"id":"race","seasonId":"season-2026","round":1,"name":"Race","circuitName":"Circuit","country":"Belgium","type":"MAIN","scheduledStartUtc":"2027-01-15T08:00:00Z","lockCutoffUtc":"2027-01-15T07:58:00Z","status":"UPCOMING","qualifyingStartUtc":null},"entrants":[{"id":"driver-with-form","code":"DRV","firstName":"Form","lastName":"Driver","number":1,"photoUrl":null,"seatKey":"team:1","seasonAverageFinish":4.5,"seasonDnfCount":3,"constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}},{"id":"legacy-driver","code":"OLD","firstName":"Legacy","lastName":"Driver","number":2,"photoUrl":null,"seatKey":"team:2","constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}}],"results":[],"qualifyingResults":[]}"#
             )
         )
         let client = APIClient(
@@ -115,7 +115,11 @@ final class APIClientTests: XCTestCase {
         let payload: RaceDetailPayload = try await client.request(.raceDetail(id: "race"))
 
         XCTAssertEqual(payload.race.id, "race")
-        XCTAssertTrue(payload.entrants.isEmpty)
+        XCTAssertEqual(payload.entrants.count, 2)
+        XCTAssertEqual(payload.entrants[0].seasonAverageFinish, 4.5)
+        XCTAssertEqual(payload.entrants[0].seasonDnfCount, 3)
+        XCTAssertNil(payload.entrants[1].seasonAverageFinish)
+        XCTAssertNil(payload.entrants[1].seasonDnfCount)
         XCTAssertTrue(payload.results.isEmpty)
         XCTAssertEqual(payload.qualifyingResults?.count, 0)
     }

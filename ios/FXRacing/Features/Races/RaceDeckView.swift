@@ -259,9 +259,7 @@ struct RaceDeckView: View {
                     RaceContextView(
                         section: section,
                         race: race,
-                        detail: detail,
-                        previousRace: previousRace(before: race),
-                        previousDetail: previousDetail(before: race)
+                        detail: detail
                     )
                     .padding(.horizontal, 18)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -575,15 +573,4 @@ struct RaceDeckView: View {
         }
     }
 
-    private func previousRace(before race: Race) -> Race? {
-        RaceContextResolver.previousCompletedRace(before: race, in: viewModel.races)
-    }
-
-    private func previousDetail(before race: Race) -> RaceDetailViewModel? {
-        guard let previousRace = previousRace(before: race) else { return nil }
-        return viewModel.existingDetailViewModel(
-            for: previousRace.id,
-            privateScopeID: privateScopeID
-        )
-    }
 }

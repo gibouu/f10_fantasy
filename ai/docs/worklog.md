@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-07-15 02:41 — Race deck review corrections
+- by: Codex
+- summary: Replaced Upcoming previous-race context with season form from optional race-detail entrant fields, kept qualifying precedence, expanded the deterministic Performance field to all 22 active 2026 drivers across 11 constructors, and restored full-width pick-row chevron alignment without changing gameplay or scoring.
+- files touched: race-detail API and season-stat service, shared/Swift driver models, race context/deck/pick panel, Performance fixtures, targeted source/XCTest/UI coverage, architecture/spec/plan docs
+- verification: targeted Node 11/11; `test:ios` 88/88; `test:services` 26/26; `test:routes` 80/80; static scripts 13/13; TypeScript, ESLint, production build, and generic Simulator build-for-testing passed; native XCTest 239/239; targeted context/API XCTest 5/5; targeted season-form/full-field UI and repaired picker/ranking UI tests passed in isolation. Two full `MainShellUITests` attempts each exposed one different deterministic-test timing/viewport assumption, both repaired; the root task owns the final post-install 8-test rerun.
+- open questions: Root task to rebuild/install/launch the Performance gameplay app, refresh the existing coordinate-pinned companion without deleting history, and run the final full UI class.
+- should update architecture?: yes — updated
+- should update decisions?: no
+
 ### 2026-07-14 15:20 — iOS race deck and performance redesign
 - by: Codex
 - summary: Kept the P1/P10/DNF game intact while replacing list/detail navigation with centered Upcoming/Past swipe decks, progressive native sheets, cached-first hydration, owner-scoped pick authority, bounded image/detail prefetch, and iOS 26 glass compatibility. Added deterministic Performance-only fixtures and raw p50/p95 measurement tooling.

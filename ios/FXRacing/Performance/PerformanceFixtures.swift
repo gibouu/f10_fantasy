@@ -16,6 +16,8 @@ enum PerformanceFixtureScenario: String, Sendable {
 enum PerformanceFixtures {
     static let now = Date(timeIntervalSince1970: 1_800_000_000)
     static let season = Season(id: "season-2026", year: 2026)
+    static let expectedEntrantCount = 22
+    static let expectedConstructorCount = 11
 
     static let mercedes = DriverConstructor(
         id: "mercedes",
@@ -41,58 +43,345 @@ enum PerformanceFixtures {
         slug: "mclaren",
         logoUrl: nil
     )
-    static let drivers = [
-        Driver(
-            id: "antonelli",
-            code: "ANT",
-            firstName: "Kimi",
-            lastName: "Antonelli",
-            number: 12,
-            photoUrl: nil,
-            seatKey: "mercedes-2",
-            constructor: mercedes
-        ),
-        Driver(
-            id: "russell",
-            code: "RUS",
-            firstName: "George",
-            lastName: "Russell",
-            number: 63,
-            photoUrl: nil,
-            seatKey: "mercedes-1",
-            constructor: mercedes
-        ),
-        Driver(
-            id: "hamilton",
-            code: "HAM",
-            firstName: "Lewis",
-            lastName: "Hamilton",
-            number: 44,
-            photoUrl: nil,
-            seatKey: "ferrari-1",
-            constructor: ferrari
-        ),
-        Driver(
-            id: "leclerc",
-            code: "LEC",
-            firstName: "Charles",
-            lastName: "Leclerc",
-            number: 16,
-            photoUrl: nil,
-            seatKey: "ferrari-2",
-            constructor: ferrari
-        ),
-        Driver(
-            id: "norris",
-            code: "NOR",
-            firstName: "Lando",
-            lastName: "Norris",
-            number: 4,
-            photoUrl: nil,
-            seatKey: "mclaren-1",
-            constructor: mclaren
-        ),
-    ]
+    static let redBull = DriverConstructor(
+        id: "red-bull",
+        name: "Red Bull Racing",
+        shortName: "RBR",
+        color: "3671C6",
+        slug: "red-bull",
+        logoUrl: nil
+    )
+    static let alpine = DriverConstructor(
+        id: "alpine",
+        name: "Alpine",
+        shortName: "ALP",
+        color: "FF87BC",
+        slug: "alpine",
+        logoUrl: nil
+    )
+    static let racingBulls = DriverConstructor(
+        id: "racing-bulls",
+        name: "Racing Bulls",
+        shortName: "RB",
+        color: "6692FF",
+        slug: "racing-bulls",
+        logoUrl: nil
+    )
+    static let haas = DriverConstructor(
+        id: "haas",
+        name: "Haas",
+        shortName: "HAA",
+        color: "B6BABD",
+        slug: "haas",
+        logoUrl: nil
+    )
+    static let williams = DriverConstructor(
+        id: "williams",
+        name: "Williams",
+        shortName: "WIL",
+        color: "64C4FF",
+        slug: "williams",
+        logoUrl: nil
+    )
+    static let audi = DriverConstructor(
+        id: "audi",
+        name: "Audi",
+        shortName: "AUD",
+        color: "C0C0C0",
+        slug: "audi",
+        logoUrl: nil
+    )
+    static let astonMartin = DriverConstructor(
+        id: "aston-martin",
+        name: "Aston Martin",
+        shortName: "AMR",
+        color: "229971",
+        slug: "aston-martin",
+        logoUrl: nil
+    )
+    static let cadillac = DriverConstructor(
+        id: "cadillac",
+        name: "Cadillac",
+        shortName: "CAD",
+        color: "2B2B2B",
+        slug: "cadillac",
+        logoUrl: nil
+    )
+
+    static let drivers: [Driver] = {
+        let field = [
+            Driver(
+                id: "antonelli",
+                code: "ANT",
+                firstName: "Kimi",
+                lastName: "Antonelli",
+                number: 12,
+                photoUrl: nil,
+                seatKey: "mercedes:2",
+                seasonAverageFinish: 5.8,
+                seasonDnfCount: 1,
+                constructor: mercedes
+            ),
+            Driver(
+                id: "russell",
+                code: "RUS",
+                firstName: "George",
+                lastName: "Russell",
+                number: 63,
+                photoUrl: nil,
+                seatKey: "mercedes:1",
+                seasonAverageFinish: 2.6,
+                seasonDnfCount: 0,
+                constructor: mercedes
+            ),
+            Driver(
+                id: "leclerc",
+                code: "LEC",
+                firstName: "Charles",
+                lastName: "Leclerc",
+                number: 16,
+                photoUrl: nil,
+                seatKey: "ferrari:1",
+                seasonAverageFinish: 3.9,
+                seasonDnfCount: 1,
+                constructor: ferrari
+            ),
+            Driver(
+                id: "hamilton",
+                code: "HAM",
+                firstName: "Lewis",
+                lastName: "Hamilton",
+                number: 44,
+                photoUrl: nil,
+                seatKey: "ferrari:2",
+                seasonAverageFinish: 7.6,
+                seasonDnfCount: 0,
+                constructor: ferrari
+            ),
+            Driver(
+                id: "norris",
+                code: "NOR",
+                firstName: "Lando",
+                lastName: "Norris",
+                number: 1,
+                photoUrl: nil,
+                seatKey: "mclaren:1",
+                seasonAverageFinish: 2.8,
+                seasonDnfCount: 0,
+                constructor: mclaren
+            ),
+            Driver(
+                id: "piastri",
+                code: "PIA",
+                firstName: "Oscar",
+                lastName: "Piastri",
+                number: 81,
+                photoUrl: nil,
+                seatKey: "mclaren:2",
+                seasonAverageFinish: 4.4,
+                seasonDnfCount: 1,
+                constructor: mclaren
+            ),
+            Driver(
+                id: "verstappen",
+                code: "VER",
+                firstName: "Max",
+                lastName: "Verstappen",
+                number: 3,
+                photoUrl: nil,
+                seatKey: "red-bull:1",
+                seasonAverageFinish: 3.1,
+                seasonDnfCount: 1,
+                constructor: redBull
+            ),
+            Driver(
+                id: "hadjar",
+                code: "HAD",
+                firstName: "Isack",
+                lastName: "Hadjar",
+                number: 6,
+                photoUrl: nil,
+                seatKey: "red-bull:2",
+                seasonAverageFinish: 6.7,
+                seasonDnfCount: 2,
+                constructor: redBull
+            ),
+            Driver(
+                id: "gasly",
+                code: "GAS",
+                firstName: "Pierre",
+                lastName: "Gasly",
+                number: 10,
+                photoUrl: nil,
+                seatKey: "alpine:1",
+                seasonAverageFinish: 10.4,
+                seasonDnfCount: 2,
+                constructor: alpine
+            ),
+            Driver(
+                id: "colapinto",
+                code: "COL",
+                firstName: "Franco",
+                lastName: "Colapinto",
+                number: 43,
+                photoUrl: nil,
+                seatKey: "alpine:2",
+                seasonAverageFinish: 13.8,
+                seasonDnfCount: 3,
+                constructor: alpine
+            ),
+            Driver(
+                id: "lawson",
+                code: "LAW",
+                firstName: "Liam",
+                lastName: "Lawson",
+                number: 30,
+                photoUrl: nil,
+                seatKey: "racing-bulls:1",
+                seasonAverageFinish: 8.9,
+                seasonDnfCount: 0,
+                constructor: racingBulls
+            ),
+            Driver(
+                id: "lindblad",
+                code: "LIN",
+                firstName: "Arvid",
+                lastName: "Lindblad",
+                number: 41,
+                photoUrl: nil,
+                seatKey: "racing-bulls:2",
+                seasonAverageFinish: 9.7,
+                seasonDnfCount: 1,
+                constructor: racingBulls
+            ),
+            Driver(
+                id: "ocon",
+                code: "OCO",
+                firstName: "Esteban",
+                lastName: "Ocon",
+                number: 31,
+                photoUrl: nil,
+                seatKey: "haas:1",
+                seasonAverageFinish: 11.2,
+                seasonDnfCount: 1,
+                constructor: haas
+            ),
+            Driver(
+                id: "bearman",
+                code: "BEA",
+                firstName: "Oliver",
+                lastName: "Bearman",
+                number: 87,
+                photoUrl: nil,
+                seatKey: "haas:2",
+                seasonAverageFinish: 7.8,
+                seasonDnfCount: 0,
+                constructor: haas
+            ),
+            Driver(
+                id: "sainz",
+                code: "SAI",
+                firstName: "Carlos",
+                lastName: "Sainz",
+                number: 55,
+                photoUrl: nil,
+                seatKey: "williams:1",
+                seasonAverageFinish: 6.4,
+                seasonDnfCount: 1,
+                constructor: williams
+            ),
+            Driver(
+                id: "albon",
+                code: "ALB",
+                firstName: "Alexander",
+                lastName: "Albon",
+                number: 23,
+                photoUrl: nil,
+                seatKey: "williams:2",
+                seasonAverageFinish: 8.3,
+                seasonDnfCount: 0,
+                constructor: williams
+            ),
+            Driver(
+                id: "hulkenberg",
+                code: "HUL",
+                firstName: "Nico",
+                lastName: "Hulkenberg",
+                number: 27,
+                photoUrl: nil,
+                seatKey: "audi:1",
+                seasonAverageFinish: 9.6,
+                seasonDnfCount: 0,
+                constructor: audi
+            ),
+            Driver(
+                id: "bortoleto",
+                code: "BOR",
+                firstName: "Gabriel",
+                lastName: "Bortoleto",
+                number: 5,
+                photoUrl: nil,
+                seatKey: "audi:2",
+                seasonAverageFinish: 12.7,
+                seasonDnfCount: 2,
+                constructor: audi
+            ),
+            Driver(
+                id: "alonso",
+                code: "ALO",
+                firstName: "Fernando",
+                lastName: "Alonso",
+                number: 14,
+                photoUrl: nil,
+                seatKey: "aston-martin:1",
+                seasonAverageFinish: 7.1,
+                seasonDnfCount: 1,
+                constructor: astonMartin
+            ),
+            Driver(
+                id: "stroll",
+                code: "STR",
+                firstName: "Lance",
+                lastName: "Stroll",
+                number: 18,
+                photoUrl: nil,
+                seatKey: "aston-martin:2",
+                seasonAverageFinish: 12.0,
+                seasonDnfCount: 2,
+                constructor: astonMartin
+            ),
+            Driver(
+                id: "perez",
+                code: "PER",
+                firstName: "Sergio",
+                lastName: "Perez",
+                number: 11,
+                photoUrl: nil,
+                seatKey: "cadillac:1",
+                seasonAverageFinish: 15.4,
+                seasonDnfCount: 3,
+                constructor: cadillac
+            ),
+            Driver(
+                id: "bottas",
+                code: "BOT",
+                firstName: "Valtteri",
+                lastName: "Bottas",
+                number: 77,
+                photoUrl: nil,
+                seatKey: "cadillac:2",
+                seasonAverageFinish: 14.6,
+                seasonDnfCount: 3,
+                constructor: cadillac
+            ),
+        ]
+
+        precondition(field.count == expectedEntrantCount)
+        precondition(
+            Set(field.map(\.constructor.id)).count == expectedConstructorCount
+        )
+        return field
+    }()
 
     static let liveSpa = race(
         id: "spa",
@@ -161,6 +450,8 @@ enum PerformanceFixtures {
             number: driver.number,
             photoUrl: "https://fixture.invalid/drivers/\(driver.id).png",
             seatKey: driver.seatKey,
+            seasonAverageFinish: driver.seasonAverageFinish,
+            seasonDnfCount: driver.seasonDnfCount,
             constructor: constructor
         )
     }
