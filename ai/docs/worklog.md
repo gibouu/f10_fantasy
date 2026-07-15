@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-07-15 19:01 — Final iOS release-polish design approved
+- by: Codex
+- summary: Captured issue #367's approved local-first autosave, plain-language legacy recovery, stable race-card geometry, driver result-history sheet, centered opaque Schedule sheet, landing cleanup, and App Store screenshot handoff. Durable feedback rule: never expose storage/recovery jargon as a normal gameplay action; conditional recovery or sync controls must not change swipe-card geometry, and aggregate form statistics should expose the exact result rows behind them.
+- files touched: `docs/superpowers/specs/2026-07-15-f10-ios-autosave-release-polish-design.md`, `ai/docs/worklog.md`
+- verification: Clean worktree from `origin/main`; baseline `test:ios`, `test:pages`, `test:components`, `test:services`, and `test:routes` all passed; design self-review and user spec review pending.
+- open questions: Implementation must retain existing performance gates; use a dedicated cached history endpoint instead of enlarging race detail only if measured payload/decode timing regresses.
+- should update architecture?: after implementation
+- should update decisions?: after implementation
+
 ### 2026-07-15 — Browser product UI retired behind the App Store landing
 - by: Codex
 - summary: Removed the retired browser route groups, component/provider/error-reporting tree, shadcn scaffold config, UI utility, and 12 browser-only direct packages. Preserved the complete API/Auth.js/scoring/cron/database surface, client-error intake/sanitizer, and driver/team asset contracts used by iOS.
