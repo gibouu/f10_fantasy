@@ -10,16 +10,17 @@ Keep it concise and high-signal.
 
 ## Current Status
 - Status: active
-- Last updated: 2026-06-23
+- Last updated: 2026-07-14
 - Updated by: Codex
 - Confidence level: high
 
 ---
 
 ## High-Level Overview
-F10 Fantasy is a Formula 1 fantasy pick'em web app (Next.js 14, App Router).
+F10 Fantasy is a Formula 1 fantasy pick'em product with a Next.js web app and a native SwiftUI iOS app.
 - Users pick: race Winner, P10 finisher, DNF driver — scored per formula below.
 - Stack: Next.js 14 App Router + TypeScript, PostgreSQL + Prisma ORM, Auth.js v5 (JWT), Tailwind CSS + Radix UI
+- iOS: Swift 6 + SwiftUI, iOS 17+, with an iOS 26 Liquid Glass compatibility boundary
 - External data: OpenF1 API (race schedule, entrants, results)
 - Deployment: Vercel. Cron jobs: AWS Lambda/EventBridge -> POST to `/api/cron/*` routes.
 
@@ -50,6 +51,14 @@ Client Components / RSC Pages
 - Cron routes: `src/app/api/cron/` (Bearer `CRON_SECRET`)
 - Middleware (auth/guest gating): `src/middleware.ts`
 
+### iOS
+- App root: `ios/FXRacing/FXRacingApp.swift`
+- Persistent shell: `ios/FXRacing/Features/Home/MainShellView.swift`
+- Race experience: `RaceDeckView` + `RaceDeckViewModel` render separate Upcoming/Past swipe decks; schedule, driver selection, and ranking-player profiles use dismissible native sheets, while the persistent shell avoids an outer `NavigationStack`
+- Public race data: `RaceRepository` owns stale-while-revalidate list/detail snapshots, single-flight requests, and a two-race prefetch cohort
+- Private picks: `LocalPickStore` persists owner-scoped, revisioned records; `SyncManager` leases and orchestrates the outbox separately from authoritative server picks
+- Images: one injected `FXImagePipeline` provides size-aware decoded-memory caching, disk-backed response caching, and bounded loading; views do not instantiate `AsyncImage`
+
 ### Key Pages
 | Route | File | Notes |
 |---|---|---|
@@ -69,6 +78,7 @@ Client Components / RSC Pages
 | `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick`; profile history hides `CANCELLED` races |
 | `src/lib/services/ingestion.service.ts` | `ingestResultsForRace` → fetches OpenF1 → upserts `RaceResult` |
 | `src/lib/services/qualifying.service.ts` | `ingestQualifyingForRace`, `getQualifyingResults`, partial-row qualifying backfill |
+| `src/lib/services/driver-season-stats.ts` | Per-driver average classified finish and non-classified count from earlier completed same-season, same-type races |
 | `src/lib/services/scoring.service.ts` | `computeAndStoreScoresForRace` — requires results in DB first |
 | `src/lib/services/leaderboard.service.ts` | `getGlobalLeaderboard`, `getFriendsLeaderboard`, `getUserSeasonRank` |
 | `src/lib/services/user.service.ts` | Username, favorite team |
@@ -101,13 +111,22 @@ Client Components / RSC Pages
 3. `lock-picks` snapshots whether each pick was last edited before `Race.qualifyingStartUtc`
 4. Scoring adds `ScoreBreakdown.earlyBirdBonus = baseScore` when that snapshot is true
 
+### iOS race deck
+1. The shell publishes the cached race list immediately, then refreshes it without replacing the deck with a blocking loader.
+2. Upcoming and Past each keep an independent centered selection; horizontal paging changes the active race instead of navigating to a new page.
+3. The selected race publishes cached public detail and the owner-scoped local draft immediately; public refresh and any authenticated server-pick request run concurrently. Obsolete work is generation guarded and canceled by lifecycle/scope ownership.
+4. Only the active race and its next neighbor may retain detail/image prefetch work. Visible-request waiter accounting demotes or cancels work after rapid swipes.
+5. Before qualifying rows exist, Upcoming shows season form from optional race-detail entrant fields; qualifying replaces it when available. This does not load previous-race detail.
+6. P1, P10, and DNF remain the complete gameplay. The progressive driver sheet advances through all three; saves are local-first and the server remains authoritative for lock/conflict/score state.
+7. While active, the shell polls race status every 60 seconds, including before a race is live. Status publication revalidates the selected live detail; foreground public-race and account refreshes run independently.
+
 ---
 
 ## API Surface
 
 - `POST /api/picks` — submit pick (auth required)
 - `GET /api/races` — public race list
-- `GET /api/races/[id]` — public race detail, including qualifying results when present
+- `GET /api/races/[id]` — public race detail, including qualifying results and optional entrant season-form fields
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
 - `POST /api/friends` — send friend request (auth required)
@@ -134,6 +153,10 @@ Client Components / RSC Pages
 - **Cron jobs are NOT Vercel crons** — they are AWS Lambda/EventBridge schedules; canonical runbook: `ai/docs/cron-operations.md`
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` never touch them
 - **Regression tests use Node's built-in test runner** — package scripts group route, auth, service, component, page, scoring, iOS-source, and script checks. Use targeted `node --test ...` suites first, then `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
+- **iOS private state is owner-scoped** — detail view-model caches and persisted pick records include the current account/device scope. Account changes cancel and evict the previous scope before rendering another user's state.
+- **iOS sync work is session-leased** — a worker is bound to the validated user, token, and session UUID. Invalidation cancels it, requeues captured syncing rows, and rejects stale responses/401s from older sessions.
+- **iOS server picks are authoritative** — local drafts/outbox rows never replace official scored selections. Private 404, 423, legacy-device, and conflict states have explicit repair/review flows.
+- **iOS performance fixtures cannot ship** — deterministic UI fixtures compile only in the `Performance` configuration. `scripts/ios-performance` gates exact-count app-owned spans: normal `simctl` launches for launch/cache and XCTest signposts for interactions. UI-automation wall time is exported only as a diagnostic.
 
 ---
 
@@ -186,6 +209,11 @@ vercel --version     # local Vercel CLI should be 54.15.0 or newer
 ---
 
 ## Update Log
+
+### 2026-07-14
+- Replaced the native iOS race list/detail navigation with cached-first centered race decks and native sheets
+- Added owner-scoped pick authority, bounded request/image prefetch, Liquid Glass compatibility surfaces, and a deterministic Performance-only measurement harness
+- reason: keep the three-pick game unchanged while making the App Store experience faster, smoother, and closer to Apple Sports
 
 ### 2026-05-01
 - Added `/api/diag/health` and `/api/diag/race/[id]` (Bearer CRON_SECRET) for race-weekend pipeline troubleshooting

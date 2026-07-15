@@ -25,6 +25,20 @@ struct ScoreBreakdown: Codable, Sendable {
         case tenthPlaceScore, winnerBonus, dnfBonus, earlyBirdBonus, totalScore
     }
 
+    init(
+        tenthPlaceScore: Int,
+        winnerBonus: Int,
+        dnfBonus: Int,
+        earlyBirdBonus: Int = 0,
+        totalScore: Int
+    ) {
+        self.tenthPlaceScore = tenthPlaceScore
+        self.winnerBonus = winnerBonus
+        self.dnfBonus = dnfBonus
+        self.earlyBirdBonus = earlyBirdBonus
+        self.totalScore = totalScore
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tenthPlaceScore = try c.decode(Int.self, forKey: .tenthPlaceScore)
@@ -64,7 +78,7 @@ enum ResultStatus: String, Codable, Sendable {
 // MARK: - Pick slot
 
 /// Identifies which pick slot is currently being edited.
-enum PickSlot: String, Identifiable, Hashable, Sendable {
+enum PickSlot: String, CaseIterable, Identifiable, Hashable, Sendable {
     case winner, p10, dnf
 
     var id: String { rawValue }
@@ -85,5 +99,66 @@ enum PickSlot: String, Identifiable, Hashable, Sendable {
         case .p10:    return "Pick P10"
         case .dnf:    return "Pick DNF"
         }
+    }
+
+    var next: PickSlot? {
+        switch self {
+        case .winner: return .p10
+        case .p10:    return .dnf
+        case .dnf:    return nil
+        }
+    }
+}
+
+/// Pure interaction state for the progressive driver picker.
+struct DriverPickerState: Sendable {
+    var activeSlot: PickSlot
+    private(set) var selectedDriverIDs: [PickSlot: String]
+    var isLocked: Bool
+    private(set) var isPresented: Bool
+
+    init(
+        activeSlot: PickSlot,
+        selectedDriverIDs: [PickSlot: String],
+        isLocked: Bool
+    ) {
+        self.activeSlot = activeSlot
+        self.selectedDriverIDs = selectedDriverIDs
+        self.isLocked = isLocked
+        isPresented = true
+    }
+
+    static func startingSlot(
+        requested: PickSlot,
+        selectedDriverIDs: [PickSlot: String]
+    ) -> PickSlot {
+        selectedDriverIDs.isEmpty ? .winner : requested
+    }
+
+    @discardableResult
+    mutating func select(_ driver: Driver) -> Bool {
+        guard isAvailable(driver) else { return false }
+
+        selectedDriverIDs[activeSlot] = driver.id
+        activeSlot = activeSlot.next ?? activeSlot
+        return true
+    }
+
+    func isAvailable(_ driver: Driver) -> Bool {
+        unavailabilityReason(for: driver) == nil
+    }
+
+    func unavailabilityReason(for driver: Driver) -> String? {
+        if isLocked {
+            return "Picks are locked."
+        }
+
+        guard let conflictingSlot = PickSlot.allCases.first(where: {
+            $0 != activeSlot && selectedDriverIDs[$0] == driver.id
+        }) else {
+            return nil
+        }
+
+        return "Already selected for \(conflictingSlot.label)."
     }
 }

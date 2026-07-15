@@ -102,9 +102,12 @@ struct ProfileView: View {
     @ViewBuilder
     private func avatarCircle(_ user: ProfileUser) -> some View {
         if let teamSlug = user.favoriteTeamSlug {
-            AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(teamSlug).webp")) { img in
-                img.resizable().scaledToFit().padding(6)
-            } placeholder: {
+            FXRemoteImage(
+                url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(teamSlug).webp"),
+                width: 38,
+                height: 38,
+                contentMode: .fit
+            ) {
                 ProgressView()
             }
             .frame(width: 50, height: 50)

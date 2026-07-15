@@ -159,9 +159,12 @@ struct FriendSearchView: View {
     @ViewBuilder
     private func avatarCircle(logoUrl: String?, color: String?, fallback: String?) -> some View {
         if let logoUrl, let hexColor = color, let teamColor = Color(hex: hexColor) {
-            AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + logoUrl)) { img in
-                img.resizable().scaledToFit().padding(4)
-            } placeholder: {
+            FXRemoteImage(
+                url: URL(string: Config.apiBaseURL.absoluteString + logoUrl),
+                width: 24,
+                height: 24,
+                contentMode: .fit
+            ) {
                 ProgressView()
             }
             .frame(width: 32, height: 32)

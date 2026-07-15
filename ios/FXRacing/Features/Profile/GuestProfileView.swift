@@ -134,9 +134,12 @@ struct GuestProfileView: View {
     @ViewBuilder
     private func teamAvatar(_ slug: String?) -> some View {
         if let slug {
-            AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(slug).webp")) { img in
-                img.resizable().scaledToFit().padding(6)
-            } placeholder: {
+            FXRemoteImage(
+                url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(slug).webp"),
+                width: 40,
+                height: 40,
+                contentMode: .fit
+            ) {
                 ProgressView()
             }
             .frame(width: 52, height: 52)

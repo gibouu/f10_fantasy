@@ -1,11 +1,27 @@
 import SwiftUI
 
 struct DriverPickerSheet: View {
-    let slot: PickSlot
-    let entrants: [Driver]
-    let onSelect: (Driver) -> Void
+    private enum PickerFocusTarget: Hashable {
+        case slotHeading
+        case driver(String)
+    }
 
     @Environment(\.dismiss) private var dismiss
+    @Binding private var state: DriverPickerState
+    @AccessibilityFocusState private var focusTarget: PickerFocusTarget?
+
+    private let entrants: [Driver]
+    private let onSelect: (Driver, PickSlot) -> Bool
+
+    init(
+        state: Binding<DriverPickerState>,
+        entrants: [Driver],
+        onSelect: @escaping (Driver, PickSlot) -> Bool
+    ) {
+        _state = state
+        self.entrants = entrants
+        self.onSelect = onSelect
+    }
 
     /// Drivers grouped by team slug (falls back to constructor name), sorted alphabetically.
     /// Merges constructors that share the same slug (e.g. "Racing Bulls" + "Visa CashApp RB").
@@ -36,16 +52,33 @@ struct DriverPickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Text("Choose a driver for \(state.activeSlot.label)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($focusTarget, equals: .slotHeading)
+
                 ForEach(grouped, id: \.name) { group in
                     Section {
                         ForEach(group.drivers) { driver in
-                            driverRow(driver)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    Haptics.select()
-                                    onSelect(driver)
-                                    dismiss()
-                                }
+                            Button {
+                                select(driver)
+                            } label: {
+                                driverRow(driver)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!state.isAvailable(driver))
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(
+                                "\(driver.firstName) \(driver.lastName), number \(driver.number)"
+                            )
+                            .accessibilityValue(accessibilityValue(for: driver))
+                            .accessibilityHint(accessibilityHint(for: driver))
+                            .accessibilityIdentifier("driver-\(driver.id)")
+                            .accessibilityFocused(
+                                $focusTarget,
+                                equals: .driver(driver.id)
+                            )
                         }
                     } header: {
                         HStack(spacing: 6) {
@@ -55,14 +88,16 @@ struct DriverPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle(slot.sheetTitle)
+            .navigationTitle(state.activeSlot.sheetTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Cancel") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private func driverRow(_ driver: Driver) -> some View {
@@ -74,12 +109,15 @@ struct DriverPickerSheet: View {
                     .frame(width: 40, height: 40)
 
                 if let logoURL = driver.constructor.logoFullURL {
-                    AsyncImage(url: logoURL) { phase in
-                        if case .success(let img) = phase {
-                            img.resizable().scaledToFit().padding(6)
-                        }
-                    }
-                    .frame(width: 40, height: 40)
+                    FXRemoteImage(
+                        url: logoURL,
+                        width: 28,
+                        height: 28,
+                        contentMode: .fit,
+                        loadedAccessibilityIdentifier: loadedImageAccessibilityIdentifier(
+                            for: driver
+                        )
+                    )
                 }
             }
 
@@ -98,7 +136,71 @@ struct DriverPickerSheet: View {
                 .font(.footnote)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
+
+            if state.selectedDriverIDs[state.activeSlot] == driver.id {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.tint)
+            }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+
+    private func select(_ driver: Driver) {
+        let selectedSlot = state.activeSlot
+        var updatedState = state
+
+        guard updatedState.select(driver) else {
+            Haptics.locked()
+            let message = state.unavailabilityReason(for: driver) ?? "This driver is unavailable."
+            AccessibilityNotification.Announcement(message).post()
+            return
+        }
+
+        guard onSelect(driver, selectedSlot) else {
+            Haptics.locked()
+            AccessibilityNotification.Announcement(
+                "Picks are locked. Your selection was not changed."
+            ).post()
+            return
+        }
+
+        Haptics.select()
+        state = updatedState
+
+        if let nextSlot = selectedSlot.next {
+            focusTarget = .slotHeading
+            AccessibilityNotification.Announcement(
+                "\(selectedSlot.label) selected. Now choose \(nextSlot.label)."
+            ).post()
+        } else {
+            focusTarget = .driver(driver.id)
+            AccessibilityNotification.Announcement(
+                "DNF selected. All three picks are complete."
+            ).post()
+        }
+    }
+
+    private func accessibilityValue(for driver: Driver) -> String {
+        guard let selectedSlot = PickSlot.allCases.first(where: {
+            state.selectedDriverIDs[$0] == driver.id
+        }) else {
+            return ""
+        }
+
+        return "Selected for \(selectedSlot.label)"
+    }
+
+    private func accessibilityHint(for driver: Driver) -> String {
+        state.unavailabilityReason(for: driver)
+            ?? "Select for \(state.activeSlot.label)."
+    }
+
+    private func loadedImageAccessibilityIdentifier(for driver: Driver) -> String? {
+#if FX_PERF_HARNESS
+        "driver-image-\(driver.id)-loaded"
+#else
+        nil
+#endif
     }
 }

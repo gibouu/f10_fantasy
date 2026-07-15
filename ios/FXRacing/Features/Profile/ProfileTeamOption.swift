@@ -30,11 +30,12 @@ struct ProfileTeamChip: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                AsyncImage(url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(team.slug).webp")) { img in
-                    img.resizable().scaledToFit().padding(5)
-                } placeholder: {
-                    Color.clear
-                }
+                FXRemoteImage(
+                    url: URL(string: Config.apiBaseURL.absoluteString + "/teamlogos/\(team.slug).webp"),
+                    width: 26,
+                    height: 26,
+                    contentMode: .fit
+                )
                 .frame(width: 36, height: 36)
                 .background(.quaternary)
                 .clipShape(Circle())

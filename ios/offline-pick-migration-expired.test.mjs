@@ -10,74 +10,130 @@ const localPickStore = await readFile(
   new URL("./FXRacing/Core/Storage/LocalPickStore.swift", import.meta.url),
   "utf8",
 )
+const localPickRecord = await readFile(
+  new URL("./FXRacing/Core/Storage/LocalPickRecord.swift", import.meta.url),
+  "utf8",
+)
 const rootView = await readFile(
   new URL("./FXRacing/RootView.swift", import.meta.url),
   "utf8",
 )
 
-test("LocalPickStore records expired migrations without retrying them", () => {
+test("local pick v2 records carry owner, revision, and persistent sync state", () => {
   assert.match(
-    localPickStore,
-    /enum LocalPickMigrationStatus:[\s\S]*case expired/,
-    "LocalPick should persist an expired migration status",
+    localPickRecord,
+    /enum PickOwnerScope:[\s\S]*case guest[\s\S]*case user\(String\)[\s\S]*case legacyAmbiguous/,
   )
   assert.match(
-    localPickStore,
-    /var migrationStatus: LocalPickMigrationStatus\?/,
-    "LocalPick should carry the persisted migration status",
+    localPickRecord,
+    /struct LocalPickRecordID:[\s\S]*let owner: PickOwnerScope[\s\S]*let raceID: String/,
+  )
+  assert.match(localPickRecord, /let revision: UInt64/)
+  assert.match(
+    localPickRecord,
+    /case syncing\(revision: UInt64, mode: PickSyncMode\)/,
+  )
+  assert.match(localPickRecord, /case conflict\(PickConflictReason\)/)
+  assert.match(localPickRecord, /case expired/)
+})
+
+test("LocalPickStore filters queues by owner and checks every transition revision", () => {
+  const queuedBlock = localPickStore.match(
+    /func queuedRecords\(currentUserID:[\s\S]*?\n    \}/,
+  )?.[0]
+  assert.ok(queuedBlock, "owner-filtered queuedRecords(currentUserID:) should exist")
+  assert.match(queuedBlock, /syncState == \.queued/)
+  assert.match(queuedBlock, /isEligibleOwner/)
+
+  const ownerBlock = localPickStore.match(
+    /func isEligibleOwner[\s\S]*?\n    \}/,
+  )?.[0]
+  assert.ok(ownerBlock, "queue eligibility should be centralized")
+  assert.match(ownerBlock, /case \.guest/)
+  assert.match(ownerBlock, /case \.user\(let userID\)/)
+  assert.match(
+    ownerBlock,
+    /case \.legacyAmbiguous:[\s\S]*return false/,
+    "ambiguous legacy records must never enter automatic retry",
   )
 
-  const unsyncedBlock = localPickStore.match(/func unsyncedPicks\(\) -> \[LocalPick\] \{[\s\S]*?\n    \}/)?.[0]
-  assert.ok(unsyncedBlock, "unsyncedPicks() should exist")
-  assert.match(unsyncedBlock, /!\$0\.synced/)
-  assert.match(
-    unsyncedBlock,
-    /\$0\.migrationStatus == nil/,
-    "expired local picks should not be retried as pending uploads",
-  )
+  const transitionBlock = localPickStore.match(
+    /func transition\([\s\S]*?\n    \}/,
+  )?.[0]
+  assert.ok(transitionBlock, "revision-checked transition should exist")
+  assert.match(transitionBlock, /record\.revision == revision/)
+  assert.match(transitionBlock, /records\[id\] = record/)
+})
 
-  const expiredBlock = localPickStore.match(/func markMigrationExpired\(raceId: String\) \{[\s\S]*?\n    \}/)?.[0]
-  assert.ok(expiredBlock, "LocalPickStore should expose markMigrationExpired(raceId:)")
-  assert.match(expiredBlock, /migrationStatus = \.expired/)
-  assert.doesNotMatch(expiredBlock, /synced = true/, "expired picks must not be marked synced")
+test("legacy v1 picks become terminal legacy records before old keys are deleted", () => {
   assert.match(
     localPickStore,
-    /expiredMigrationNoticeCount/,
-    "LocalPickStore should publish a notice count for post-sign-in UX",
+    /legacy\.migrationStatus == \.expired[\s\S]*\? \.expired/,
+    "expired legacy migrations should remain terminal",
   )
   assert.match(
     localPickStore,
-    /func clearExpiredMigrationNotice\(\) \{[\s\S]*expiredMigrationNoticeCount = 0/,
-    "LocalPickStore should allow the UI to acknowledge and clear expired-pick notices",
+    /\.conflict\(\.legacyNeedsReview\)/,
+    "non-expired ownerless records should require explicit review",
+  )
+  assert.match(
+    localPickStore,
+    /if let v2Data[\s\S]*isValid\(envelope\)[\s\S]*removeData\(forKey: Self\.v1Key\)/,
+    "a later valid v2 load should retire the legacy copy",
+  )
+  const migrationBlock = localPickStore.match(
+    /private func migrateLegacyIfPresent\(\) \{[\s\S]*?\n    \}\n\n    private func isValid/,
+  )?.[0]
+  assert.ok(migrationBlock, "legacy migration should remain explicit")
+  assert.match(migrationBlock, /_ = persistV2\(\)/)
+  assert.doesNotMatch(
+    migrationBlock,
+    /removeData\(forKey:/,
+    "the process that writes v2 must retain v1 until a later launch reads v2",
   )
 })
 
-test("SyncManager records locked migration results instead of marking them synced", () => {
-  const lockedSkipBlock = syncManager.match(
-    /if let race = raceMap\[localPick\.raceId\], race\.isLocked \{[\s\S]*?continue\s*\}/,
-  )?.[0]
-  assert.ok(lockedSkipBlock, "client-side locked race branch should exist")
-  assert.match(lockedSkipBlock, /markMigrationExpired\(raceId: localPick\.raceId\)/)
-  assert.doesNotMatch(
-    lockedSkipBlock,
-    /markSynced\(raceId: localPick\.raceId\)/,
-    "client-known locked races should not be marked synced",
+test("SyncManager serializes owner-scoped revisions through one worker", () => {
+  assert.match(
+    syncManager,
+    /func submitExplicit\([\s\S]*?currentUserID: String[\s\S]*?case \.user\(let ownerID\) = id\.owner,[\s\S]*?ownerID == currentUserID/,
   )
+  assert.match(
+    syncManager,
+    /private var workers: \[LocalPickRecordID: Worker\]/,
+    "workers must be keyed by composite owner/race ID",
+  )
+  assert.match(
+    syncManager,
+    /latestExplicitRevision: \[LocalPickRecordID: UInt64\]/,
+  )
+  assert.match(
+    syncManager,
+    /if !isExplicit \{[\s\S]*?\.pickForRace\(raceId: id\.raceID\)/,
+    "only automatic work should preflight the server pick",
+  )
+  assert.match(syncManager, /\.submitPick\([\s\S]*?raceId: id\.raceID/)
+  assert.match(syncManager, /\? \.serverWins[\s\S]*: \.accountPickFound/)
+})
 
-  assert.match(syncManager, /private enum UploadPickResult[\s\S]*case locked/)
-
-  const serverLockedBlock = syncManager.match(/catch APIError\.serverError\(let code,[\s\S]*?code == 423 \{[\s\S]*?\n        \}/)?.[0]
-  assert.ok(serverLockedBlock, "uploadPick should handle HTTP 423 explicitly")
-  assert.match(serverLockedBlock, /return \.locked/)
-  assert.doesNotMatch(serverLockedBlock, /return true/, "HTTP 423 should not be treated as upload success")
-
-  const lockedUploadCase = syncManager.match(/case \.locked:[\s\S]*?(?=\n            case \.failed:)/)?.[0]
-  assert.ok(lockedUploadCase, "migration should handle locked upload results")
-  assert.match(lockedUploadCase, /markMigrationExpired\(raceId: localPick\.raceId\)/)
-  assert.doesNotMatch(
-    lockedUploadCase,
-    /markSynced\(raceId: localPick\.raceId\)/,
-    "server-locked uploads should not be marked synced",
+test("SyncManager keeps locked and unauthorized outcomes revision safe", () => {
+  assert.match(
+    syncManager,
+    /clock\.now\(\) >= race\.lockCutoffUtc[\s\S]*?terminalResult\([\s\S]*?\.expired/,
+    "a known locked race should expire without a request",
+  )
+  assert.match(
+    syncManager,
+    /catch APIError\.serverError\(let code, _\) where code == 423[\s\S]*?terminalResult\([\s\S]*?\.expired/,
+    "POST 423 must expire the captured revision",
+  )
+  assert.match(
+    syncManager,
+    /catch APIError\.unauthorized[\s\S]*?queueCapturedRevision\([\s\S]*?return \.unauthorized/,
+  )
+  assert.match(
+    syncManager,
+    /localPickStore\.transition\([\s\S]*?revision: revision/,
   )
 })
 

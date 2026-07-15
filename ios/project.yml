@@ -7,6 +7,11 @@ options:
   createIntermediateGroups: true
   xcodeVersion: "16.0"
 
+configs:
+  Debug: debug
+  Performance: release
+  Release: release
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -53,6 +58,79 @@ targets:
           DEBUG_INFORMATION_FORMAT: dwarf
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Performance:
+          DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"
+          SWIFT_OPTIMIZATION_LEVEL: "-Owholemodule"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: FX_PERF_HARNESS
+          SUPPORTED_PLATFORMS: iphonesimulator
+          CODE_SIGNING_ALLOWED: NO
+          ENABLE_TESTABILITY: YES
         Release:
           DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym"
           SWIFT_OPTIMIZATION_LEVEL: "-Owholemodule"
+
+  FXRacingTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: FXRacingTests
+    dependencies:
+      - target: FXRacing
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fxracing.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  FXRacingUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: FXRacingUITests
+    dependencies:
+      - target: FXRacing
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.fxracing.app.uitests
+        GENERATE_INFOPLIST_FILE: YES
+      configs:
+        Performance:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: FX_PERF_HARNESS
+
+schemes:
+  FXRacing:
+    build:
+      targets:
+        FXRacing: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - FXRacingTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  FXRacingPerformance:
+    build:
+      targets:
+        FXRacing: all
+    run:
+      config: Performance
+    test:
+      config: Performance
+      debugEnabled: false
+      disableMainThreadChecker: true
+      targets:
+        - FXRacingUITests
+    profile:
+      config: Performance
+    analyze:
+      config: Performance
+    archive:
+      config: Release

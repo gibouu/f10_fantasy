@@ -4,9 +4,12 @@ struct APIClient: Sendable {
     private let baseURL: URL
     private let session: URLSession
 
-    init(baseURL: URL = Config.apiBaseURL) {
+    init(
+        baseURL: URL = Config.apiBaseURL,
+        session: URLSession = .shared
+    ) {
         self.baseURL = baseURL
-        self.session = .shared
+        self.session = session
     }
 
     /// Executes an API request and decodes the JSON response body into `T`.

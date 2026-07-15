@@ -31,6 +31,24 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-07-15 02:41 — Race deck review corrections
+- by: Codex
+- summary: Replaced Upcoming previous-race context with season form from optional race-detail entrant fields, kept qualifying precedence, expanded the deterministic Performance field to all 22 active 2026 drivers across 11 constructors, and restored full-width pick-row chevron alignment without changing gameplay or scoring.
+- files touched: race-detail API and season-stat service, shared/Swift driver models, race context/deck/pick panel, Performance fixtures, targeted source/XCTest/UI coverage, architecture/spec/plan docs
+- verification: targeted Node 11/11; `test:ios` 88/88; `test:services` 26/26; `test:routes` 80/80; static scripts 13/13; TypeScript, ESLint, production build, and generic Simulator build-for-testing passed; native XCTest 239/239; targeted context/API XCTest 5/5; targeted season-form/full-field UI and repaired picker/ranking UI tests passed in isolation. Two full `MainShellUITests` attempts each exposed one different deterministic-test timing/viewport assumption, both repaired; the root task owns the final post-install 8-test rerun.
+- open questions: Root task to rebuild/install/launch the Performance gameplay app, refresh the existing coordinate-pinned companion without deleting history, and run the final full UI class.
+- should update architecture?: yes — updated
+- should update decisions?: no
+
+### 2026-07-14 15:20 — iOS race deck and performance redesign
+- by: Codex
+- summary: Kept the P1/P10/DNF game intact while replacing list/detail navigation with centered Upcoming/Past swipe decks, progressive native sheets, cached-first hydration, owner-scoped pick authority, bounded image/detail prefetch, and iOS 26 glass compatibility. Added deterministic Performance-only fixtures and raw p50/p95 measurement tooling.
+- files touched: `ios/FXRacing/`, `ios/FXRacingTests/`, `ios/FXRacingUITests/`, `ios/project.yml`, `scripts/ios-performance`, iOS source-contract tests
+- verification: `npm run test:ios` (84/84); native XCTest suite (239/239); `MainShellUITests` (7/7). On the dedicated iPhone 17 Pro Simulator, exact 3-warmup/30-sample gates passed for cached launch (launch-to-shell p50 0.164 s / p95 0.188 s; cached publication p50 0.003 s / p95 0.013 s), offline launch (0.284 s / 0.454 s; cached publication 0.012 s / 0.032 s), driver picking (presentation 0.171 s / 0.220 s against 0.500 s; preparation 0.002 s / 0.004 s against 0.100 s), race selection (0.068 s / 0.106 s against 0.600 s), schedule presentation (0.078 s / 0.126 s against 0.500 s), and local save (0.018 s / 0.038 s against 0.200 s). The local-save harness now runs its diagnostic and signpost phases as separate XCTest methods to avoid per-test watchdog termination while retaining an exact 30-sample set for each phase.
+- open questions: User visual review of the installed iPhone 17 Pro Simulator build; iOS 17 runtime compatibility pass; expand the localhost annotation companion beyond its current Upcoming screen so prior screens and notes use stable route/element identifiers.
+- should update architecture?: yes — updated
+- should update decisions?: yes — updated
+
 ### 2026-06-23 14:06 — iOS decode logs redacted
 - by: Codex
 - summary: Removed raw response body previews from iOS API decode-failure logs while retaining endpoint, status, type, timing, byte-count, auth-marker, and decode-error diagnostics.

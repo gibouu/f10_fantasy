@@ -18,11 +18,19 @@ final class LeaderboardViewModel {
         didSet {
             guard oldValue != scope else { return }
             loadGeneration += 1
+            rows = []
+            userRank = nil
+            userRow = nil
+            errorMessage = nil
             isLoading = false
         }
     }
 
-    private let client = APIClient()
+    @ObservationIgnored private let client: any APIRequesting
+
+    init(client: any APIRequesting = APIClient()) {
+        self.client = client
+    }
 
     func load(token: String?) async {
         loadGeneration += 1
@@ -55,6 +63,16 @@ final class LeaderboardViewModel {
     func switchScope(to newScope: Scope, token: String?) async {
         scope = newScope
         await load(token: token)
+    }
+
+    func clearBlockedFriendsContent() {
+        guard scope == .friends else { return }
+        loadGeneration += 1
+        rows = []
+        userRank = nil
+        userRow = nil
+        isLoading = false
+        errorMessage = nil
     }
 }
 

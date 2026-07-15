@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRaceById, getRaceEntrants } from '@/lib/services/race.service'
 import { getQualifyingResults } from '@/lib/services/qualifying.service'
+import { getDriverSeasonStats } from '@/lib/services/driver-season-stats'
 import { db } from '@/lib/db/client'
 import { getResultScoreGuide } from '@/lib/scoring/formula'
 
@@ -14,13 +15,16 @@ export async function GET(
     return NextResponse.json({ error: 'Race not found' }, { status: 404 })
   }
 
-  const entrants = await getRaceEntrants(params.id)
-
-  // Include results if race is completed
-  const results =
-    race.status === 'COMPLETED'
-      ? (
-          await db.raceResult.findMany({
+  const [entrants, seasonStats, resultRows, qualifyingResults] =
+    await Promise.all([
+      getRaceEntrants(params.id),
+      getDriverSeasonStats({
+        seasonId: race.seasonId,
+        raceType: race.type,
+        before: race.scheduledStartUtc,
+      }),
+      race.status === 'COMPLETED'
+        ? db.raceResult.findMany({
             where: { raceId: params.id },
             select: {
               driverId: true,
@@ -30,13 +34,23 @@ export async function GET(
             },
             orderBy: { position: 'asc' },
           })
-        ).map((result) => ({
-          ...result,
-          scoreGuide: getResultScoreGuide(result, race.type),
-        }))
-      : []
+        : Promise.resolve([]),
+      (async () => await getQualifyingResults(params.id))(),
+    ])
 
-  const qualifyingResults = await getQualifyingResults(params.id)
+  const enrichedEntrants = entrants.map((entrant) => {
+    const stats = seasonStats.get(entrant.id)
+    return {
+      ...entrant,
+      seasonAverageFinish: stats?.averageFinish ?? null,
+      seasonDnfCount: stats?.dnfCount ?? null,
+    }
+  })
+
+  const results = resultRows.map((result) => ({
+    ...result,
+    scoreGuide: getResultScoreGuide(result, race.type),
+  }))
 
   return NextResponse.json({
     race: {
@@ -47,7 +61,7 @@ export async function GET(
         ? race.qualifyingStartUtc.toISOString()
         : null,
     },
-    entrants,
+    entrants: enrichedEntrants,
     results,
     qualifyingResults,
   })

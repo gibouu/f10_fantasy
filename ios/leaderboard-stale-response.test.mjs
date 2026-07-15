@@ -56,3 +56,20 @@ test("LeaderboardViewModel discards stale scope load responses", () => {
   assert.ok(errorGuardIndex < errorIndex, "errors should only update after stale-response guard")
   assert.ok(loadingGuardIndex < loadingDoneIndex, "loading state should only clear for the current load")
 })
+
+test("changing leaderboard scope atomically clears rows from the previous scope", () => {
+  const scopeBlock = source.match(
+    /var scope: Scope = \.global \{[\s\S]*?\n    \}/,
+  )?.[0]
+
+  assert.ok(scopeBlock, "scope should keep its didSet invalidation boundary")
+  assert.match(scopeBlock, /loadGeneration \+= 1/)
+  assert.match(scopeBlock, /rows = \[\]/)
+  assert.match(scopeBlock, /userRank = nil/)
+  assert.match(scopeBlock, /userRow = nil/)
+  assert.match(scopeBlock, /errorMessage = nil/)
+  assert.ok(
+    scopeBlock.indexOf("rows = []") < scopeBlock.indexOf("isLoading = false"),
+    "old rows must disappear synchronously before the next scope can render",
+  )
+})
