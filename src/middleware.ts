@@ -8,23 +8,6 @@ import { isCronRoutePath } from "@/lib/auth/cronPath";
 
 const { auth } = NextAuth(authConfig);
 
-// Routes that are always publicly accessible (no session required).
-const PUBLIC_ROUTES = ["/", "/signin", "/races", "/leaderboard", "/privacy", "/support"];
-
-// Prefixes that are publicly accessible without authentication.
-// Read-only browsing: race list, race detail, leaderboard, user profiles.
-const PUBLIC_PREFIXES = ["/races/", "/profile/"];
-
-// Prefix for all Auth.js internal API routes.
-const AUTH_PREFIX = "/api/auth";
-
-// Prefix for the onboarding flow — authenticated users without a username
-// must be allowed through here.
-const ONBOARDING_PREFIX = "/onboarding";
-
-// All non-auth API routes — let authenticated users call them freely.
-const API_PREFIX = "/api";
-
 // Auth.js v5 injects `auth` (the Session or null) onto the request object
 // when `auth()` is used as a middleware wrapper.
 type NextAuthRequest = NextRequest & { auth: Session | null };
@@ -57,12 +40,7 @@ export default auth((req: NextAuthRequest) => {
   const { nextUrl, auth: session } = req;
   const pathname = nextUrl.pathname;
 
-  // ── 1. Auth.js internal routes — always pass through ──────────────────
-  if (pathname.startsWith(AUTH_PREFIX)) {
-    return NextResponse.next();
-  }
-
-  // ── 2. Cron routes — validated by CRON_SECRET header, not session ─────
+  // ── 1. Cron routes — validated by CRON_SECRET header, not session ─────
   if (isCronRoutePath(pathname)) {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.get("authorization");
@@ -76,25 +54,16 @@ export default auth((req: NextAuthRequest) => {
     return NextResponse.next();
   }
 
-  // ── 3. Public routes — always pass through ────────────────────────────
-  if (PUBLIC_ROUTES.includes(pathname)) {
-    return NextResponse.next();
-  }
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
-
-  // ── 3b. Public API routes — no session needed ─────────────────────────
+  // ── 2. Public API routes — no session needed ──────────────────────────
   if (isPublicApiRoute(pathname, req.method)) {
     return NextResponse.next();
   }
 
-  // ── 4. Unauthenticated users → redirect to /signin ────────────────────
+  // ── 3. Unauthenticated users → preserve the existing API contract ─────
   if (!session) {
     // Only explicit Bearer-capable API routes bypass the web-session redirect.
     // Those handlers must validate either mobileAuth(req) or CRON_SECRET.
     if (
-      pathname.startsWith(API_PREFIX) &&
       isBearerAuthApiRoute(pathname, req.method) &&
       req.headers.get("authorization")?.startsWith("Bearer ")
     ) {
@@ -107,36 +76,11 @@ export default auth((req: NextAuthRequest) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // ── 5. Authenticated but username not set → enforce onboarding ────────
-  // Allow API calls, the profile page, and onboarding itself through.
-  if (
-    !session.user.usernameSet &&
-    !pathname.startsWith(ONBOARDING_PREFIX) &&
-    !pathname.startsWith(API_PREFIX) &&
-    pathname !== "/profile"
-  ) {
-    return NextResponse.redirect(new URL("/onboarding/username", nextUrl.origin));
-  }
-
-  // ── 6. Username already set but visiting onboarding → send home ───────
-  if (session.user.usernameSet && pathname.startsWith(ONBOARDING_PREFIX)) {
-    return NextResponse.redirect(new URL("/races", nextUrl.origin));
-  }
-
-  // ── 7. All checks passed — allow the request ──────────────────────────
+  // ── 4. Authenticated API request — allow the request ──────────────────
   return NextResponse.next();
 });
 
 export const config = {
-  /*
-   * Match every route EXCEPT:
-   *   - Next.js internals: _next/static, _next/image
-   *   - favicon.ico
-   *   - Everything inside /public (images, fonts, etc.)
-   *   - /api/auth/* — Auth.js handles these internally via the route handler;
-   *     the edge-only authConfig (providers: []) cannot process OAuth callbacks.
-   */
-  matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|api/auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
-  ],
+  // Auth.js handles /api/auth/* directly through its route handler.
+  matcher: ["/api/((?!auth(?:/|$)).*)"],
 };

@@ -43,7 +43,7 @@ export const authConfig: NextAuthConfig = {
   },
 
   pages: {
-    signIn: "/signin",
-    error: "/signin",
+    signIn: "/",
+    error: "/",
   },
 };

@@ -31,6 +31,15 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+### 2026-07-15 — Browser product UI retired behind the App Store landing
+- by: Codex
+- summary: Removed the retired browser route groups, component/provider/error-reporting tree, shadcn scaffold config, UI utility, and 12 browser-only direct packages. Preserved the complete API/Auth.js/scoring/cron/database surface, client-error intake/sanitizer, and driver/team asset contracts used by iOS.
+- files touched: `src/app/(main)`, `src/app/(auth)`, `src/components`, `src/app/error.tsx`, `src/lib/observability/report-client-error.ts`, `src/lib/utils*`, `components.json`, `package*.json`, `tailwind.config.ts`, shared architecture/decision/worklog docs, implementation plan
+- verification: retirement guard red (2 expected failures) then green (3/3); source import audit clean; component/page/utils/auth/route suites 124/124; `npx tsc --noEmit`; direct ESLint with the local config; `npx next build --no-lint`; build manifest 24 API entries and 0 retired page entries; `git diff --check`
+- open questions: `next lint` discovers the identical ancestor config in this nested worktree and reports a plugin conflict; direct ESLint passes, and a normal CI checkout will not have the duplicate ancestor config.
+- should update architecture?: yes — updated
+- should update decisions?: yes — updated
+
 ### 2026-07-15 02:41 — Race deck review corrections
 - by: Codex
 - summary: Replaced Upcoming previous-race context with season form from optional race-detail entrant fields, kept qualifying precedence, expanded the deterministic Performance field to all 22 active 2026 drivers across 11 constructors, and restored full-width pick-row chevron alignment without changing gameplay or scoring.
