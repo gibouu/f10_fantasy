@@ -142,6 +142,8 @@ git commit -m $'Lock the backend route manifest\n\n— gib'
 **Files:**
 - Create: `src/app/page.test.mjs`
 - Create: `src/app/support/page.test.mjs`
+- Create: `src/app/(auth)/layout.tsx`
+- Create: `src/app/(auth)/provider-boundary.test.mjs`
 - Create: `src/app/site-chrome.test.mjs`
 - Create: `src/app/site-chrome.tsx`
 - Create: `src/app/site.module.css`
@@ -152,6 +154,7 @@ git commit -m $'Lock the backend route manifest\n\n— gib'
 - Create: `public/landing/fx-racing-driver-picker-v1.jpg`
 - Modify: `src/app/page.tsx`
 - Modify: `src/app/layout.tsx`
+- Modify: `src/app/(main)/layout.tsx`
 - Modify: `src/app/globals.css`
 - Modify: `src/app/privacy/page.tsx`
 - Modify: `src/app/privacy/page.test.mjs`
@@ -297,6 +300,8 @@ export const metadata: Metadata = {
 ```
 
 Remove `next/font/google`, `Providers`, and the 430 px shell. Use `<body>{children}</body>` and local/system CSS only.
+
+Until Task 4 removes the retired route groups, scope the existing `Providers` component inside both `(auth)` and `(main)` layouts. Add a temporary provider-boundary contract under `(auth)` proving the root layout remains provider-free while the legacy groups remain buildable. Task 4 deletes these temporary route-group boundaries with the retired routes.
 
 `site-chrome.tsx` must export server-only `SiteHeader` and `SiteFooter`. Use stable IDs/data attributes: `landing-navigation`, `landing-app-store-navigation`, `landing-app-store-hero`, `landing-footer`.
 

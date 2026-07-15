@@ -5,6 +5,7 @@ import type { TeamSlug } from "@/lib/f1/teams"
 import { UserAvatarMenu } from "./UserAvatarMenu"
 import { TabBarLink } from "./TabBarLink"
 import { LegalModal } from "@/components/legal/LegalModal"
+import { Providers } from "@/components/Providers"
 import { Flag, Trophy } from "lucide-react"
 import Link from "next/link"
 
@@ -27,7 +28,8 @@ export default async function MainLayout({
   const teamInfo = teamSlug ? (TEAMS[teamSlug as TeamSlug] ?? null) : null
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <Providers>
+      <div className="flex flex-col min-h-screen">
       {/* ── Sticky header ──────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 glass border-b border-black/[0.07] rounded-b-[22px]">
         <div className="flex items-center justify-between px-4 py-3">
@@ -78,6 +80,7 @@ export default async function MainLayout({
           />
         </div>
       </nav>
-    </div>
+      </div>
+    </Providers>
   )
 }

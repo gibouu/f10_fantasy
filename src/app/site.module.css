@@ -1,0 +1,536 @@
+.sitePage {
+  --canvas: #050506;
+  --panel: #111114;
+  --hairline: #2C2C30;
+  --ink: #F5F5F7;
+  --muted: #A1A1A8;
+  --racing-red: #E10600;
+  --app-store-badge-height: 42px;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  color-scheme: dark;
+  color: var(--ink);
+  font-weight: 450;
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(var(--hairline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hairline) 1px, transparent 1px);
+  background-size: 3.25rem 3.25rem;
+}
+
+.sitePage ::selection {
+  background: color-mix(in srgb, var(--racing-red) 35%, var(--canvas));
+  color: var(--ink);
+}
+
+.shell {
+  width: min(calc(100% - 2rem), 1240px);
+  margin-inline: auto;
+}
+
+.siteHeader {
+  position: relative;
+  z-index: 10;
+  border-bottom: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.navigation {
+  min-height: 5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: baseline;
+  gap: 0.38rem;
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.brand::before {
+  width: 0.32rem;
+  height: 1.18rem;
+  content: "";
+  background: var(--racing-red);
+  transform: skewX(-12deg);
+}
+
+.brandWord {
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.appStoreLink {
+  min-height: 2.75rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.appStoreBadgeWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--app-store-badge-height) / 4);
+}
+
+.appStoreBadge {
+  width: auto;
+  height: var(--app-store-badge-height);
+  display: block;
+}
+
+.navigationStoreLink {
+  display: none;
+}
+
+.navigationStoreLink .appStoreText {
+  display: none;
+}
+
+.heroStoreLink {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+}
+
+.heroStoreLink .appStoreText {
+  display: none;
+}
+
+.appStoreText {
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--racing-red);
+  padding-block: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.appStoreText::after {
+  content: "↗";
+  color: var(--racing-red);
+}
+
+.hero {
+  width: min(calc(100% - 2rem), 1240px);
+  margin-inline: auto;
+  padding-block: clamp(3rem, 9vw, 7rem);
+  display: grid;
+  gap: 3.25rem;
+  align-items: center;
+}
+
+.heroCopy {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  animation: copyReveal 500ms ease-out both;
+}
+
+.eyebrow,
+.legalEyebrow {
+  margin: 0 0 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before,
+.legalEyebrow::before {
+  width: 0.85rem;
+  height: 2px;
+  content: "";
+  background: var(--racing-red);
+}
+
+.heroTitle {
+  max-width: 8ch;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(3.55rem, 16vw, 7.25rem);
+  font-weight: 800;
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+  text-transform: uppercase;
+}
+
+.heroTitle span {
+  display: block;
+}
+
+.heroTitle span:last-child {
+  color: var(--racing-red);
+}
+
+.heroLead {
+  max-width: 29rem;
+  margin: 1.85rem auto 0;
+  color: var(--ink);
+  font-size: clamp(1.08rem, 2.4vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.heroDetail {
+  max-width: 30rem;
+  margin: 0.75rem auto 1.25rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.screenStage {
+  width: min(100%, 36rem);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  animation: screenReveal 650ms 80ms ease-out both;
+}
+
+.deviceFrame {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  aspect-ratio: 736 / 1600;
+  border: 1px solid var(--hairline);
+  border-radius: clamp(1rem, 3vw, 2rem);
+  background: var(--panel);
+  box-shadow: 0 2rem 4rem rgba(0, 0, 0, 0.42);
+}
+
+.raceDeckFrame {
+  z-index: 2;
+  transform: translateX(8%);
+}
+
+.driverPickerFrame {
+  z-index: 1;
+  transform: translateX(-8%) translateY(5%);
+}
+
+.deviceImage {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.scoringSection {
+  border-block: 1px solid var(--hairline);
+  background: var(--panel);
+}
+
+.scoringInner {
+  padding-block: clamp(2.25rem, 5vw, 3.75rem);
+}
+
+.scoreGrid {
+  margin: 0;
+  display: grid;
+  gap: 1.4rem;
+}
+
+.scoreItem {
+  display: grid;
+  grid-template-columns: 4.25rem 1fr;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.scoreItem dt {
+  color: var(--racing-red);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+
+.scoreItem dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bonusCopy {
+  margin: 2rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.siteFooter {
+  margin-top: auto;
+  background: var(--canvas);
+}
+
+.footerInner {
+  padding-block: 2rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.legalNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.legalNavigation a,
+.legalLink {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-underline-offset: 0.25rem;
+  text-transform: uppercase;
+}
+
+.legalNavigation a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.footerNotices {
+  max-width: 48rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.footerNotices p {
+  margin: 0;
+}
+
+.footerNotices p + p {
+  margin-top: 0.4rem;
+}
+
+.legalMain {
+  flex: 1;
+}
+
+.legalArticle {
+  width: min(calc(100% - 2rem), 48rem);
+  margin-inline: auto;
+  padding-block: clamp(3.5rem, 8vw, 7rem);
+}
+
+.legalArticle h1 {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(2.8rem, 9vw, 5.5rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.legalBrand {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.legalSections {
+  margin-top: clamp(3rem, 7vw, 5rem);
+}
+
+.legalSection {
+  scroll-margin-top: 2rem;
+}
+
+.legalSection + .legalSection {
+  margin-top: 3rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 3rem;
+}
+
+.legalSection h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.legalSection p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+.legalSection p + p {
+  margin-top: 0.85rem;
+}
+
+.supportCard {
+  margin-top: 2.5rem;
+  border: 1px solid var(--hairline);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  background: var(--panel);
+}
+
+.supportCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.supportCard .supportAddress {
+  margin-block: 1rem;
+}
+
+.supportAddress {
+  display: inline-block;
+  color: var(--ink);
+  font-size: clamp(1.05rem, 4vw, 1.35rem);
+  font-weight: 700;
+  text-underline-offset: 0.3rem;
+}
+
+.supportAddress a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+@keyframes copyReveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+
+@keyframes screenReveal {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+@media (min-width: 48rem) {
+  .shell,
+  .hero,
+  .legalArticle {
+    width: min(calc(100% - 4rem), var(--shell-width, 1240px));
+  }
+
+  .navigationStoreLink {
+    display: inline-flex;
+  }
+
+  .heroStoreLink .appStoreBadgeWrapper {
+    display: none;
+  }
+
+  .heroStoreLink .appStoreText {
+    display: inline-flex;
+  }
+
+  .hero {
+    min-height: 42rem;
+    grid-template-columns: minmax(0, 0.88fr) minmax(25rem, 1.12fr);
+    gap: clamp(2rem, 5vw, 5rem);
+  }
+
+  .heroCopy {
+    text-align: left;
+  }
+
+  .heroTitle,
+  .heroLead,
+  .heroDetail {
+    margin-inline: 0;
+  }
+
+  .heroTitle {
+    font-size: clamp(5rem, 9vw, 7.25rem);
+  }
+
+  .scoreGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  .scoreItem {
+    min-height: 4rem;
+    padding-inline: clamp(1rem, 3vw, 2.5rem);
+    grid-template-columns: auto 1fr;
+  }
+
+  .scoreItem + .scoreItem {
+    border-left: 1px solid var(--hairline);
+  }
+
+  .scoreItem:first-child {
+    padding-left: 0;
+  }
+
+  .scoreItem:last-child {
+    padding-right: 0;
+  }
+
+  .footerInner {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+
+  .footerNotices {
+    justify-self: end;
+    text-align: right;
+  }
+
+  .legalArticle {
+    --shell-width: 48rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroCopy,
+  .screenStage {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .siteHeader,
+  .scoringSection {
+    background: var(--canvas);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
