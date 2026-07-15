@@ -18,6 +18,11 @@ const performanceFixtures = await readFile(
   new URL("./FXRacing/Performance/PerformanceFixtures.swift", import.meta.url),
   "utf8",
 )
+const seasonFormSource = contextSource.match(
+  /private struct SeasonFormContextView[\s\S]*?(?=private struct CompactScoreContextView)/,
+)?.[0]
+
+assert.ok(seasonFormSource, "SeasonFormContextView source should be present")
 
 test("upcoming races show season form before qualifying instead of previous-race data", () => {
   assert.match(contextSource, /case seasonForm/)
@@ -37,6 +42,21 @@ test("driver decoding remains compatible while carrying optional season form", (
   assert.match(driverSource, /let seasonDnfCount: Int\?/)
   assert.match(driverSource, /seasonAverageFinish: Double\? = nil/)
   assert.match(driverSource, /seasonDnfCount: Int\? = nil/)
+})
+
+test("season form stays image-free and does not create remote image work", () => {
+  assert.doesNotMatch(seasonFormSource, /DriverBubbleView|FXRemoteImage/)
+  assert.match(seasonFormSource, /driver\.teamColor/)
+})
+
+test("season form adapts to Dynamic Type without fixed typography or stat columns", () => {
+  assert.doesNotMatch(seasonFormSource, /\.font\(\.system\(size:/)
+  assert.doesNotMatch(seasonFormSource, /\.frame\(width:\s*(?:44|36)\b/)
+  assert.match(seasonFormSource, /ViewThatFits\(in:\s*\.horizontal\)/)
+  assert.match(seasonFormSource, /@Environment\(\\\.dynamicTypeSize\)/)
+  assert.match(seasonFormSource, /dynamicTypeSize\.isAccessibilitySize/)
+  assert.match(seasonFormSource, /\.font\(\.caption/)
+  assert.match(seasonFormSource, /\.font\(\.subheadline/)
 })
 
 test("gameplay review fixture mirrors the complete 22-driver 11-team field", () => {

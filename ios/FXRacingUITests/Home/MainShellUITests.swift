@@ -43,7 +43,7 @@ final class MainShellUITests: XCTestCase {
         row.tap()
 
         let done = app.buttons["Done"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(done.waitForExistence(timeout: 2))
         done.tap()
 
         XCTAssertFalse(done.waitForExistence(timeout: 2))
