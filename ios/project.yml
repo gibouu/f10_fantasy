@@ -75,6 +75,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: FXRacingTests
+    resources:
+      - path: FXRacingTests/Fixtures/race-detail-22x24.json
     dependencies:
       - target: FXRacing
     settings:

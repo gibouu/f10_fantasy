@@ -119,7 +119,7 @@ final class MainShellUITests: XCTestCase {
         let antonelliForm = element(in: app, identifier: "season-form-row-antonelli")
         XCTAssertTrue(antonelliForm.exists)
         XCTAssertTrue(antonelliForm.label.contains("average finish"))
-        XCTAssertTrue(antonelliForm.label.contains("DNF"))
+        XCTAssertTrue(antonelliForm.label.contains("non-classified results"))
 
         let p10Slot = app.buttons["pick-slot-spa-p10"]
         reveal(p10Slot, bySwipingDown: deck)
@@ -133,6 +133,27 @@ final class MainShellUITests: XCTestCase {
         let sainz = app.buttons["driver-sainz"]
         revealHittable(sainz, in: app)
         XCTAssertTrue(sainz.isHittable)
+    }
+
+    @MainActor
+    func testSeasonFormOpensDriverHistory() {
+        let app = launch(.gameplay)
+        let deck = element(in: app, identifier: "race-deck")
+        let antonelliForm = app.buttons["season-form-row-antonelli"]
+
+        reveal(antonelliForm, bySwipingUp: deck)
+        XCTAssertTrue(waitUntilHittable(antonelliForm))
+        antonelliForm.tap()
+
+        let sheet = element(in: app, identifier: "driver-form-sheet-antonelli")
+        XCTAssertTrue(sheet.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Kimi Antonelli"].exists)
+        XCTAssertTrue(app.staticTexts["Race results before Belgium"].exists)
+        XCTAssertTrue(app.staticTexts["British Grand Prix"].exists)
+
+        sheet.swipeDown()
+        XCTAssertFalse(sheet.waitForExistence(timeout: 2))
+        XCTAssertTrue(antonelliForm.isHittable)
     }
 
     @MainActor

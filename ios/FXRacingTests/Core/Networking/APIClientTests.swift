@@ -104,7 +104,7 @@ final class APIClientTests: XCTestCase {
         let session = URLSession(
             configuration: StubURLProtocol.configuration(
                 status: 200,
-                body: #"{"race":{"id":"race","seasonId":"season-2026","round":1,"name":"Race","circuitName":"Circuit","country":"Belgium","type":"MAIN","scheduledStartUtc":"2027-01-15T08:00:00Z","lockCutoffUtc":"2027-01-15T07:58:00Z","status":"UPCOMING","qualifyingStartUtc":null},"entrants":[{"id":"driver-with-form","code":"DRV","firstName":"Form","lastName":"Driver","number":1,"photoUrl":null,"seatKey":"team:1","seasonAverageFinish":4.5,"seasonDnfCount":3,"constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}},{"id":"legacy-driver","code":"OLD","firstName":"Legacy","lastName":"Driver","number":2,"photoUrl":null,"seatKey":"team:2","constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}}],"results":[],"qualifyingResults":[]}"#
+                body: #"{"race":{"id":"race","seasonId":"season-2026","round":1,"name":"Race","circuitName":"Circuit","country":"Belgium","type":"MAIN","scheduledStartUtc":"2027-01-15T08:00:00Z","lockCutoffUtc":"2027-01-15T07:58:00Z","status":"UPCOMING","qualifyingStartUtc":null},"entrants":[{"id":"driver-with-form","code":"DRV","firstName":"Form","lastName":"Driver","number":1,"photoUrl":null,"seatKey":"team:1","seasonAverageFinish":4.5,"seasonDnfCount":3,"seasonResults":[{"raceId":"prior-race","raceName":"Prior Race","scheduledStartUtc":"2027-01-08T08:00:00Z","position":8,"status":"CLASSIFIED"}],"constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}},{"id":"legacy-driver","code":"OLD","firstName":"Legacy","lastName":"Driver","number":2,"photoUrl":null,"seatKey":"team:2","constructor":{"id":"team","name":"Team","shortName":"TEM","color":"FF0000","slug":"team","logoUrl":null}}],"results":[],"qualifyingResults":[]}"#
             )
         )
         let client = APIClient(
@@ -118,10 +118,29 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(payload.entrants.count, 2)
         XCTAssertEqual(payload.entrants[0].seasonAverageFinish, 4.5)
         XCTAssertEqual(payload.entrants[0].seasonDnfCount, 3)
+        XCTAssertEqual(payload.entrants[0].seasonResults?.map(\.raceId), ["prior-race"])
+        XCTAssertEqual(payload.entrants[0].seasonResults?.first?.resultLabel, "P8")
         XCTAssertNil(payload.entrants[1].seasonAverageFinish)
         XCTAssertNil(payload.entrants[1].seasonDnfCount)
+        XCTAssertNil(payload.entrants[1].seasonResults)
         XCTAssertTrue(payload.results.isEmpty)
         XCTAssertEqual(payload.qualifyingResults?.count, 0)
+    }
+
+    func testWorstCaseRaceDetailFixtureDecodesWithinResponseBudget() throws {
+        let fixtureURL = try XCTUnwrap(
+            Bundle(for: Self.self).url(
+                forResource: "race-detail-22x24",
+                withExtension: "json"
+            )
+        )
+        let data = try Data(contentsOf: fixtureURL)
+
+        let payload = try JSONDecoder.api().decode(RaceDetailPayload.self, from: data)
+
+        XCTAssertEqual(payload.entrants.count, 22)
+        XCTAssertTrue(payload.entrants.allSatisfy { $0.seasonResults?.count == 24 })
+        XCTAssertLessThanOrEqual(data.count, 131_072)
     }
 
     func testInjectedSessionDecodesSharedPickResponse() async throws {

@@ -14,6 +14,10 @@ const driverSource = await readFile(
   new URL("./FXRacing/Core/Models/Driver.swift", import.meta.url),
   "utf8",
 )
+const driverFormSheetSource = await readFile(
+  new URL("./FXRacing/Features/Races/DriverFormSheet.swift", import.meta.url),
+  "utf8",
+).catch(() => "")
 const performanceFixtures = await readFile(
   new URL("./FXRacing/Performance/PerformanceFixtures.swift", import.meta.url),
   "utf8",
@@ -42,11 +46,40 @@ test("driver decoding remains compatible while carrying optional season form", (
   assert.match(driverSource, /let seasonDnfCount: Int\?/)
   assert.match(driverSource, /seasonAverageFinish: Double\? = nil/)
   assert.match(driverSource, /seasonDnfCount: Int\? = nil/)
+  assert.match(driverSource, /let seasonResults: \[DriverSeasonResult\]\?/)
+  assert.match(driverSource, /seasonResults: \[DriverSeasonResult\]\? = nil/)
 })
 
-test("season form stays image-free and does not create remote image work", () => {
+test("season form and driver history stay image-free and do not create remote image work", () => {
   assert.doesNotMatch(seasonFormSource, /DriverBubbleView|FXRemoteImage/)
+  assert.doesNotMatch(driverFormSheetSource, /DriverBubbleView|FXRemoteImage/)
   assert.match(seasonFormSource, /driver\.teamColor/)
+})
+
+test("season form rows are full-width accessible buttons that open native history", () => {
+  assert.match(seasonFormSource, /Button\s*\{[\s\S]*?selectedDriver\s*=\s*driver/)
+  assert.match(seasonFormSource, /Image\(systemName:\s*"chevron\.right"\)/)
+  assert.match(seasonFormSource, /\.frame\(maxWidth:\s*\.infinity[\s\S]*?minHeight:\s*44/)
+  assert.match(seasonFormSource, /\.buttonStyle\(\.plain\)/)
+  assert.match(contextSource, /\.sheet\(item:\s*\$selectedDriver\)/)
+  assert.match(contextSource, /DriverFormSheet\(race:\s*race,\s*driver:\s*driver\)/)
+  assert.match(contextSource, /Text\("OUT"\)/)
+  assert.match(contextSource, /non-classified results/)
+})
+
+test("driver history is an opaque native sheet that preserves server ordering", () => {
+  assert.match(driverFormSheetSource, /struct DriverFormSheet:\s*View/)
+  assert.match(driverFormSheetSource, /let race:\s*Race/)
+  assert.match(driverFormSheetSource, /let driver:\s*Driver/)
+  assert.match(driverFormSheetSource, /driver\.seasonResults/)
+  assert.doesNotMatch(driverFormSheetSource, /\.sorted\s*\(/)
+  assert.match(driverFormSheetSource, /AVG uses classified finishes\./)
+  assert.match(driverFormSheetSource, /Race results before/)
+  assert.match(driverFormSheetSource, /Sprint results before/)
+  assert.match(driverFormSheetSource, /No completed races yet\./)
+  assert.match(driverFormSheetSource, /No completed sprints yet\./)
+  assert.match(driverFormSheetSource, /\.presentationDetents\(\[\.medium,\s*\.large\]\)/)
+  assert.match(driverFormSheetSource, /\.presentationBackground\(Color\(\.systemBackground\)\)/)
 })
 
 test("season form adapts to Dynamic Type without fixed typography or stat columns", () => {
@@ -97,4 +130,5 @@ test("gameplay review fixture mirrors the complete 22-driver 11-team field", () 
   assert.equal(new Set(fixtureField).size, 22)
   assert.match(performanceFixtures, /seasonAverageFinish:/)
   assert.match(performanceFixtures, /seasonDnfCount:/)
+  assert.match(performanceFixtures, /seasonResults:\s*driver\.seasonResults/)
 })

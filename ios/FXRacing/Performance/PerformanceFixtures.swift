@@ -120,6 +120,22 @@ enum PerformanceFixtures {
                 seatKey: "mercedes:2",
                 seasonAverageFinish: 5.8,
                 seasonDnfCount: 1,
+                seasonResults: [
+                    DriverSeasonResult(
+                        raceId: "silverstone",
+                        raceName: "British Grand Prix",
+                        scheduledStartUtc: now.addingTimeInterval(-86_400),
+                        position: 1,
+                        status: .classified
+                    ),
+                    DriverSeasonResult(
+                        raceId: "austria",
+                        raceName: "Austrian Grand Prix",
+                        scheduledStartUtc: now.addingTimeInterval(-691_200),
+                        position: nil,
+                        status: .dnf
+                    ),
+                ],
                 constructor: mercedes
             ),
             Driver(
@@ -452,6 +468,7 @@ enum PerformanceFixtures {
             seatKey: driver.seatKey,
             seasonAverageFinish: driver.seasonAverageFinish,
             seasonDnfCount: driver.seasonDnfCount,
+            seasonResults: driver.seasonResults,
             constructor: constructor
         )
     }
