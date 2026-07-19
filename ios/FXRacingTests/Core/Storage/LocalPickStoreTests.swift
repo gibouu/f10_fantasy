@@ -1112,6 +1112,443 @@ final class LocalPickStoreTests: XCTestCase {
         XCTAssertNil(reloaded.authoritativePick(for: "spa", owner: .user("b")))
     }
 
+    func testGuestCanAtomicallyAdoptExpectedLegacyConflictIntoQueue() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let expectedRecord = LocalPickRecord(
+            id: LocalPickRecordID(owner: .guest, raceID: RaceFixtures.upcoming.id),
+            selection: legacy.selection,
+            savedAt: RaceFixtures.now,
+            revision: legacy.revision + 1,
+            syncState: .queued
+        )
+
+        persistence.resetSetDataCallCount()
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .guest,
+                expectedLegacyRevision: legacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .adopted(expectedRecord)
+        )
+
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(store.record(id: expectedRecord.id), expectedRecord)
+        XCTAssertEqual(store.queuedRecords(currentUserID: nil), [expectedRecord])
+        XCTAssertEqual(persistence.setDataCallCount, 1)
+    }
+
+    func testAccountCanAtomicallyAdoptExpectedLegacyConflictIntoItsQueue() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let expectedRecord = LocalPickRecord(
+            id: LocalPickRecordID(
+                owner: .user("user-a"),
+                raceID: RaceFixtures.upcoming.id
+            ),
+            selection: legacy.selection,
+            savedAt: RaceFixtures.now,
+            revision: legacy.revision + 1,
+            syncState: .queued
+        )
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .adopted(expectedRecord)
+        )
+
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(store.queuedRecords(currentUserID: "user-a"), [expectedRecord])
+        XCTAssertTrue(store.queuedRecords(currentUserID: "user-b").isEmpty)
+    }
+
+    func testAdoptRejectsOccupiedDestinationWithoutChangingEitherRecord() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let destination = try saveRecord(
+            in: store,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        persistence.resetSetDataCallCount()
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .destinationOccupied(destination)
+        )
+
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertEqual(store.record(id: destination.id), destination)
+        XCTAssertEqual(persistence.setDataCallCount, 0)
+    }
+
+    func testReplaceRequiresExpectedDestinationAndAtomicallyQueuesLegacySelection() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let destination = try saveRecord(
+            in: store,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        let expectedRecord = LocalPickRecord(
+            id: destination.id,
+            selection: legacy.selection,
+            savedAt: RaceFixtures.now.addingTimeInterval(1),
+            revision: destination.revision + 1,
+            syncState: .queued
+        )
+
+        persistence.resetSetDataCallCount()
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .replace(expectedDestinationRevision: destination.revision),
+                now: expectedRecord.savedAt
+            ),
+            .adopted(expectedRecord)
+        )
+
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(store.record(id: destination.id), expectedRecord)
+        XCTAssertEqual(store.queuedRecords(currentUserID: "user-a"), [expectedRecord])
+        XCTAssertEqual(persistence.setDataCallCount, 1)
+    }
+
+    func testKeepCurrentRequiresCapturedDestinationRevisionBeforeDiscardingLegacy() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let destination = try saveRecord(
+            in: store,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .keepCurrent(
+                    expectedDestinationRevision: destination.revision
+                ),
+                now: RaceFixtures.now
+            ),
+            .keptCurrent
+        )
+
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(store.record(id: destination.id), destination)
+    }
+
+    func testDiscardAtomicallyRemovesOnlyExpectedLegacyConflict() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .guest,
+                expectedLegacyRevision: legacy.revision,
+                decision: .discard,
+                now: RaceFixtures.now
+            ),
+            .discarded
+        )
+
+        XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertTrue(store.queuedRecords(currentUserID: nil).isEmpty)
+    }
+
+    func testResolutionRejectsLockedAdoptionAndInvalidOwnerWithoutMutation() throws {
+        let lockedPersistence = LocalPickPersistenceSpy()
+        let (lockedStore, lockedLegacy) = try makeStoreWithLegacyConflict(
+            persistence: lockedPersistence
+        )
+
+        XCTAssertEqual(
+            lockedStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .guest,
+                expectedLegacyRevision: lockedLegacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.upcoming.lockCutoffUtc
+            ),
+            .locked
+        )
+        XCTAssertEqual(
+            lockedStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            lockedLegacy
+        )
+
+        let invalidPersistence = LocalPickPersistenceSpy()
+        let (invalidStore, invalidLegacy) = try makeStoreWithLegacyConflict(
+            persistence: invalidPersistence
+        )
+        XCTAssertEqual(
+            invalidStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .legacyAmbiguous,
+                expectedLegacyRevision: invalidLegacy.revision,
+                decision: .discard,
+                now: RaceFixtures.now
+            ),
+            .invalidOwner
+        )
+        XCTAssertEqual(
+            invalidStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            invalidLegacy
+        )
+    }
+
+    func testResolutionRejectsStaleLegacyRevisionWithoutInspectingDestination() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .guest,
+                expectedLegacyRevision: legacy.revision + 1,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .staleLegacy
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertNil(store.record(for: RaceFixtures.upcoming.id, owner: .guest))
+    }
+
+    func testReplaceAndKeepRejectChangedDestinationWithoutDiscardingLegacy() throws {
+        let replacePersistence = LocalPickPersistenceSpy()
+        let (replaceStore, replaceLegacy) = try makeStoreWithLegacyConflict(
+            persistence: replacePersistence
+        )
+        let replaceDestination = try saveRecord(
+            in: replaceStore,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+
+        XCTAssertEqual(
+            replaceStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: replaceLegacy.revision,
+                decision: .replace(
+                    expectedDestinationRevision: replaceDestination.revision + 1
+                ),
+                now: RaceFixtures.now
+            ),
+            .destinationChanged(replaceDestination)
+        )
+        XCTAssertEqual(
+            replaceStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            replaceLegacy
+        )
+        XCTAssertEqual(replaceStore.record(id: replaceDestination.id), replaceDestination)
+
+        let keepPersistence = LocalPickPersistenceSpy()
+        let (keepStore, keepLegacy) = try makeStoreWithLegacyConflict(
+            persistence: keepPersistence
+        )
+        let keepDestination = try saveRecord(
+            in: keepStore,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        XCTAssertEqual(
+            keepStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: keepLegacy.revision,
+                decision: .keepCurrent(expectedDestinationRevision: nil),
+                now: RaceFixtures.now
+            ),
+            .destinationChanged(keepDestination)
+        )
+        XCTAssertEqual(
+            keepStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            keepLegacy
+        )
+        XCTAssertEqual(keepStore.record(id: keepDestination.id), keepDestination)
+    }
+
+    func testReplaceReportsMissingCapturedDestinationWithoutDiscardingLegacy() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .replace(expectedDestinationRevision: 42),
+                now: RaceFixtures.now
+            ),
+            .destinationChanged(nil)
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+    }
+
+    func testRejectedAdoptRollsBackSourceDestinationAndNextRevision() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        persistence.rejectsWrites = true
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertNil(store.record(for: RaceFixtures.upcoming.id, owner: .user("user-a")))
+        XCTAssertTrue(store.queuedRecords(currentUserID: "user-a").isEmpty)
+
+        persistence.rejectsWrites = false
+        let retried = store.resolveLegacyConflict(
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a"),
+            expectedLegacyRevision: legacy.revision,
+            decision: .adopt,
+            now: RaceFixtures.now
+        )
+        guard case .adopted(let adopted) = retried else {
+            return XCTFail("Expected retry to adopt the retained legacy conflict")
+        }
+        XCTAssertEqual(adopted.revision, legacy.revision + 1)
+    }
+
+    func testRejectedDiscardAndKeepRetainAmbiguousSourceAndDestination() throws {
+        let discardPersistence = LocalPickPersistenceSpy()
+        let (discardStore, discardLegacy) = try makeStoreWithLegacyConflict(
+            persistence: discardPersistence
+        )
+        discardPersistence.rejectsWrites = true
+        XCTAssertEqual(
+            discardStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .guest,
+                expectedLegacyRevision: discardLegacy.revision,
+                decision: .discard,
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(
+            discardStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            discardLegacy
+        )
+
+        let keepPersistence = LocalPickPersistenceSpy()
+        let (keepStore, keepLegacy) = try makeStoreWithLegacyConflict(
+            persistence: keepPersistence
+        )
+        let destination = try saveRecord(
+            in: keepStore,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        keepPersistence.rejectsWrites = true
+        XCTAssertEqual(
+            keepStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: keepLegacy.revision,
+                decision: .keepCurrent(
+                    expectedDestinationRevision: destination.revision
+                ),
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(
+            keepStore.legacyConflict(for: RaceFixtures.upcoming.id),
+            keepLegacy
+        )
+        XCTAssertEqual(keepStore.record(id: destination.id), destination)
+    }
+
+    func testRejectedReplaceRestoresLegacyDestinationAndNextRevision() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let destination = try saveRecord(
+            in: store,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        persistence.rejectsWrites = true
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .replace(
+                    expectedDestinationRevision: destination.revision
+                ),
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertEqual(store.record(id: destination.id), destination)
+
+        persistence.rejectsWrites = false
+        let retried = store.resolveLegacyConflict(
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a"),
+            expectedLegacyRevision: legacy.revision,
+            decision: .replace(expectedDestinationRevision: destination.revision),
+            now: RaceFixtures.now
+        )
+        guard case .adopted(let adopted) = retried else {
+            return XCTFail("Expected retry to replace the unchanged destination")
+        }
+        XCTAssertEqual(adopted.revision, destination.revision + 1)
+    }
+
     func testLegacyRecoveryCopiesIntoDormantDraftAndOnlyRemovesLegacyAfterPersistence() throws {
         let persistence = LocalPickPersistenceSpy()
         let legacy = LegacyLocalPickV1(
@@ -1258,6 +1695,30 @@ final class LocalPickStoreTests: XCTestCase {
         return record
     }
 
+    private func makeStoreWithLegacyConflict(
+        persistence: LocalPickPersistenceSpy,
+        race: Race = RaceFixtures.upcoming
+    ) throws -> (store: LocalPickStore, legacy: LocalPickRecord) {
+        let legacyPick = LegacyLocalPickV1(
+            raceId: race.id,
+            winnerId: selection.winnerDriverID,
+            p10Id: selection.tenthPlaceDriverID,
+            dnfId: selection.dnfDriverID,
+            savedAt: RaceFixtures.now.addingTimeInterval(-60),
+            synced: false
+        )
+        persistence.seed(
+            try JSONEncoder().encode([race.id: legacyPick]),
+            forKey: "localPicks_v1"
+        )
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        let legacy = try XCTUnwrap(store.legacyConflict(for: race.id))
+        return (store, legacy)
+    }
+
     private func makeV2EnvelopeData(
         nextRevision: UInt64,
         records: [LocalPickRecord]
@@ -1300,6 +1761,7 @@ private enum TestFailure: Error {
 @MainActor
 private final class LocalPickPersistenceSpy: LocalPickPersisting {
     var rejectsWrites: Bool
+    private(set) var setDataCallCount = 0
     private var values: [String: Data] = [:]
 
     init(rejectsWrites: Bool = false) {
@@ -1311,6 +1773,7 @@ private final class LocalPickPersistenceSpy: LocalPickPersisting {
     }
 
     func setData(_ data: Data, forKey key: String) {
+        setDataCallCount += 1
         guard !rejectsWrites else { return }
         values[key] = data
     }
@@ -1321,5 +1784,9 @@ private final class LocalPickPersistenceSpy: LocalPickPersisting {
 
     func seed(_ data: Data, forKey key: String) {
         values[key] = data
+    }
+
+    func resetSetDataCallCount() {
+        setDataCallCount = 0
     }
 }
