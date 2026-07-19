@@ -50,6 +50,8 @@ export type DriverSummary = {
   seasonAverageFinish?: number | null
   /** Non-classified finishes in earlier completed races of the same season/type. */
   seasonDnfCount?: number | null
+  /** Earlier completed same-season, same-type race results, newest first. */
+  seasonResults?: SerializedDriverSeasonResult[]
   constructor: {
     id: string
     name: string
@@ -98,6 +100,21 @@ export type RaceResultRecord = {
     winner: number
     dnf: number
   }
+}
+
+export type DriverSeasonResult = {
+  driverId: string
+  raceId: string
+  raceName: string
+  scheduledStartUtc: Date
+  position: number | null
+  status: ResultStatus
+}
+
+export type DriverSeasonForm = {
+  averageFinish: number | null
+  nonClassifiedCount: number
+  results: DriverSeasonResult[]
 }
 
 // ─────────────────────────────────────────────
@@ -205,6 +222,11 @@ export type SerializedRaceSummary = Omit<
 export type SerializedScoreBreakdownData = Omit<ScoreBreakdownData, 'computedAt'> & {
   computedAt: string
 }
+
+export type SerializedDriverSeasonResult = Omit<
+  DriverSeasonResult,
+  'driverId' | 'scheduledStartUtc'
+> & { scheduledStartUtc: string }
 
 export type SerializedPickSetData = Omit<PickSetData, 'createdAt' | 'updatedAt' | 'lockedAt'> & {
   createdAt: string
