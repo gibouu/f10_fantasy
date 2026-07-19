@@ -4,6 +4,7 @@ struct RacePickPanel: View {
     @Bindable var viewModel: RaceDetailViewModel
     let now: Date
     let onSelectSlot: (PickSlot) -> Void
+    let onRetryCommit: () -> PickSelectionOutcome
     let onSignIn: () -> Void
     let isAuthenticated: Bool
 
@@ -73,7 +74,7 @@ struct RacePickPanel: View {
         case .none:
             break
         case .retry:
-            onSelectSlot(.dnf)
+            PickCommitFeedback.publish(for: .selection(onRetryCommit()))
         case .signIn:
             onSignIn()
         case .resolveConflict:

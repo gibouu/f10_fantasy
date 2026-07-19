@@ -7,6 +7,7 @@ struct UpcomingRaceCard: View {
     let isAuthenticated: Bool
     let onSchedule: () -> Void
     let onSelectSlot: (PickSlot) -> Void
+    let onRetryCommit: () -> PickSelectionOutcome
     let onSignIn: () -> Void
 
     var body: some View {
@@ -26,6 +27,7 @@ struct UpcomingRaceCard: View {
                     viewModel: detail,
                     now: now,
                     onSelectSlot: onSelectSlot,
+                    onRetryCommit: onRetryCommit,
                     onSignIn: onSignIn,
                     isAuthenticated: isAuthenticated
                 )

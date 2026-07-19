@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct DriverPickerSheet: View {
+    private struct RetrySelection {
+        let driver: Driver
+        let slot: PickSlot
+        let updatedState: DriverPickerState
+    }
+
     private enum PickerFocusTarget: Hashable {
         case slotHeading
         case driver(String)
@@ -10,19 +16,22 @@ struct DriverPickerSheet: View {
     @Binding private var state: DriverPickerState
     @AccessibilityFocusState private var focusTarget: PickerFocusTarget?
     @State private var alertMessage: String?
-    @State private var retrySelection: (driver: Driver, slot: PickSlot)?
+    @State private var retrySelection: RetrySelection?
 
     private let entrants: [Driver]
     private let onSelect: (Driver, PickSlot) -> PickSelectionOutcome
+    private let onRetryCommit: () -> PickSelectionOutcome
 
     init(
         state: Binding<DriverPickerState>,
         entrants: [Driver],
-        onSelect: @escaping (Driver, PickSlot) -> PickSelectionOutcome
+        onSelect: @escaping (Driver, PickSlot) -> PickSelectionOutcome,
+        onRetryCommit: @escaping () -> PickSelectionOutcome
     ) {
         _state = state
         self.entrants = entrants
         self.onSelect = onSelect
+        self.onRetryCommit = onRetryCommit
     }
 
     /// Drivers grouped by team slug (falls back to constructor name), sorted alphabetically.
@@ -176,6 +185,20 @@ struct DriverPickerSheet: View {
         }
 
         let outcome = onSelect(driver, selectedSlot)
+        handleSelectionOutcome(
+            outcome,
+            updatedState: updatedState,
+            driver: driver,
+            selectedSlot: selectedSlot
+        )
+    }
+
+    private func handleSelectionOutcome(
+        _ outcome: PickSelectionOutcome,
+        updatedState: DriverPickerState,
+        driver: Driver,
+        selectedSlot: PickSlot
+    ) {
         switch state.apply(updatedState, outcome: outcome) {
         case .advance:
             Haptics.select()
@@ -185,13 +208,14 @@ struct DriverPickerSheet: View {
                 "\(selectedSlot.label) selected. Now choose \(nextSlot.label)."
             ).post()
         case .dismiss:
-            Haptics.success()
-            AccessibilityNotification.Announcement(
-                "Picks saved on this iPhone."
-            ).post()
+            PickCommitFeedback.publish(for: .selection(outcome))
             dismiss()
         case .showError(let message):
-            retrySelection = (driver, selectedSlot)
+            retrySelection = RetrySelection(
+                driver: driver,
+                slot: selectedSlot,
+                updatedState: updatedState
+            )
             alertMessage = message
         }
     }
@@ -200,7 +224,12 @@ struct DriverPickerSheet: View {
         guard let retrySelection else { return }
         alertMessage = nil
         self.retrySelection = nil
-        select(retrySelection.driver)
+        handleSelectionOutcome(
+            onRetryCommit(),
+            updatedState: retrySelection.updatedState,
+            driver: retrySelection.driver,
+            selectedSlot: retrySelection.slot
+        )
     }
 
     private func accessibilityValue(for driver: Driver) -> String {

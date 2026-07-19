@@ -787,6 +787,37 @@ final class RaceDetailViewModel {
         )
     }
 
+    func retryCurrentSelectionCommit(
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore
+    ) -> PickSelectionOutcome {
+        let scope = sessionScope(token: token, userID: userID)
+        guard activeScope == scope else {
+            let message = "Your account changed. Please confirm your picks again."
+            submissionErrorMessage = message
+            return .rejected(message)
+        }
+        guard let selectedWinnerID,
+              let selectedP10ID,
+              let selectedDNFID
+        else {
+            let message = "Choose all three picks before trying again."
+            submissionErrorMessage = message
+            return .rejected(message)
+        }
+
+        return commitCurrentSelection(
+            PickSelection(
+                winnerDriverID: selectedWinnerID,
+                tenthPlaceDriverID: selectedP10ID,
+                dnfDriverID: selectedDNFID
+            ),
+            scope: scope,
+            localPickStore: localPickStore
+        )
+    }
+
     private func commitCurrentSelection(
         _ selection: PickSelection,
         scope: SessionScope,

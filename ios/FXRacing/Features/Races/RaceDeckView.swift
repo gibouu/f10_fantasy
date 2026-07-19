@@ -117,6 +117,8 @@ struct RaceDeckView: View {
                     entrants: detail.entrants
                 ) { driver, slot in
                     commitSelection(driver, for: slot, detail: detail)
+                } onRetryCommit: {
+                    retryCurrentSelectionCommit(detail: detail)
                 }
                 .accessibilityIdentifier("driver-picker")
                 .onAppear { finishPickerPresentation() }
@@ -302,6 +304,12 @@ struct RaceDeckView: View {
                 isAuthenticated: authManager.isAuthenticated,
                 onSchedule: { openSchedule(race) },
                 onSelectSlot: { slot in openPicker(slot, for: race) },
+                onRetryCommit: {
+                    guard let detail else {
+                        return .rejected("Race picks are not ready yet.")
+                    }
+                    return retryCurrentSelectionCommit(detail: detail)
+                },
                 onSignIn: { isShowingSignIn = true }
             )
         case .past:
@@ -540,23 +548,46 @@ struct RaceDeckView: View {
         ].compactMapValues { $0 }
         selectedDriverIDs[slot] = driver.id
         let isFinalSelection = selectedDriverIDs.count == PickSlot.allCases.count
-        let saveCompletionInterval = isFinalSelection
-            ? FXPerformance.begin(.saveCompletion)
-            : nil
-
-        let outcome = detail.selectAndCommit(
-            driver: driver,
-            for: slot,
-            token: authManager.accessToken,
-            userID: authManager.authenticatedUser?.id,
-            localPickStore: localPickStore
+        let outcome = PickCommitMeasurement.perform(
+            shouldMeasure: isFinalSelection,
+            begin: { FXPerformance.begin(.saveCompletion) },
+            end: { $0.end() },
+            operation: {
+                detail.selectAndCommit(
+                    driver: driver,
+                    for: slot,
+                    token: authManager.accessToken,
+                    userID: authManager.authenticatedUser?.id,
+                    localPickStore: localPickStore
+                )
+            }
         )
+        return finishLocalCommit(outcome, detail: detail)
+    }
 
-        guard case .committed(let ticket) = outcome else {
-            saveCompletionInterval?.abandon()
-            return outcome
-        }
-        saveCompletionInterval?.end()
+    private func retryCurrentSelectionCommit(
+        detail: RaceDetailViewModel
+    ) -> PickSelectionOutcome {
+        let outcome = PickCommitMeasurement.perform(
+            shouldMeasure: true,
+            begin: { FXPerformance.begin(.saveCompletion) },
+            end: { $0.end() },
+            operation: {
+                detail.retryCurrentSelectionCommit(
+                    token: authManager.accessToken,
+                    userID: authManager.authenticatedUser?.id,
+                    localPickStore: localPickStore
+                )
+            }
+        )
+        return finishLocalCommit(outcome, detail: detail)
+    }
+
+    private func finishLocalCommit(
+        _ outcome: PickSelectionOutcome,
+        detail: RaceDetailViewModel
+    ) -> PickSelectionOutcome {
+        guard case .committed(let ticket) = outcome else { return outcome }
         Task {
             await detail.syncCommittedPick(
                 ticket,

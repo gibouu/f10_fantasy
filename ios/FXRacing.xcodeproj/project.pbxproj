@@ -49,6 +49,7 @@
 		6D4FB8B0E17AE0B635CC694A /* FriendSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */; };
 		6F8B59597A821398F5A7C7E3 /* RaceScheduleSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8DE41DC39A2A9790AFDE69 /* RaceScheduleSheetTests.swift */; };
 		730F85A4392CF36F04644DAD /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */; };
+		75F72ED5C89C765B556F996E /* PickCommitFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */; };
 		787538A847C0C72104EA9282 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38466ACFC9DCC1DC84C22141 /* Haptics.swift */; };
 		787D8958572B1E7531E02439 /* APIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C808C928ABC015907CF35F4 /* APIClientSpy.swift */; };
 		7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */; };
@@ -206,6 +207,7 @@
 		9059D4BC746CBD1E9B5AE6F1 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		957CB0DDA5D11B3C6694D4CD /* Race.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Race.swift; sourceTree = "<group>"; };
 		96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModel.swift; sourceTree = "<group>"; };
+		975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickCommitFeedback.swift; sourceTree = "<group>"; };
 		98D2367A25C738D1170388BC /* DriverFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFixtures.swift; sourceTree = "<group>"; };
 		99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsViewModel.swift; sourceTree = "<group>"; };
 		9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
@@ -266,6 +268,7 @@
 				5CC323C1ED58017E45B580EF /* DriverFormSheet.swift */,
 				C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */,
 				68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */,
+				975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */,
 				3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */,
 				4469E358F5D2657310E7A1E9 /* RaceContextView.swift */,
 				0DDD234C2CF79BC4C0824234 /* RaceDeckView.swift */,
@@ -883,6 +886,7 @@
 				88AFED4DEE2074C378FC2DEE /* PerformanceAppDependencies.swift in Sources */,
 				C29CC74AAF88D1F8A544BD24 /* PerformanceFixtures.swift in Sources */,
 				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
+				75F72ED5C89C765B556F996E /* PickCommitFeedback.swift in Sources */,
 				AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */,
 				13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */,
 				7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */,

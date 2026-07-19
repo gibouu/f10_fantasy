@@ -51,10 +51,13 @@ test("picker consumes the atomic selection outcome and dismisses only after comm
   assert.match(source, /case \.showError\(let message\)/);
   assert.match(source, /dismiss\(\)/);
   assert.match(source, /alert\(/);
+  assert.match(source, /private let onRetryCommit:\s*\(\)\s*->\s*PickSelectionOutcome/);
+  assert.match(source, /onRetryCommit\(\)/);
 });
 
 test("race deck synchronously commits then starts revision-safe sync in a Task", () => {
   assert.match(raceDeckSource, /detail\.selectAndCommit\(/);
+  assert.match(raceDeckSource, /detail\.retryCurrentSelectionCommit\(/);
   assert.match(raceDeckSource, /case \.committed\(let ticket\)[\s\S]*Task\s*\{[\s\S]*detail\.syncCommittedPick\(/);
   assert.doesNotMatch(raceDeckSource, /onSave:/);
   assert.doesNotMatch(raceDeckSource, /onReviewDevicePicks:/);
@@ -62,9 +65,14 @@ test("race deck synchronously commits then starts revision-safe sync in a Task",
 });
 
 test("local durability is the only success announcement and haptic boundary", () => {
-  assert.equal(source.match(/Haptics\.success\(\)/g)?.length, 1);
-  assert.match(source, /Picks saved on this iPhone\./);
+  assert.match(source, /PickCommitFeedback\.publish\(for:/);
+  assert.match(pickPanelSource, /PickCommitFeedback\.publish\(for:/);
   assert.doesNotMatch(detailViewModelSource, /Haptics\.success\(\)/);
+});
+
+test("rail retry commits the failed draft instead of opening a pick role", () => {
+  assert.match(pickPanelSource, /case \.retry:[\s\S]*onRetryCommit\(\)/);
+  assert.doesNotMatch(pickPanelSource, /case \.retry:[\s\S]*onSelectSlot\(\.dnf\)/);
 });
 
 test("local-save performance starts immediately before final selection", () => {

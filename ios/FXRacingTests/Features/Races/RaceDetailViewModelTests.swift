@@ -2561,6 +2561,99 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.submissionErrorMessage)
     }
 
+    func testRetryCurrentSelectionPersistsTheExactFailedWinnerDraft() async throws {
+        let api = GatedAPIClientSpy(
+            responses: [
+                "POST /api/picks": [.failure(.serverError(503, "offline"))],
+            ]
+        )
+        let persistence = MemoryPickPersistence()
+        let store = LocalPickStore(
+            persistence: persistence,
+            clock: TestClock.fixed
+        )
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        syncManager.setUnauthorizedHandler { _ in }
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        XCTAssertEqual(
+            viewModel.selectAndCommit(
+                driver: DriverFixtures.piastri,
+                for: .p10,
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .incomplete
+        )
+        XCTAssertEqual(
+            viewModel.selectAndCommit(
+                driver: DriverFixtures.leclerc,
+                for: .dnf,
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .incomplete
+        )
+
+        persistence.rejectsWrites = true
+        guard case .rejected = viewModel.selectAndCommit(
+            driver: DriverFixtures.norris,
+            for: .winner,
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        ) else {
+            return XCTFail("Expected the winner-slot local write to fail")
+        }
+        XCTAssertTrue(viewModel.didLocalWriteFail)
+        XCTAssertEqual(viewModel.selectedWinnerID, DriverFixtures.norris.id)
+        XCTAssertEqual(viewModel.selectedP10ID, DriverFixtures.piastri.id)
+        XCTAssertEqual(viewModel.selectedDNFID, DriverFixtures.leclerc.id)
+        XCTAssertNil(store.record(for: raceID, owner: .user("user-a")))
+        let postsBeforeRetry = await api.calls(method: "POST", to: pickPath)
+        XCTAssertEqual(postsBeforeRetry, 0)
+
+        persistence.rejectsWrites = false
+        let outcome = viewModel.retryCurrentSelectionCommit(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        guard case .committed(let ticket) = outcome else {
+            return XCTFail("Expected the same complete draft to persist")
+        }
+
+        XCTAssertEqual(ticket.selection, selection)
+        XCTAssertEqual(viewModel.selectedWinnerID, DriverFixtures.norris.id)
+        XCTAssertEqual(viewModel.selectedP10ID, DriverFixtures.piastri.id)
+        XCTAssertEqual(viewModel.selectedDNFID, DriverFixtures.leclerc.id)
+        XCTAssertFalse(viewModel.didLocalWriteFail)
+        XCTAssertEqual(store.record(id: ticket.recordID)?.revision, ticket.revision)
+        XCTAssertEqual(store.record(id: ticket.recordID)?.selection, selection)
+        let postsBeforeSync = await api.calls(method: "POST", to: pickPath)
+        XCTAssertEqual(postsBeforeSync, 0)
+
+        await viewModel.syncCommittedPick(
+            ticket,
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        let postsAfterSync = await api.calls(method: "POST", to: pickPath)
+        XCTAssertEqual(postsAfterSync, 1)
+    }
+
     func testImmediateCancellationAfterCommitKeepsReadableQueuedRevision() async throws {
         let api = GatedAPIClientSpy(responses: [:])
         let viewModel = makeViewModel(api: api)

@@ -125,8 +125,9 @@ test("race detail, picker, and save intervals cover their async UI boundaries", 
   assert.match(deckSource, /\.onAppear\s*\{\s*finishPickerPresentation\(\)\s*\}/)
   assert.match(
     deckSource,
-    /let isFinalSelection[\s\S]*?FXPerformance\.begin\(\.saveCompletion\)[\s\S]*?detail\.selectAndCommit\([\s\S]*?guard case \.committed[\s\S]*?saveCompletionInterval\?\.end\(\)/,
+    /PickCommitMeasurement\.perform\([\s\S]*?FXPerformance\.begin\(\.saveCompletion\)[\s\S]*?\.end\(\)[\s\S]*?detail\.selectAndCommit\(/,
   )
+  assert.doesNotMatch(deckSource, /saveCompletion[\s\S]*?abandon\(\)/)
   assert.match(
     detailModelSource,
     /let serverAcknowledgementInterval = FXPerformance\.begin\(\.serverAcknowledgement\)[\s\S]*?await syncManager\.submitExplicit\([\s\S]*?serverAcknowledgementInterval\.end\(\)/,
