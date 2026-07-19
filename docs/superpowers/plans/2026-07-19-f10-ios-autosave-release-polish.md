@@ -119,6 +119,22 @@ assert.deepEqual(stats.get("norris"), {
       position: null,
       status: "DNF",
     },
+    {
+      driverId: "norris",
+      raceId: "canada",
+      raceName: "Canadian Grand Prix",
+      scheduledStartUtc: new Date("2026-06-14T18:00:00.000Z"),
+      position: 2,
+      status: "CLASSIFIED",
+    },
+    {
+      driverId: "norris",
+      raceId: "monaco",
+      raceName: "Monaco Grand Prix",
+      scheduledStartUtc: new Date("2026-05-24T13:00:00.000Z"),
+      position: null,
+      status: "DSQ",
+    },
   ],
 })
 ```
