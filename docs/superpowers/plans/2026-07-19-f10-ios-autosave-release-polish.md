@@ -491,8 +491,8 @@ Run the focused `RaceDetailViewModelTests`; expected failure is missing commit/s
 Extend `Pick` with optional defaulted fields:
 
 ```swift
-let updatedAt: Date?
-let lockedSubmittedBeforeQualifying: Bool?
+var updatedAt: Date? = nil
+var lockedSubmittedBeforeQualifying: Bool? = nil
 ```
 
 Preserve backwards decoding. Bonus status uses server `updatedAt < qualifyingStartUtc`; equality is false. Only `lockedSubmittedBeforeQualifying == true` says secured.
