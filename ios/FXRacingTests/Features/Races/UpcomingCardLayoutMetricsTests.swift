@@ -62,8 +62,19 @@ final class UpcomingCardLayoutMetricsTests: XCTestCase {
     func testAccessibilitySizesProvideEnoughHeightForReflowedContent() {
         XCTAssertGreaterThanOrEqual(
             UpcomingCardLayoutMetrics.cardHeight(for: .accessibility5),
-            1_060,
-            "Largest accessibility cards need enough vertical room for a single-column header, three pick rows, and status rail without clipping"
+            1_160,
+            "Largest accessibility cards need enough vertical room for a single-column header, three pick rows, status rail, and positive bottom inset without clipping"
+        )
+    }
+
+    func testAccessibilityHeightBudgetIncludesFooterReserve() {
+        let largestHeight = UpcomingCardLayoutMetrics.cardHeight(for: .accessibility5)
+        let previousHeight = UpcomingCardLayoutMetrics.cardHeight(for: .accessibility4)
+
+        XCTAssertGreaterThanOrEqual(
+            largestHeight - previousHeight,
+            100,
+            "The largest accessibility card needs a deliberate footer reserve so status rows such as Choose 3 more, Saving..., Picks saved, Saved on this iPhone, conflict, failure, and Race locked stay fully inside the card"
         )
     }
 }

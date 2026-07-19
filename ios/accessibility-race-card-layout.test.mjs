@@ -47,6 +47,19 @@ test("pick panel reflows its heading and rows for accessibility sizes", () => {
 })
 
 test("largest accessibility height budget covers the reflowed card", () => {
-  assert.match(metricsSource, /case \.accessibility5:\s*1_060/)
-  assert.match(metricsSource, /@unknown default:\s*1_060/)
+  assert.match(metricsSource, /case \.accessibility5:\s*1_160/)
+  assert.match(metricsSource, /@unknown default:\s*1_160/)
+})
+
+test("accessibility pick status rail keeps a positive bottom inset inside the card", () => {
+  assert.match(
+    pickPanelSource,
+    /accessibilityFooterBottomInset/,
+    "The pick panel should reserve explicit bottom space after every status variant at accessibility sizes",
+  )
+  assert.match(
+    pickPanelSource,
+    /RacePickStatusRail\(status:\s*pickStatus,\s*onAction:\s*handleStatusAction\)[\s\S]*?\.padding\(\.bottom,\s*accessibilityFooterBottomInset\)/,
+    "Status rail needs a bottom inset so titles such as Choose 3 more do not touch or cross the card clip",
+  )
 })

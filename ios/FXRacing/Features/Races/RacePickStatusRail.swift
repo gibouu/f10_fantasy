@@ -197,6 +197,7 @@ struct RacePickStatusRail: View {
                 .buttonStyle(.plain)
             }
         }
+        .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(status.title)

@@ -721,6 +721,10 @@ Use a dedicated accessibility header with a single-line explicit Schedule action
 
 Run the focused source-contract regression, `npm run test:ios`, generic iOS build, generic build-for-testing, XcodeGen consistency, and `git diff --check`. Attempt native UI execution when CoreSimulator is available; if unavailable, record the host infrastructure failure and rerun the buildable checks.
 
+- [x] **Step 6: Fix clipped accessibility footer**
+
+After manual screenshot evidence showed the bottom `Choose 3 more` status rail clipped by the card boundary, add a regression for largest accessibility footer reserve, increase only accessibility height floors, add an accessibility-only bottom inset after every status rail variant, and keep the rail vertically fixed-size so saved, saving, failure, conflict, locked, and recovery statuses remain inside the card. Normal Dynamic Type geometry remains unchanged.
+
 ---
 
 ### Task 7: Remove the repeated website strip and add screenshot validation

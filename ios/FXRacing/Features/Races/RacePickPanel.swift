@@ -55,11 +55,16 @@ struct RacePickPanel: View {
 
             RacePickStatusRail(status: pickStatus, onAction: handleStatusAction)
                 .padding(.top, dynamicTypeSize.isAccessibilitySize ? 8 : 12)
+                .padding(.bottom, accessibilityFooterBottomInset)
         }
     }
 
     private var pickRowSpacing: CGFloat {
         dynamicTypeSize.isAccessibilitySize ? 10 : 0
+    }
+
+    private var accessibilityFooterBottomInset: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 28 : 0
     }
 
     private var accessibilityProgress: some View {
@@ -333,8 +338,13 @@ struct RacePickPanelPlaceholder: View {
             }
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.top, 12)
+            .padding(.bottom, accessibilityFooterBottomInset)
         }
         .redacted(reason: .placeholder)
         .accessibilityLabel("Loading picks")
+    }
+
+    private var accessibilityFooterBottomInset: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 28 : 0
     }
 }

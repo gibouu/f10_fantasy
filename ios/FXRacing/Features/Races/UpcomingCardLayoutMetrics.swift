@@ -31,11 +31,11 @@ enum UpcomingCardLayoutMetrics {
         case .accessibility3:
             920
         case .accessibility4:
-            1_000
+            1_060
         case .accessibility5:
-            1_060
+            1_160
         @unknown default:
-            1_060
+            1_160
         }
     }
 }
