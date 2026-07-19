@@ -228,12 +228,19 @@ Before making changes:
 ### 12. Shared Project Memory (CRITICAL)
 Durable repo knowledge must be stored in shared files so Claude and Codex stay aligned.
 
+Before making changes in this repository:
+- read `MEMORY.md` if it exists
+- confirm the GitHub issue or PR being worked
+- verify branch, HEAD, open issues, and current blockers against GitHub
+
 Update when appropriate:
 - `ai/docs/architecture.md` -> structure and data flow
 - `ai/docs/decisions.md` -> durable technical decisions
 - `ai/docs/worklog.md` -> concise recent updates and open issues
+- `MEMORY.md` -> handoff state for active branches, release gates, open issues/PRs, verification results, deferred work, and known blockers
 
 Do NOT store temporary or speculative information as durable knowledge.
+Do NOT overwrite useful historical context with an incomplete summary. Distinguish verified facts from pending or inferred state, and keep branch, HEAD, issue, PR, test, and blocker references current after material changes.
 
 ### 13. Cross-Model Consistency
 If work appears to have been done by another model:

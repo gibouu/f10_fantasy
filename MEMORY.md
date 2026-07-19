@@ -1,107 +1,154 @@
 # FX Racing release-polish handoff memory
 
-Last updated: 2026-07-19
+> Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-## Read this first
+Last updated: 2026-07-19T18:05:59Z
 
-This file is the repo handoff for future agents or teammates continuing the FX Racing release-polish work.
+## Project purpose
 
-Before changing code, read:
+FX Racing is an F1 fantasy app. The core gameplay is intentionally simple: users pick P1, P10, and DNF before qualifying/race lock, receive bonus/scoring based on those picks, and compare rankings. The current product priority is a cleaner, faster iOS experience with Apple Sports-style race cards, reliable autosave, safe account/device pick recovery, accessible Dynamic Type layouts, and release-ready App Store/landing-page assets.
 
-1. `MEMORY.md`
-2. `.superpowers/sdd/progress.md`
-3. `.superpowers/sdd/task-6a-verification-blocker.md`
-4. `docs/superpowers/plans/2026-07-19-f10-ios-autosave-release-polish.md`
+Primary journeys:
 
-Worktree used for this branch:
+- Browse upcoming/past races and rankings.
+- Pick exactly three drivers: P1, P10, DNF.
+- Autosave picks locally first, then sync safely to the account/server.
+- Review driver season form and race-by-race results.
+- Use the static website as an App Store landing page.
 
-```text
-/Users/gibou/code/github/f10_fantasy/.worktrees/feat-367-ios-autosave-release-polish
+## Current repository state
+
+- Repository: `gibouu/f10_fantasy`
+- Default branch: `main`
+- Active branch: `feat/367-ios-autosave-release-polish`
+- Active branch HEAD at this handoff: `d2fab3ce8184ac76af163b7f1b2d7453810b1e02`
+- Remote: `https://github.com/gibouu/f10_fantasy.git`
+- Upstream: `origin/feat/367-ios-autosave-release-polish`
+- Draft PR: #373 — `Polish FX Racing iOS autosave and release handoff`
+- Onboarding issue: #374 — `Start here: FX Racing release handoff and repository state`
+- Umbrella issue: #367
+
+Important worktrees observed:
+
+- `/Users/gibou/code/github/f10_fantasy` — primary checkout, dirty and unrelated; do not touch without explicit approval.
+- `/Users/gibou/code/github/f10_fantasy/.worktrees/feat-367-ios-autosave-release-polish` — active handoff branch.
+- `/Users/gibou/code/github/f10_fantasy/.worktrees/feat-360-ios-race-deck-performance` — clean related historical worktree.
+- `/Users/gibou/code/github/f10_fantasy/.worktrees/fix-313-privacy-manifest` — dirty unrelated privacy-manifest work; do not touch without explicit approval.
+
+Existing stash observed:
+
+- `stash@{0}: WIP on feat/sprint-round-label-suffix: 850c754 ui: append 'S' to sprint round labels on web (closes #29)` — unrelated; do not apply/drop without explicit approval.
+
+Deployment/release state:
+
+- PR #373 is intentionally draft.
+- PR #373 checks observed: Web checks success, Vercel success, Vercel Preview Comments success.
+- No App Store submission has been performed.
+- No screenshots or builds have been uploaded for release.
+- No signing identities, certificates, or provisioning profiles were changed during handoff.
+
+## Architecture
+
+- Frontend/web: Next.js App Router under `src/app`.
+- Landing website: `src/app/page.tsx` and `src/app/site.module.css`.
+- Backend/API: Next.js route handlers under `src/app/api`, service code under `src/lib/services`.
+- Database: Prisma/Supabase; DB access must go through `scripts/db` per `AGENTS.md` and `docs/DATABASE_ACCESS.md`.
+- Native iOS app: SwiftUI/XCTest under `ios/FXRacing`, `ios/FXRacingTests`, and `ios/FXRacingUITests`.
+- iOS project generation: `ios/project.yml` via XcodeGen.
+- Auth/account sync: native auth/session code plus server endpoints; guest mode must remain supported.
+- Storage: local pick storage/cache in iOS, server persistence through API routes.
+- External services: GitHub, Vercel, Supabase, Apple App Store Connect/Xcode signing.
+
+Important commands:
+
+```bash
+npm run test:ios
+npm run test:services
+npm run test:routes
+npm run test:pages
+npm run test:components
+npm run test:scripts:static
+npx tsc --noEmit
+npm run lint
+npm run build
+xcodegen generate --spec ios/project.yml
+git diff --check
 ```
 
-Do not touch the dirty primary checkout:
+## Completed work
 
-```text
-/Users/gibou/code/github/f10_fantasy
-```
+Grouped milestones on `feat/367-ios-autosave-release-polish`:
 
-Current branch:
+- Task 1 — season form/history contract.
+  - Commits include `3acd2ee`, `4c13ee5`.
+  - Added cached driver form history and response bounds coverage.
+- Task 2 — native driver form sheet.
+  - Commits include `d667143`, `9a26727`.
+  - Presented cached driver race history in iOS.
+- Task 3 — local-first autosave foundation.
+  - Commits include `3653c66`, `de8d670`, `066094c`.
+  - Added atomic recovery/autosave foundations and authority defaults.
+- Task 4 — autosave status clarity.
+  - Commits include `305bfee`, `da26378`, `6495d5a`.
+  - Added complete pick revision autosave and status review fixes.
+- Task 5A/5B — legacy/device recovery and safety hardening.
+  - Commits include `ba5990c`, `905ab7d`, `3e7f1c2`, `bd323d4`, `64f4f94`, `0e1ef0a`.
+  - Recovery actions are session/authority/fingerprint guarded.
+- Task 5C — saved-pick integrity through metadata refresh.
+  - Commit `03ad7e0`.
+  - Preserves saved picks when driver metadata is temporarily unavailable.
+- Task 6 — stable card geometry and Schedule centering.
+  - Commits include `ed344cb`, `41137ca`.
+- Task 6A — accessibility layout hardening and footer clipping fix.
+  - `62d36c5c959ccdd185115fa179e6be3877bd4570` — `Harden race card accessibility layout`
+  - `41ec84043b76cea3e7b1afe7c63d3816fabf09c8` — `Fix accessibility race-card footer clipping`
+  - Automated checks are green, but simulator/manual verification remains pending.
+- Handoff preservation.
+  - `d2fab3ce8184ac76af163b7f1b2d7453810b1e02` — `Add FX Racing handoff memory`
 
-```text
-feat/367-ios-autosave-release-polish
-```
+## Decisions and rationale
 
-Task 6A implementation/fix HEAD before this handoff file:
+- Autosave remains local-first: local persistence must happen before picker dismissal or remote sync.
+- Saved picks must never disappear solely because driver metadata is temporarily unavailable.
+- Metadata refreshes must not mutate/invalidate persisted selections.
+- UI presentation and persistence stay decoupled.
+- Do not reintroduce card-level `Review device picks` without an approved spec.
+- Task 6A uses an accessibility-specific layout path instead of squeezing content into normal card height.
+- App Store/release work remains gated by native simulator/manual verification.
+- Unrelated dirty worktrees/stashes must be preserved and not cleaned/reset/stashed by future agents.
 
-```text
-41ec84043b76cea3e7b1afe7c63d3816fabf09c8
-```
+## Verification status
 
-Run `git rev-parse HEAD` for the latest handoff commit after this file is committed.
+Recorded Task 6A automated verification:
 
-## GitHub issue order
-
-Umbrella:
-
-- #367 — Polish iOS autosave, driver form, stable cards, and release assets
-
-Remaining child issues:
-
-1. #368 — Verify Task 6A accessibility race card in Simulator
-2. #369 — Complete Task 7 static landing cleanup and screenshot validator
-3. #370 — Run Task 8 full verification and visual feedback loop
-4. #372 — Prepare Task 9 release identifiers screenshots and landing assets
-5. #371 — Complete Task 10 PR merge deployment upload and App Store submission
-
-Recommended order:
-
-1. Finish #368 first if CoreSimulator is healthy.
-2. If simulator remains blocked, #369 is the only explicitly separable non-simulator preparation slice.
-3. Do #370 after #368.
-4. Do #372 after #370.
-5. Do #371 last.
-
-## Completed work on this branch
-
-- Task 1: complete — season form/history contract.
-- Task 2: complete — native driver form sheet.
-- Task 3: complete — local-first autosave.
-- Task 4: complete — pick status rail and save clarity.
-- Task 5A: complete — legacy/device recovery foundation.
-- Task 5B: complete — recovery safety hardening.
-- Task 5C: complete — saved-pick integrity through metadata refresh.
-- Task 6: complete — stable card geometry and Schedule centering.
-- Task 6A: implemented and automated-test green, but not fully verified because simulator/manual verification remains blocked.
-
-Latest Task 6A commits:
-
-```text
-62d36c5c959ccdd185115fa179e6be3877bd4570 Harden race card accessibility layout
-41ec84043b76cea3e7b1afe7c63d3816fabf09c8 Fix accessibility race-card footer clipping
-```
-
-Task 6A automated verification already recorded:
-
-```text
+```bash
 node --test ios/accessibility-race-card-layout.test.mjs  # 5/5 passed
 npm run test:ios                                        # 113/113 passed
-generic simulator build-for-testing                     # passed
+xcodebuild ... generic/platform=iOS Simulator build-for-testing  # passed when run outside restricted sandbox
 xcodegen generate --spec ios/project.yml                # no project drift
 git diff --check                                        # clean
 ```
 
-## Current blocker
+PR #373 checks observed on 2026-07-19:
 
-Task 6A is not fully verified.
+- Web checks: success.
+- Vercel: success.
+- Vercel Preview Comments: success.
+- Merge state observed: clean.
 
-Blocked checks:
+Still mandatory before claiming Task 6A fully verified:
 
-- focused Task 6A UI regression
-- broader `MainShellUITests`
-- four-state manual inspection
-- screenshots
+- focused Task 6A UI regression:
+  - `FXRacingUITests/MainShellUITests/testAccessibilitySizeRaceCardKeepsCriticalContentVisibleAndOrdered`
+- broader `MainShellUITests` slice
+- four-state manual inspection:
+  - normal Dynamic Type, dark
+  - normal Dynamic Type, light
+  - `accessibility-extra-extra-extra-large`, dark
+  - `accessibility-extra-extra-extra-large`, light
+- screenshots for all four states
 
-Known CoreSimulator/simdiskimaged errors:
+Known blocker evidence:
 
 ```text
 CoreSimulatorService connection became invalid
@@ -116,44 +163,88 @@ Known simulator device:
 9184C625-91BA-4DB0-B467-3D364F2554B5
 ```
 
-Do not mark Task 6A fully verified until #368 is complete.
+## Known issues and unfinished work
 
-## Task 7 / release gate
+- #374 — onboarding and continuation guide.
+  - Status: open.
+  - Purpose: first issue future agents should read.
+- #368 — Task 6A simulator verification.
+  - Status: open, release gate.
+  - Matters because accessibility layout cannot be called fully verified until native UI/manual checks pass.
+- #369 — Task 7 static landing cleanup and screenshot validator.
+  - Status: open.
+  - This is the only explicitly separable non-simulator slice if #368 remains blocked.
+- #370 — Task 8 full verification and visual feedback loop.
+  - Status: open, depends on #368.
+- #372 — Task 9 release identifiers, screenshots, and landing assets.
+  - Status: open, depends on #368/#370 and owner/App Store access.
+- #371 — Task 10 PR merge, deployment, upload, and App Store submission.
+  - Status: open, final release step; do last.
+- #365 — align iOS DNF tutorial copy with scoring behavior.
+  - Status: pre-existing open issue, not part of this handoff branch unless explicitly scoped.
+- #362 — optimistic concurrency for cross-device pick edits.
+  - Status: pre-existing open issue, separate from current branch.
+- #361 — public race API / production TTFB optimization.
+  - Status: pre-existing open issue, separate from current branch.
 
-Task 7 as a whole remains gated by Task 6A simulator verification.
+## Operational knowledge
 
-The only approved independent slice is #369:
+Required services/tools:
 
-- landing-page strip removal
-- static landing tests
-- App Store screenshot validator script/tests
-- ignored `.artifacts/app-store/` staging path
+- Node/npm.
+- Xcode 26.6 observed during this work.
+- XcodeGen.
+- GitHub CLI.
+- Vercel.
+- Supabase through `scripts/db` only.
+- Apple App Store Connect/Xcode signing only with owner credentials and explicit approval.
 
-Do not treat this as release approval.
+Environment variables and secrets:
 
-## Do not do until explicitly authorized
+- Do not print or commit secret values.
+- DB credentials live outside the repo per `AGENTS.md`.
+- Apple credentials/2FA must be entered by the owner only.
 
+Safe recovery guidance:
+
+- Prefer read-only process and repository inspection first.
+- Do not delete simulator devices/runtimes/caches without explicit approval.
+- Do not force-push, reset, clean, or apply/drop stashes without explicit approval.
+
+## External dependencies and blockers
+
+- CoreSimulator/simdiskimaged health is required for #368 and later native visual/performance verification.
+- App Store Connect access, legal agreements, content rights, screenshots, and owner approval are required before release/upload/submission.
+- Vercel/GitHub CI must pass before PR merge.
+- Supabase/database access must use the documented CLI entrypoint only.
+
+## Recommended continuation order
+
+1. Read #374, this file, `AGENTS.md`, the implementation plan, SDD progress, and #368–#372.
+2. Confirm branch/HEAD and PR #373 checks.
+3. Complete #368 if CoreSimulator is usable.
+4. If simulator remains blocked and owner approves non-simulator work, complete #369 only.
+5. Complete #370 after #368.
+6. Complete #372 after #370 and owner/App Store/screenshot prerequisites.
+7. Complete #371 last.
+8. Keep PR #373 draft until required verification and CI pass.
+9. Update this file and related GitHub issues after every material state change.
+
+## Explicit prohibitions until separately authorized
+
+- Do not merge PR #373.
+- Do not mark PR #373 ready for review.
 - Do not submit to App Store.
-- Do not upload builds or screenshots.
+- Do not upload screenshots or builds.
 - Do not change signing identities, certificates, or provisioning profiles.
 - Do not accept Apple legal agreements for the owner.
-- Do not expose Apple credentials, secrets, or 2FA.
-- Do not delete simulator devices/runtimes/caches unless separately approved.
-- Do not touch the primary checkout.
+- Do not expose credentials, secrets, tokens, or 2FA.
+- Do not touch the unrelated dirty primary checkout or privacy-manifest worktree.
+- Do not apply/drop the unrelated stash.
 
-## Merge / PR guidance
+## Last updated
 
-This branch is feature work for #367 and is ahead of `origin/main`.
-
-If handing off to another teammate:
-
-1. Push the branch.
-2. Open or update a draft PR against `main`.
-3. Keep the PR blocked on #368 unless the owner explicitly accepts merging without final simulator verification.
-4. Reference this file in the PR body.
-
-Every commit and PR body must end with:
-
-```text
-— gib
-```
+- UTC timestamp: 2026-07-19T18:05:59Z
+- Branch: `feat/367-ios-autosave-release-polish`
+- Commit SHA at update start: `d2fab3ce8184ac76af163b7f1b2d7453810b1e02`
+- Authoring environment: Codex desktop session
