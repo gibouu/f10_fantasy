@@ -681,6 +681,48 @@ git commit -m $'Stabilize race cards and Schedule sheet\n\n— gib'
 
 ---
 
+### Task 6A: Accessibility layout hardening
+
+**Status:** Complete in this branch after the Task 6A closeout commit.
+
+**Task 6 baseline:** `41137caec21426f1b59192fdcf162bdb0cdc28d8`
+
+Fix the release-audit Dynamic Type blocker while preserving Task 6 normal-size geometry and Task 5C persistence invariants. At accessibility content sizes, the upcoming/live race card must reflow vertically, keep all critical content visible and reachable, keep Schedule readable as one explicit action, and avoid overlapping picks, status, lock, or recovery content. Normal Dynamic Type card floors and pager behavior remain unchanged.
+
+**Files:**
+- Modify: `ios/FXRacing/Features/Races/UpcomingCardLayoutMetrics.swift`
+- Modify: `ios/FXRacing/Features/Races/UpcomingRaceCard.swift`
+- Modify: `ios/FXRacing/Features/Races/RacePickPanel.swift`
+- Modify: `ios/FXRacing/Features/Races/RacePickStatusRail.swift`
+- Modify: `ios/FXRacingTests/Features/Races/UpcomingCardLayoutMetricsTests.swift`
+- Modify: `ios/FXRacingUITests/Home/MainShellUITests.swift`
+- Create: `ios/accessibility-race-card-layout.test.mjs`
+- Modify: `ios/image-design-system.test.mjs`
+- Modify: `ios/leaderboard-guest-access.test.mjs`
+- Modify: `package.json`
+
+- [x] **Step 1: Add failing accessibility regressions**
+
+Add source-contract and native UI/unit coverage proving that, at `accessibility-extra-extra-extra-large`, Schedule stays one readable action, race identity and pick rows do not overlap, status content remains below picks, bottom content is reachable, and normal-size card geometry remains at the Task 6 floor.
+
+- [x] **Step 2: Verify RED**
+
+Run the new source-contract regression and confirm it fails against the fixed-height normal layout because the accessibility layout path, Schedule reflow, pick-panel reflow, and larger height budget do not exist.
+
+- [x] **Step 3: Add accessibility-only layout path**
+
+Allow accessibility card content to grow beyond the normal fixed card height while retaining the deterministic Task 6 fixed maximum height for normal Dynamic Type sizes.
+
+- [x] **Step 4: Reflow Schedule, race identity, picks, and status**
+
+Use a dedicated accessibility header with a single-line explicit Schedule action, expanded race title/circuit line budgets, vertical pick-row layout, and multiline status rail text. Preserve pick persistence, autosave, recovery safety, race locking, and pager selection semantics.
+
+- [x] **Step 5: Verify and commit**
+
+Run the focused source-contract regression, `npm run test:ios`, generic iOS build, generic build-for-testing, XcodeGen consistency, and `git diff --check`. Attempt native UI execution when CoreSimulator is available; if unavailable, record the host infrastructure failure and rerun the buildable checks.
+
+---
+
 ### Task 7: Remove the repeated website strip and add screenshot validation
 
 **Files:**

@@ -179,6 +179,8 @@ enum RacePickStatusResolver {
 }
 
 struct RacePickStatusRail: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let status: RacePickStatus
     let onAction: (RacePickStatusAction) -> Void
 
@@ -203,26 +205,29 @@ struct RacePickStatusRail: View {
     }
 
     private var content: some View {
-        HStack(alignment: .center, spacing: 9) {
+        HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: 9) {
             if status.showsProgress {
                 ProgressView()
                     .controlSize(.small)
+                    .padding(.top, dynamicTypeSize.isAccessibilitySize ? 2 : 0)
             } else if let systemImage = status.systemImage {
                 Image(systemName: systemImage)
                     .font(.caption.weight(.bold))
+                    .padding(.top, dynamicTypeSize.isAccessibilitySize ? 4 : 0)
             } else {
                 Image(systemName: "circle")
                     .font(.system(size: 7, weight: .bold))
+                    .padding(.top, dynamicTypeSize.isAccessibilitySize ? 8 : 0)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
                     .font(.caption.weight(.semibold))
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                 Text(status.detail ?? " ")
                     .font(.caption2)
                     .foregroundStyle(status.action == .none ? .secondary : FXTheme.Colors.accent)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
             }
 
             Spacer(minLength: 0)

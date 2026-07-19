@@ -115,7 +115,14 @@ test("upcoming card geometry uses deterministic metrics instead of content-drive
     upcomingCardSource,
     /UpcomingCardLayoutMetrics\.cardHeight\(\s*for:\s*dynamicTypeSize/,
   )
-  assert.match(upcomingCardSource, /\.frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*cardHeight,\s*maxHeight:\s*cardHeight/)
+  assert.match(
+    upcomingCardSource,
+    /\.frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*cardHeight,\s*alignment:\s*\.topLeading\)/,
+  )
+  assert.match(
+    upcomingCardSource,
+    /maxHeight:\s*dynamicTypeSize\.isAccessibilitySize \? nil : cardHeight/,
+  )
   assert.doesNotMatch(upcomingCardSource, /\.frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*412/)
 })
 

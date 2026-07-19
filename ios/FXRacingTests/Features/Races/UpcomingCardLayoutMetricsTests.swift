@@ -50,4 +50,20 @@ final class UpcomingCardLayoutMetricsTests: XCTestCase {
             )
         }
     }
+
+    func testNormalSizeCardGeometryRemainsTask6Stable() {
+        XCTAssertEqual(
+            UpcomingCardLayoutMetrics.cardHeight(for: .large),
+            412,
+            accuracy: 0.001
+        )
+    }
+
+    func testAccessibilitySizesProvideEnoughHeightForReflowedContent() {
+        XCTAssertGreaterThanOrEqual(
+            UpcomingCardLayoutMetrics.cardHeight(for: .accessibility5),
+            1_060,
+            "Largest accessibility cards need enough vertical room for a single-column header, three pick rows, and status rail without clipping"
+        )
+    }
 }

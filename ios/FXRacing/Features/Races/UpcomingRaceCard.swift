@@ -46,7 +46,11 @@ struct UpcomingRaceCard: View {
             }
         }
         .padding(18)
-        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: cardHeight, alignment: .topLeading)
+        .frame(
+            maxHeight: dynamicTypeSize.isAccessibilitySize ? nil : cardHeight,
+            alignment: .topLeading
+        )
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
         .overlay {
@@ -69,70 +73,121 @@ struct UpcomingRaceCard: View {
         }
     }
 
+    @ViewBuilder
     private func header(now: Date) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            accessibilityHeader(now: now)
+        } else {
+            normalHeader(now: now)
+        }
+    }
+
+    private func normalHeader(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
-                Text(race.roundLabel)
-                    .font(.system(size: 11, weight: .black, design: .monospaced))
-                    .foregroundStyle(.secondary)
-
-                if race.status == .live {
-                    Text("LIVE")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(FXTheme.Colors.accent, in: Capsule())
-                        .foregroundStyle(.white)
-                } else if race.isSprint {
-                    Text("SPRINT")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(FXTheme.Colors.gold.opacity(0.18), in: Capsule())
-                        .foregroundStyle(FXTheme.Colors.gold)
-                }
-
+                raceStateLine
                 Spacer()
-
-                Button(action: onSchedule) {
-                    Label("Schedule", systemImage: "calendar")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 11)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .background(.thinMaterial, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("schedule-\(race.id)")
+                scheduleButton
             }
 
-            HStack(alignment: .top, spacing: 12) {
-                Text(race.flagEmoji)
-                    .font(.system(size: 32))
+            raceIdentity(now: now, isAccessibilityLayout: false)
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(race.name)
-                        .font(.title3.weight(.bold))
-                        .tracking(-0.3)
-                        .lineLimit(2)
-                    Text(race.circuitName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                    Text(countdownLine(now: now))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(
-                            race.status == .live
-                                ? FXTheme.Colors.accent
-                                : Color.primary
-                        )
-                        .contentTransition(.numericText())
-                    Text(dateLine)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
+    private func accessibilityHeader(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            raceStateLine
+            accessibilityScheduleButton
+            raceIdentity(now: now, isAccessibilityLayout: true)
+        }
+    }
 
-                Spacer(minLength: 0)
+    private var raceStateLine: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(race.roundLabel)
+                .font(.system(size: 11, weight: .black, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            if race.status == .live {
+                Text("LIVE")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(FXTheme.Colors.accent, in: Capsule())
+                    .foregroundStyle(.white)
+            } else if race.isSprint {
+                Text("SPRINT")
+                    .font(.system(size: 9, weight: .black, design: .monospaced))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(FXTheme.Colors.gold.opacity(0.18), in: Capsule())
+                    .foregroundStyle(FXTheme.Colors.gold)
             }
+        }
+    }
+
+    private var scheduleButton: some View {
+        Button(action: onSchedule) {
+            Label("Schedule", systemImage: "calendar")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 11)
+                .frame(minWidth: 44, minHeight: 44)
+                .background(.thinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Schedule")
+        .accessibilityIdentifier("schedule-\(race.id)")
+    }
+
+    private var accessibilityScheduleButton: some View {
+        Button(action: onSchedule) {
+            Label("Schedule", systemImage: "calendar")
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(1)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .background(.thinMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Schedule")
+        .accessibilityIdentifier("schedule-\(race.id)")
+    }
+
+    private func raceIdentity(
+        now: Date,
+        isAccessibilityLayout: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(race.flagEmoji)
+                .font(.system(size: isAccessibilityLayout ? 28 : 32))
+
+            VStack(alignment: .leading, spacing: isAccessibilityLayout ? 8 : 3) {
+                Text(race.name)
+                    .font(.title3.weight(.bold))
+                    .tracking(-0.3)
+                    .lineLimit(isAccessibilityLayout ? 3 : 2)
+                Text(race.circuitName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(isAccessibilityLayout ? 3 : 2)
+                Text(countdownLine(now: now))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(
+                        race.status == .live
+                            ? FXTheme.Colors.accent
+                            : Color.primary
+                    )
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(1)
+                Text(dateLine)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(isAccessibilityLayout ? 2 : 1)
+            }
+
+            Spacer(minLength: 0)
         }
     }
 

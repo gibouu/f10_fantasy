@@ -71,6 +71,48 @@ final class MainShellUITests: XCTestCase {
     }
 
     @MainActor
+    func testAccessibilitySizeRaceCardKeepsCriticalContentVisibleAndOrdered() {
+        let app = launch(
+            .gameplay,
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXXL",
+            ]
+        )
+
+        let card = element(in: app, identifier: "race-card-spa")
+        XCTAssertTrue(card.waitForExistence(timeout: 2))
+
+        let schedule = app.buttons["schedule-spa"]
+        let title = app.staticTexts["Belgian Grand Prix"]
+        let circuit = app.staticTexts["Circuit de Spa-Francorchamps"]
+        let heading = app.staticTexts["Your picks"]
+        let winner = app.buttons["pick-slot-spa-winner"]
+        let p10 = app.buttons["pick-slot-spa-p10"]
+        let dnf = app.buttons["pick-slot-spa-dnf"]
+        let status = app.staticTexts["Choose 3 more"]
+
+        for element in [schedule, title, circuit, heading, winner, p10, dnf, status] {
+            XCTAssertTrue(element.waitForExistence(timeout: 2), "\(element) should exist")
+            XCTAssertFalse(element.frame.isEmpty, "\(element) should have a visible frame")
+            XCTAssertTrue(
+                card.frame.insetBy(dx: -1, dy: -1).contains(element.frame),
+                "\(element) should be fully visible inside the race card"
+            )
+        }
+
+        XCTAssertEqual(schedule.label, "Schedule")
+        XCTAssertFalse(schedule.label.contains("\n"))
+
+        assertFrame(title.frame, isBefore: circuit.frame, "Race title should be above circuit")
+        assertFrame(circuit.frame, isBefore: heading.frame, "Circuit should be above picks")
+        assertFrame(heading.frame, isBefore: winner.frame, "Picks heading should be above winner row")
+        assertFrame(winner.frame, isBefore: p10.frame, "Winner row should be above P10 row")
+        assertFrame(p10.frame, isBefore: dnf.frame, "P10 row should be above DNF row")
+        assertFrame(dnf.frame, isBefore: status.frame, "DNF row should be above save status")
+    }
+
+    @MainActor
     func testEmptyDraftProgressesP1P10DNFAndSaves() {
         let app = launch(.gameplay)
 
@@ -259,5 +301,27 @@ final class MainShellUITests: XCTestCase {
         for _ in 0..<12 where !element.isHittable {
             app.swipeUp()
         }
+    }
+
+    private func assertFrame(
+        _ upper: CGRect,
+        isBefore lower: CGRect,
+        _ message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertLessThanOrEqual(
+            upper.maxY,
+            lower.minY,
+            message,
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            upper.intersects(lower),
+            message,
+            file: file,
+            line: line
+        )
     }
 }

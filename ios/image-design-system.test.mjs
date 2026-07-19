@@ -143,6 +143,8 @@ test("race results expose picks without relying on color and allow names to grow
 
   assert.doesNotMatch(results, /lineLimit\(1\)/);
   assert.doesNotMatch(qualifying, /lineLimit\(1\)/);
-  assert.doesNotMatch(upcoming, /lineLimit\(1\)/);
+  assert.match(upcoming, /Text\(race\.name\)[\s\S]*?\.lineLimit\(isAccessibilityLayout \? 3 : 2\)/);
+  assert.match(upcoming, /Text\(race\.circuitName\)[\s\S]*?\.lineLimit\(isAccessibilityLayout \? 3 : 2\)/);
+  assert.match(upcoming, /accessibilityScheduleButton[\s\S]*?\.lineLimit\(1\)/);
   assert.doesNotMatch(past, /lineLimit\(1\)/);
 });
