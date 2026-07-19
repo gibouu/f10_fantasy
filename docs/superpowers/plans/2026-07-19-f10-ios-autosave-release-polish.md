@@ -547,11 +547,14 @@ git commit -m $'Autosave complete pick revisions\n\n— gib'
 **Files:**
 - Create: `ios/FXRacing/Features/Races/RacePickStatusRail.swift`
 - Create: `ios/FXRacing/Features/Races/LegacyPickRecoverySheet.swift`
+- Create: `ios/FXRacing/Features/Races/LegacyRecoveryPresentationSession.swift`
+- Modify: `ios/FXRacing/Features/Home/MainShellView.swift`
 - Modify: `ios/FXRacing/Features/Races/RacePickPanel.swift`
 - Modify: `ios/FXRacing/Features/Races/DriverPickerSheet.swift`
 - Modify: `ios/FXRacing/Features/Races/RaceDeckView.swift`
 - Modify: `ios/FXRacing/Features/Races/UpcomingRaceCard.swift`
 - Create: `ios/FXRacingTests/Features/Races/RacePickStatusResolverTests.swift`
+- Create: `ios/FXRacingTests/Features/Races/LegacyRecoveryPresentationSessionTests.swift`
 - Modify: `ios/FXRacingTests/Features/Races/DriverPickerStateTests.swift`
 - Modify: `ios/FXRacingUITests/Home/MainShellUITests.swift`
 - Modify: `ios/FXRacingUITests/FXRacingPerformanceTests.swift`
@@ -561,6 +564,7 @@ git commit -m $'Autosave complete pick revisions\n\n— gib'
 **Interfaces:**
 - Consumes: Task 3 legacy transaction and Task 4 commit ticket.
 - Produces: fixed `RacePickStatusRail` and plain-language recovery matrix.
+- Produces: one app-session presentation registry keyed by `raceID + privateScopeID`, owned above section switching.
 
 - [ ] **Step 1: Write failing status resolver and UI-contract tests**
 
