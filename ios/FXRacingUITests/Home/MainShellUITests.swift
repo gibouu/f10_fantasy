@@ -83,27 +83,18 @@ final class MainShellUITests: XCTestCase {
         XCTAssertTrue(waitUntilHittable(p10Slot))
         p10Slot.tap()
 
-        let leclerc = app.buttons["driver-leclerc"]
-        revealHittable(leclerc, in: app)
-        XCTAssertTrue(leclerc.isHittable)
-        leclerc.tap()
+        firstAvailableDriver(in: app).tap()
         XCTAssertTrue(app.navigationBars["Pick P10"].waitForExistence(timeout: 2))
-        let hamilton = app.buttons["driver-hamilton"]
-        revealHittable(hamilton, in: app)
-        XCTAssertTrue(hamilton.isHittable)
-        hamilton.tap()
+        firstAvailableDriver(in: app).tap()
         XCTAssertTrue(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
-        let norris = app.buttons["driver-norris"]
-        revealHittable(norris, in: app)
-        XCTAssertTrue(norris.isHittable)
-        norris.tap()
-        app.buttons["Done"].tap()
+        firstAvailableDriver(in: app).tap()
 
-        let save = app.buttons["save-picks-spa"]
-        XCTAssertTrue(save.waitForExistence(timeout: 1))
-        XCTAssertTrue(save.isEnabled)
-        save.tap()
-        XCTAssertTrue(app.buttons["Picks saved"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 2)
+                || app.staticTexts["Saved to account"].exists
+        )
+        XCTAssertFalse(app.buttons["save-picks-spa"].exists)
     }
 
     @MainActor
@@ -221,6 +212,20 @@ final class MainShellUITests: XCTestCase {
             object: element
         )
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func firstAvailableDriver(in app: XCUIApplication) -> XCUIElement {
+        let driver = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH 'driver-' AND enabled == true"
+            )
+        ).allElementsBoundByIndex.first(where: \.isHittable)
+            ?? app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH 'driver-' AND enabled == true")
+            ).firstMatch
+        XCTAssertTrue(driver.waitForExistence(timeout: 2))
+        return driver
     }
 
     @MainActor

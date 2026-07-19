@@ -4,10 +4,8 @@ struct RacePickPanel: View {
     @Bindable var viewModel: RaceDetailViewModel
     let now: Date
     let onSelectSlot: (PickSlot) -> Void
-    let onSave: () -> Void
     let onSignIn: () -> Void
     let isAuthenticated: Bool
-    let onReviewDevicePicks: () -> Void
 
     private var isLocked: Bool {
         now >= viewModel.race.lockCutoffUtc || viewModel.serverPick?.lockedAt != nil
@@ -41,72 +39,45 @@ struct RacePickPanel: View {
             Divider().padding(.leading, 52)
             pickRow(.dnf, driver: viewModel.selectedDNF)
 
-            statusLine
+            RacePickStatusRail(status: pickStatus, onAction: handleStatusAction)
                 .padding(.top, 12)
+        }
+    }
 
-            if let message = viewModel.errorMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(FXTheme.Colors.danger)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-            }
+    private var pickStatus: RacePickStatus {
+        let lookupIssue: RacePickSyncIssue? = switch viewModel.privatePickAuthority {
+        case .unauthorized: .unauthorized
+        case .unavailable: .offline
+        case .notRequired, .checking, .missing, .found: nil
+        }
+        return RacePickStatusResolver.resolve(
+            RacePickStatusContext(
+                selectionCount: selectionCount,
+                submissionState: viewModel.submissionState,
+                isAuthenticated: isAuthenticated,
+                syncIssue: viewModel.syncIssue ?? lookupIssue,
+                didLocalWriteFail: viewModel.didLocalWriteFail,
+                isLocked: isLocked,
+                localRevision: viewModel.currentLocalPickRevision,
+                acknowledgedRevision: viewModel.acknowledgedLocalPickRevision,
+                currentRevisionRejected: viewModel.currentRevisionRejected,
+                bonusAuthority: viewModel.pickBonusAuthority,
+                qualifyingStartUtc: viewModel.race.qualifyingStartUtc,
+                now: now
+            )
+        )
+    }
 
-            if viewModel.hasRecoverableDevicePick {
-                Button(action: onReviewDevicePicks) {
-                    Label("Review device picks", systemImage: "arrow.uturn.down.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 46)
-                }
-                .buttonStyle(.plain)
-                .fxGlassControl(radius: FXTheme.Radius.md)
-                .accessibilityIdentifier("review-device-picks-\(viewModel.race.id)")
-                .padding(.top, 12)
-            }
-
-            if !isLocked {
-                Button(action: onSave) {
-                    Group {
-                        if viewModel.isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                        } else if viewModel.submitSuccess {
-                            Label("Picks saved", systemImage: "checkmark")
-                        } else if viewModel.submissionState == .reviewRequired {
-                            Text("Save reviewed picks")
-                        } else if viewModel.submissionState == .missingFromAccount {
-                            Text("Repair account pick")
-                        } else {
-                            Text(selectionCount == 3 ? "Save picks" : "Choose \(3 - selectionCount) more")
-                        }
-                    }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
-                }
-                .buttonStyle(.plain)
-                .fxGlassControl(
-                    radius: FXTheme.Radius.md,
-                    emphasis: viewModel.canSave ? .prominent : .regular
-                )
-                .foregroundStyle(viewModel.canSave ? .white : .secondary)
-                .disabled(!viewModel.canSave || viewModel.isSubmitting)
-                .accessibilityIdentifier("save-picks-\(viewModel.race.id)")
-                .padding(.top, 12)
-            }
-
-            if viewModel.isLocalOnly && !isAuthenticated {
-                Button(action: onSignIn) {
-                    Label("Sign in to sync these picks", systemImage: "icloud.and.arrow.up")
-                        .font(.caption.weight(.semibold))
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(FXTheme.Colors.accent)
-                .padding(.top, 10)
-            }
+    private func handleStatusAction(_ action: RacePickStatusAction) {
+        switch action {
+        case .none:
+            break
+        case .retry:
+            onSelectSlot(.dnf)
+        case .signIn:
+            onSignIn()
+        case .resolveConflict:
+            onSelectSlot(.winner)
         }
     }
 
@@ -214,24 +185,6 @@ struct RacePickPanel: View {
         return "Opens the driver picker"
     }
 
-    @ViewBuilder
-    private var statusLine: some View {
-        if isLocked {
-            Label("Picks locked", systemImage: "lock.fill")
-                .foregroundStyle(.secondary)
-        } else if let qualifying = viewModel.race.qualifyingStartUtc,
-                  now < qualifying {
-            Label("Save before qualifying for 2× points", systemImage: "bolt.fill")
-                .foregroundStyle(FXTheme.Colors.accent)
-        } else {
-            Label(
-                "Locks \(viewModel.race.lockCutoffUtc.formatted(date: .omitted, time: .shortened))",
-                systemImage: "clock"
-            )
-            .foregroundStyle(.secondary)
-        }
-    }
-
     private func slotDescription(_ slot: PickSlot) -> String {
         switch slot {
         case .winner: "Race winner"
@@ -276,6 +229,17 @@ struct RacePickPanelPlaceholder: View {
 
                 if index < 2 { Divider().padding(.leading, 52) }
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: 118, height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: 184, height: 8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.top, 12)
         }
         .redacted(reason: .placeholder)
         .accessibilityLabel("Loading picks")

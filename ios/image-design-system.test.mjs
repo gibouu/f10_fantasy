@@ -63,10 +63,13 @@ test("the compact profile control consumes the glass boundary", async () => {
   assert.doesNotMatch(shell, /profileButtonLabel[\s\S]*\.background\(\.thinMaterial,\s*in:\s*Circle\(\)\)/);
 });
 
-test("the primary save action uses prominent glass with a usable guest action", async () => {
+test("the fixed status rail replaces normal save and review controls", async () => {
   const picks = await source("Features/Races/RacePickPanel.swift");
-  assert.match(picks, /\.fxGlassControl\([\s\S]*emphasis:\s*viewModel\.canSave\s*\?\s*\.prominent/);
-  assert.match(picks, /Label\("Sign in to sync these picks"[\s\S]*\.frame\(minHeight:\s*44\)/);
+  const rail = await source("Features/Races/RacePickStatusRail.swift");
+  assert.match(picks, /RacePickStatusRail\(/);
+  assert.doesNotMatch(picks, /Review device picks|Save picks|save-picks-/);
+  assert.match(rail, /\.frame\([^)]*minHeight:\s*44/);
+  assert.match(rail, /\.accessibilityValue\(/);
 });
 
 test("pager adjustment respects Reduce Motion", async () => {

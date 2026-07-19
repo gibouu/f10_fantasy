@@ -2373,6 +2373,28 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertTrue(requests.isEmpty)
     }
 
+    func testHydratedGuestDraftDoesNotMasqueradeAsAnOfflineAccountSync() async {
+        let store = makeStore()
+        guard case .saved = store.save(
+            selection: selection,
+            race: RaceFixtures.upcoming,
+            owner: .guest,
+            now: RaceFixtures.now
+        ) else {
+            return XCTFail("Expected a queued guest draft")
+        }
+        let viewModel = makeViewModel(api: GatedAPIClientSpy(responses: [:]))
+
+        await viewModel.loadIfNeeded(
+            token: nil,
+            userID: nil,
+            localPickStore: store
+        )
+
+        XCTAssertEqual(viewModel.submissionState, .savedOnDevice)
+        XCTAssertNil(viewModel.syncIssue)
+    }
+
     func testSelectAndCommitKeepsIncompleteSelectionOutOfPersistence() async {
         let api = GatedAPIClientSpy(responses: [:])
         let viewModel = makeViewModel(api: api)

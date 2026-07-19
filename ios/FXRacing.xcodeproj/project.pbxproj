@@ -13,6 +13,7 @@
 		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
 		06DA7DE5EBDACF2F364058A5 /* PastRaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */; };
 		09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */; };
+		107B193C54672BDF07C00458 /* RacePickStatusRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */; };
 		12092150C4EDD14BEDDD0CE7 /* RaceScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F7BFA78AE9988B7DE59FB7 /* RaceScheduleSheet.swift */; };
 		13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB930FED2C9918990560892D /* ProfileView.swift */; };
 		151AA313C6ACC9BECA05F016 /* RaceScheduleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B947A443645D3B868599D46A /* RaceScheduleRow.swift */; };
@@ -102,6 +103,7 @@
 		D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */; };
 		D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B893A7A9D248C607360F4 /* AuthManagerTests.swift */; };
 		D905E3A317D0C48464E8BDFB /* RaceResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3998F13F6F6EFF48C8D38A /* RaceResultsView.swift */; };
+		D944476C73629A7297A2563F /* RacePickStatusResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */; };
 		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
 		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
 		DE42D8F82A03C9251264FEDD /* race-detail-22x24.json in Resources */ = {isa = PBXBuildFile; fileRef = 8DA9EA75E2BB093C7FE2818F /* race-detail-22x24.json */; };
@@ -227,6 +229,7 @@
 		B89D6F2921C74496E154358E /* FriendProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfile.swift; sourceTree = "<group>"; };
 		B93F2A851054E21570EFBF91 /* RaceSnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceSnapshotCacheTests.swift; sourceTree = "<group>"; };
 		B947A443645D3B868599D46A /* RaceScheduleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceScheduleRow.swift; sourceTree = "<group>"; };
+		BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusRail.swift; sourceTree = "<group>"; };
 		BB14888FFB5F6A3AEEB8C6B4 /* SignInViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInViewModel.swift; sourceTree = "<group>"; };
 		BD00667AD2257E9B85982312 /* RacePickPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickPanel.swift; sourceTree = "<group>"; };
 		C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickStore.swift; sourceTree = "<group>"; };
@@ -240,6 +243,7 @@
 		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusResolverTests.swift; sourceTree = "<group>"; };
 		E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickRecord.swift; sourceTree = "<group>"; };
 		E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDeckViewModelTests.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -269,6 +273,7 @@
 				96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */,
 				825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */,
 				BD00667AD2257E9B85982312 /* RacePickPanel.swift */,
+				BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */,
 				7B3998F13F6F6EFF48C8D38A /* RaceResultsView.swift */,
 				B947A443645D3B868599D46A /* RaceScheduleRow.swift */,
 				73F7BFA78AE9988B7DE59FB7 /* RaceScheduleSheet.swift */,
@@ -321,6 +326,7 @@
 				FE31EF43B1EF82B0DF50150E /* RaceContextResolverTests.swift */,
 				E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */,
 				FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */,
+				DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */,
 				0B8DE41DC39A2A9790AFDE69 /* RaceScheduleSheetTests.swift */,
 			);
 			path = Races;
@@ -802,6 +808,7 @@
 				7D51D8FC98611EA655B899C3 /* RaceDeckViewModelTests.swift in Sources */,
 				9CA847720054D425717BB2EC /* RaceDetailViewModelTests.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
+				D944476C73629A7297A2563F /* RacePickStatusResolverTests.swift in Sources */,
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
 				ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */,
 				454107C25E1738896541119C /* RaceRepositoryStub.swift in Sources */,
@@ -886,6 +893,7 @@
 				C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */,
 				D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */,
 				461780E5853E170778E57147 /* RacePickPanel.swift in Sources */,
+				107B193C54672BDF07C00458 /* RacePickStatusRail.swift in Sources */,
 				03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */,
 				D905E3A317D0C48464E8BDFB /* RaceResultsView.swift in Sources */,
 				151AA313C6ACC9BECA05F016 /* RaceScheduleRow.swift in Sources */,

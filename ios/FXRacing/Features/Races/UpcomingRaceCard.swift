@@ -7,9 +7,7 @@ struct UpcomingRaceCard: View {
     let isAuthenticated: Bool
     let onSchedule: () -> Void
     let onSelectSlot: (PickSlot) -> Void
-    let onSave: () -> Void
     let onSignIn: () -> Void
-    let onReviewDevicePicks: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -28,10 +26,8 @@ struct UpcomingRaceCard: View {
                     viewModel: detail,
                     now: now,
                     onSelectSlot: onSelectSlot,
-                    onSave: onSave,
                     onSignIn: onSignIn,
-                    isAuthenticated: isAuthenticated,
-                    onReviewDevicePicks: onReviewDevicePicks
+                    isAuthenticated: isAuthenticated
                 )
             } else {
                 RacePickPanelPlaceholder()

@@ -39,26 +39,76 @@ final class DriverPickerStateTests: XCTestCase {
         XCTAssertTrue(state.isPresented)
     }
 
-    func testSelectingAllThreeDriversKeepsSheetPresented() {
+    func testIncompleteOutcomeAdvancesAndKeepsSheetPresented() {
         var state = DriverPickerState(
             activeSlot: .winner,
             selectedDriverIDs: [:],
             isLocked: false
         )
 
-        XCTAssertTrue(state.select(DriverFixtures.norris))
-        XCTAssertTrue(state.select(DriverFixtures.piastri))
-        XCTAssertTrue(state.select(DriverFixtures.leclerc))
+        var updatedState = state
+        XCTAssertTrue(updatedState.select(DriverFixtures.norris))
+        XCTAssertEqual(
+            state.apply(updatedState, outcome: .incomplete),
+            .advance
+        )
 
         XCTAssertEqual(
             state.selectedDriverIDs,
-            [
+            [.winner: DriverFixtures.norris.id]
+        )
+        XCTAssertEqual(state.activeSlot, .p10)
+        XCTAssertTrue(state.isPresented)
+    }
+
+    func testCommittedOutcomePublishesSelectionAndDismisses() {
+        var state = DriverPickerState(
+            activeSlot: .dnf,
+            selectedDriverIDs: [
                 .winner: DriverFixtures.norris.id,
                 .p10: DriverFixtures.piastri.id,
-                .dnf: DriverFixtures.leclerc.id,
-            ]
+            ],
+            isLocked: false
         )
-        XCTAssertEqual(state.activeSlot, .dnf)
+        var updatedState = state
+        XCTAssertTrue(updatedState.select(DriverFixtures.leclerc))
+        let ticket = PickCommitTicket(
+            recordID: LocalPickRecordID(owner: .guest, raceID: "spa"),
+            revision: 7,
+            selection: PickSelection(
+                winnerDriverID: DriverFixtures.norris.id,
+                tenthPlaceDriverID: DriverFixtures.piastri.id,
+                dnfDriverID: DriverFixtures.leclerc.id
+            ),
+            userID: nil,
+            draftGeneration: 3
+        )
+
+        XCTAssertEqual(
+            state.apply(updatedState, outcome: .committed(ticket)),
+            .dismiss(ticket)
+        )
+        XCTAssertEqual(state.selectedDriverIDs[.dnf], DriverFixtures.leclerc.id)
+        XCTAssertFalse(state.isPresented)
+    }
+
+    func testRejectedOutcomeKeepsPreviousStateAndSheetPresented() {
+        var state = DriverPickerState(
+            activeSlot: .dnf,
+            selectedDriverIDs: [
+                .winner: DriverFixtures.norris.id,
+                .p10: DriverFixtures.piastri.id,
+            ],
+            isLocked: false
+        )
+        var updatedState = state
+        XCTAssertTrue(updatedState.select(DriverFixtures.leclerc))
+
+        XCTAssertEqual(
+            state.apply(updatedState, outcome: .rejected("Disk full")),
+            .showError("Disk full")
+        )
+        XCTAssertNil(state.selectedDriverIDs[.dnf])
         XCTAssertTrue(state.isPresented)
     }
 

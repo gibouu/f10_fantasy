@@ -263,15 +263,10 @@ final class FXRacingPerformanceTests: XCTestCase {
         try record("local-save", enforced: false) {
             let app = try self.launchReadyApp(.gameplay)
             defer { app.terminate() }
-            try self.prepareThreePicks(in: app)
-
-            let save = app.buttons["save-picks-spa"]
-            guard self.waitUntilHittable(save) else {
-                throw HarnessFailure.notReady("Save picks")
-            }
+            let finalDriver = try self.prepareTwoPicks(in: app)
             let start = ContinuousClock.now
-            save.tap()
-            guard self.waitUntilHittable(app.buttons["Picks saved"]) else {
+            finalDriver.tap()
+            guard app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 10) else {
                 throw HarnessFailure.notReady("Saved state")
             }
             return self.seconds(start.duration(to: .now))
@@ -297,14 +292,14 @@ final class FXRacingPerformanceTests: XCTestCase {
                 return
             }
             do {
-                try self.prepareThreePicks(in: app)
+                let finalDriver = try self.prepareTwoPicks(in: app)
+                finalDriver.tap()
             } catch {
                 XCTFail(error.localizedDescription)
                 app.terminate()
                 return
             }
-            app.buttons["save-picks-spa"].tap()
-            XCTAssertTrue(self.waitUntilHittable(app.buttons["Picks saved"]))
+            XCTAssertTrue(app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 10))
             app.terminate()
         }
     }
@@ -398,26 +393,37 @@ final class FXRacingPerformanceTests: XCTestCase {
     }
 
     @MainActor
-    private func prepareThreePicks(in app: XCUIApplication) throws {
+    private func prepareTwoPicks(in app: XCUIApplication) throws -> XCUIElement {
         let slot = app.buttons["pick-slot-spa-winner"]
         guard waitUntilHittable(slot) else {
             throw HarnessFailure.notReady("P1 slot")
         }
         slot.tap()
 
-        for driverID in ["leclerc", "hamilton", "norris"] {
-            let driver = app.buttons["driver-\(driverID)"]
-            guard waitUntilHittable(driver) else {
-                throw HarnessFailure.notReady("Driver \(driverID)")
+        for _ in 0..<2 {
+            let driver = firstAvailableDriver(in: app)
+            guard driver.waitForExistence(timeout: 10) else {
+                throw HarnessFailure.notReady("Available driver")
             }
             driver.tap()
         }
 
-        let done = app.buttons["Done"]
-        guard waitUntilHittable(done) else {
-            throw HarnessFailure.notReady("Picker Done button")
+        let finalDriver = firstAvailableDriver(in: app)
+        guard finalDriver.waitForExistence(timeout: 10) else {
+            throw HarnessFailure.notReady("Final driver")
         }
-        done.tap()
+        return finalDriver
+    }
+
+    @MainActor
+    private func firstAvailableDriver(in app: XCUIApplication) -> XCUIElement {
+        let drivers = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH 'driver-' AND enabled == true"
+            )
+        )
+        return drivers.allElementsBoundByIndex.first(where: \.isHittable)
+            ?? drivers.firstMatch
     }
 
     @MainActor

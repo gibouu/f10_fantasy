@@ -9,14 +9,16 @@ struct DriverPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding private var state: DriverPickerState
     @AccessibilityFocusState private var focusTarget: PickerFocusTarget?
+    @State private var alertMessage: String?
+    @State private var retrySelection: (driver: Driver, slot: PickSlot)?
 
     private let entrants: [Driver]
-    private let onSelect: (Driver, PickSlot) -> Bool
+    private let onSelect: (Driver, PickSlot) -> PickSelectionOutcome
 
     init(
         state: Binding<DriverPickerState>,
         entrants: [Driver],
-        onSelect: @escaping (Driver, PickSlot) -> Bool
+        onSelect: @escaping (Driver, PickSlot) -> PickSelectionOutcome
     ) {
         _state = state
         self.entrants = entrants
@@ -98,6 +100,22 @@ struct DriverPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .alert(
+            "Selection not saved",
+            isPresented: Binding(
+                get: { alertMessage != nil },
+                set: { if !$0 { alertMessage = nil } }
+            )
+        ) {
+            if retrySelection != nil {
+                Button("Try again") { retryPendingSelection() }
+            }
+            Button("Not now", role: .cancel) {
+                retrySelection = nil
+            }
+        } message: {
+            Text(alertMessage ?? "Your picks weren't changed.")
+        }
     }
 
     private func driverRow(_ driver: Driver) -> some View {
@@ -157,28 +175,32 @@ struct DriverPickerSheet: View {
             return
         }
 
-        guard onSelect(driver, selectedSlot) else {
-            Haptics.locked()
-            AccessibilityNotification.Announcement(
-                "Picks are locked. Your selection was not changed."
-            ).post()
-            return
-        }
-
-        Haptics.select()
-        state = updatedState
-
-        if let nextSlot = selectedSlot.next {
+        let outcome = onSelect(driver, selectedSlot)
+        switch state.apply(updatedState, outcome: outcome) {
+        case .advance:
+            Haptics.select()
             focusTarget = .slotHeading
+            let nextSlot = state.activeSlot
             AccessibilityNotification.Announcement(
                 "\(selectedSlot.label) selected. Now choose \(nextSlot.label)."
             ).post()
-        } else {
-            focusTarget = .driver(driver.id)
+        case .dismiss:
+            Haptics.success()
             AccessibilityNotification.Announcement(
-                "DNF selected. All three picks are complete."
+                "Picks saved on this iPhone."
             ).post()
+            dismiss()
+        case .showError(let message):
+            retrySelection = (driver, selectedSlot)
+            alertMessage = message
         }
+    }
+
+    private func retryPendingSelection() {
+        guard let retrySelection else { return }
+        alertMessage = nil
+        self.retrySelection = nil
+        select(retrySelection.driver)
     }
 
     private func accessibilityValue(for driver: Driver) -> String {

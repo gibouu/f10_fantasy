@@ -163,4 +163,27 @@ struct DriverPickerState: Sendable {
 
         return "Already selected for \(conflictingSlot.label)."
     }
+
+    mutating func apply(
+        _ updatedState: DriverPickerState,
+        outcome: PickSelectionOutcome
+    ) -> DriverPickerSelectionEffect {
+        switch outcome {
+        case .incomplete:
+            self = updatedState
+            return .advance
+        case .committed(let ticket):
+            self = updatedState
+            isPresented = false
+            return .dismiss(ticket)
+        case .rejected(let message):
+            return .showError(message)
+        }
+    }
+}
+
+enum DriverPickerSelectionEffect: Equatable, Sendable {
+    case advance
+    case dismiss(PickCommitTicket)
+    case showError(String)
 }

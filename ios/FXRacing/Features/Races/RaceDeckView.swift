@@ -116,7 +116,7 @@ struct RaceDeckView: View {
                     state: $pickerState,
                     entrants: detail.entrants
                 ) { driver, slot in
-                    detail.select(driver: driver, for: slot)
+                    commitSelection(driver, for: slot, detail: detail)
                 }
                 .accessibilityIdentifier("driver-picker")
                 .onAppear { finishPickerPresentation() }
@@ -302,15 +302,7 @@ struct RaceDeckView: View {
                 isAuthenticated: authManager.isAuthenticated,
                 onSchedule: { openSchedule(race) },
                 onSelectSlot: { slot in openPicker(slot, for: race) },
-                onSave: { submitSelectedRace(race) },
-                onSignIn: { isShowingSignIn = true },
-                onReviewDevicePicks: {
-                    detail?.reviewLegacyDevicePick(
-                        token: authManager.accessToken,
-                        userID: authManager.authenticatedUser?.id,
-                        localPickStore: localPickStore
-                    )
-                }
+                onSignIn: { isShowingSignIn = true }
             )
         case .past:
             PastRaceCard(
@@ -536,23 +528,44 @@ struct RaceDeckView: View {
         schedulePresentationInterval = nil
     }
 
-    private func submitSelectedRace(_ race: Race) {
-        guard race.id == selectedRace?.id,
-              let detail = scopedSelectedDetail
-        else { return }
+    private func commitSelection(
+        _ driver: Driver,
+        for slot: PickSlot,
+        detail: RaceDetailViewModel
+    ) -> PickSelectionOutcome {
+        var selectedDriverIDs: [PickSlot: String] = [
+            .winner: detail.selectedWinnerID,
+            .p10: detail.selectedP10ID,
+            .dnf: detail.selectedDNFID,
+        ].compactMapValues { $0 }
+        selectedDriverIDs[slot] = driver.id
+        let isFinalSelection = selectedDriverIDs.count == PickSlot.allCases.count
+        let saveCompletionInterval = isFinalSelection
+            ? FXPerformance.begin(.saveCompletion)
+            : nil
 
-        let saveCompletionInterval = FXPerformance.begin(.saveCompletion)
+        let outcome = detail.selectAndCommit(
+            driver: driver,
+            for: slot,
+            token: authManager.accessToken,
+            userID: authManager.authenticatedUser?.id,
+            localPickStore: localPickStore
+        )
+
+        guard case .committed(let ticket) = outcome else {
+            saveCompletionInterval?.abandon()
+            return outcome
+        }
+        saveCompletionInterval?.end()
         Task {
-            await detail.submit(
+            await detail.syncCommittedPick(
+                ticket,
                 token: authManager.accessToken,
                 userID: authManager.authenticatedUser?.id,
-                localPickStore: localPickStore,
-                onLocalSavePublished: {
-                    saveCompletionInterval.end()
-                }
+                localPickStore: localPickStore
             )
-            saveCompletionInterval.end()
         }
+        return outcome
     }
 
     @MainActor

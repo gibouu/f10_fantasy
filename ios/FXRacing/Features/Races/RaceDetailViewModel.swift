@@ -58,6 +58,8 @@ final class RaceDetailViewModel {
     private(set) var isLoading = false
     private(set) var loadErrorMessage: String?
     private(set) var submissionErrorMessage: String?
+    private(set) var didLocalWriteFail = false
+    private(set) var syncIssue: RacePickSyncIssue?
     private(set) var hasRecoverableDevicePick = false
     private(set) var privatePickAuthority: PrivatePickAuthority = .notRequired
 
@@ -119,6 +121,20 @@ final class RaceDetailViewModel {
               updatedAt < qualifyingStartUtc
         else { return .notEligible }
         return .eligible
+    }
+
+    var currentLocalPickRevision: UInt64? {
+        lastObservedVisibleRecord?.revision
+    }
+
+    var acknowledgedLocalPickRevision: UInt64? {
+        guard lastObservedVisibleRecord?.syncState == .confirmed else { return nil }
+        return lastObservedVisibleRecord?.revision
+    }
+
+    var currentRevisionRejected: Bool {
+        guard let lastObservedVisibleRecord else { return false }
+        return lastObservedVisibleRecord.syncState == .expired
     }
 
     var canSave: Bool {
@@ -709,6 +725,8 @@ final class RaceDetailViewModel {
         hasUnsavedEdits = true
         submissionState = .idle
         submissionErrorMessage = nil
+        didLocalWriteFail = false
+        syncIssue = nil
         return true
     }
 
@@ -798,6 +816,8 @@ final class RaceDetailViewModel {
         let priorState = submissionState
         submissionState = .savingLocally
         submissionErrorMessage = nil
+        didLocalWriteFail = false
+        syncIssue = nil
 
         let saveResult: LocalPickSaveResult
         if let dirtyGuestDraft, case .user = scope {
@@ -835,6 +855,7 @@ final class RaceDetailViewModel {
             submissionState = priorState
             let message = "Your picks could not be saved on this device. Please try again."
             submissionErrorMessage = message
+            didLocalWriteFail = true
             return .rejected(message)
         }
 
@@ -845,6 +866,7 @@ final class RaceDetailViewModel {
             submissionState = priorState
             let message = "Your picks could not be saved on this device. Please try again."
             submissionErrorMessage = message
+            didLocalWriteFail = true
             return .rejected(message)
         }
 
@@ -853,6 +875,7 @@ final class RaceDetailViewModel {
         lastObservedVisibleRecord = readableRecord
         submissionState = .savedOnDevice
         submissionErrorMessage = nil
+        didLocalWriteFail = false
         return .committed(
             PickCommitTicket(
                 recordID: readableRecord.id,
@@ -968,6 +991,7 @@ final class RaceDetailViewModel {
         }
 
         submissionState = .syncing
+        syncIssue = nil
         let serverAcknowledgementInterval = FXPerformance.begin(.serverAcknowledgement)
         defer { serverAcknowledgementInterval.abandon() }
         let result = await syncManager.submitExplicit(
@@ -1022,10 +1046,14 @@ final class RaceDetailViewModel {
         switch result {
         case .saved:
             submissionState = .savedOnDevice
-        case .queued, .unauthorized:
+        case .queued:
             submissionState = .savedOnDevice
             submissionErrorMessage = "Saved on this device — will sync when your account is available."
-            Haptics.success()
+            syncIssue = .offline
+        case .unauthorized:
+            submissionState = .savedOnDevice
+            submissionErrorMessage = "Saved on this device — sign in again to sync."
+            syncIssue = .unauthorized
         case .conflict(let pick):
             serverPick = pick
             submissionState = .conflict
@@ -1075,7 +1103,6 @@ final class RaceDetailViewModel {
         onLocalSavePublished()
 
         if ticket.userID == nil {
-            Haptics.success()
             return
         }
         await Task.yield()
@@ -1101,7 +1128,7 @@ final class RaceDetailViewModel {
             }
             submissionState = .savedToAccount
             submissionErrorMessage = nil
-            Haptics.success()
+            syncIssue = nil
             return true
         case .conflict:
             if let returnedPick {
@@ -1170,6 +1197,8 @@ final class RaceDetailViewModel {
         serverPick = nil
         (selectedWinnerID, selectedP10ID, selectedDNFID) = (nil, nil, nil)
         submissionState = .idle
+        didLocalWriteFail = false
+        syncIssue = nil
         loadErrorMessage = nil
         submissionErrorMessage = nil
         privatePickAuthority = .notRequired
@@ -1301,11 +1330,14 @@ final class RaceDetailViewModel {
             submissionErrorMessage = "Review these device picks, then save when they look right."
         case .queued:
             if case .user = scope {
+                syncIssue = .offline
                 submissionErrorMessage = "Saved on this device — will sync when your account is available."
             } else {
+                syncIssue = nil
                 submissionErrorMessage = nil
             }
         case .syncing, .confirmed:
+            syncIssue = nil
             submissionErrorMessage = nil
         case .conflict:
             submissionErrorMessage = "Your account has a different pick. Your device copy is still safe."
