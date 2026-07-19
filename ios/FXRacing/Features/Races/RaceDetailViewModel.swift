@@ -172,6 +172,7 @@ final class RaceDetailViewModel {
         let generation: UInt64
         let scope: SessionScope
         let requestToken: String?
+        let privateSessionLease: SyncManager.SessionLease?
         let task: Task<Void, Never>
     }
 
@@ -233,11 +234,16 @@ final class RaceDetailViewModel {
         force: Bool = false
     ) async {
         let scope = sessionScope(token: token, userID: userID)
+        let privateSessionLease = currentPrivateSessionLease(
+            scope: scope,
+            token: token
+        )
 
         if !force,
            let flight = loadFlight,
            flight.scope == scope,
-           flight.requestToken == token {
+           flight.requestToken == token,
+           flight.privateSessionLease == privateSessionLease {
             await flight.task.value
             return
         }
@@ -318,14 +324,10 @@ final class RaceDetailViewModel {
 
         prepare(scope: scope, localPickStore: localPickStore)
         let capturedDraftGeneration = draftGeneration
-        let privateSessionLease = scope.userID.flatMap { currentUserID in
-            token.flatMap { token in
-                syncManager.currentSessionLease(
-                    currentUserID: currentUserID,
-                    token: token
-                )
-            }
-        }
+        let privateSessionLease = currentPrivateSessionLease(
+            scope: scope,
+            token: token
+        )
 
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -344,6 +346,7 @@ final class RaceDetailViewModel {
             generation: generation,
             scope: scope,
             requestToken: token,
+            privateSessionLease: privateSessionLease,
             task: task
         )
 
@@ -939,6 +942,15 @@ final class RaceDetailViewModel {
               selectedDNFID == ticket.selection.dnfDriverID
         else { return }
 
+        guard let currentBeforeSync = localPickStore.record(id: ticket.recordID),
+              currentBeforeSync.revision == ticket.revision,
+              currentBeforeSync.selection == ticket.selection
+        else {
+            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            return
+        }
+        lastObservedVisibleRecord = currentBeforeSync
+
         guard case .user(let currentUserID) = scope,
               let token
         else {
@@ -950,14 +962,6 @@ final class RaceDetailViewModel {
             token: token
         )
         guard syncManager.isCurrent(sessionLease) else { return }
-        guard let currentBeforeSync = localPickStore.record(id: ticket.recordID),
-              currentBeforeSync.revision == ticket.revision,
-              currentBeforeSync.selection == ticket.selection
-        else {
-            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
-            return
-        }
-        lastObservedVisibleRecord = currentBeforeSync
 
         if applyTerminalState(from: currentBeforeSync, serverPick: nil) {
             return
@@ -1333,6 +1337,20 @@ final class RaceDetailViewModel {
             return false
         }
         return syncManager.isCurrent(capture.sessionLease)
+    }
+
+    private func currentPrivateSessionLease(
+        scope: SessionScope,
+        token: String?
+    ) -> SyncManager.SessionLease? {
+        scope.userID.flatMap { currentUserID in
+            token.flatMap { token in
+                syncManager.currentSessionLease(
+                    currentUserID: currentUserID,
+                    token: token
+                )
+            }
+        }
     }
 
     private func refreshStoredAuthority(

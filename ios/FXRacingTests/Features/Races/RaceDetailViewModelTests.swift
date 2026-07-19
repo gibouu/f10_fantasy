@@ -2574,7 +2574,7 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertEqual(postCalls, 0)
     }
 
-    func testTwoRapidCommitsIgnoreTheOlderAcknowledgement() async throws {
+    func testSecondPostCompletesBeforeFirstWithoutApplyingTheOlderAcknowledgement() async throws {
         let oldPick = makePick(id: "old-ack")
         let newestPick = makePick(
             id: "new-ack",
@@ -2591,8 +2591,15 @@ final class RaceDetailViewModelTests: XCTestCase {
             ],
             gatedKeys: ["POST /api/picks"]
         )
-        let viewModel = makeViewModel(api: api)
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        syncManager.setUnauthorizedHandler { _ in }
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
         let store = makeStore()
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
         await viewModel.loadIfNeeded(
             token: "token-a",
             userID: "user-a",
@@ -2642,9 +2649,12 @@ final class RaceDetailViewModelTests: XCTestCase {
         guard case .committed(let secondTicket) = secondOutcome else {
             return XCTFail("Expected the newer revision")
         }
-        let secondStarted = expectation(description: "Newer sync joined the race lane")
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
         let secondSync = Task {
-            secondStarted.fulfill()
             await viewModel.syncCommittedPick(
                 secondTicket,
                 token: "token-a",
@@ -2652,24 +2662,61 @@ final class RaceDetailViewModelTests: XCTestCase {
                 localPickStore: store
             )
         }
-        await fulfillment(of: [secondStarted], timeout: 1)
-
-        await api.releaseRequest(id: firstRequest)
         let secondRequest = await api.waitForRequest(
             method: "POST",
             to: pickPath,
             ordinal: 2
         )
+        let overlappingPostCalls = await api.calls(method: "POST", to: pickPath)
+        XCTAssertEqual(overlappingPostCalls, 2)
+
         await api.releaseRequest(id: secondRequest)
-        await firstSync.value
         await secondSync.value
 
         XCTAssertGreaterThan(secondTicket.revision, firstTicket.revision)
         XCTAssertEqual(store.record(id: secondTicket.recordID)?.revision, secondTicket.revision)
         XCTAssertEqual(store.record(id: secondTicket.recordID)?.selection, alternateSelection)
         XCTAssertEqual(store.record(id: secondTicket.recordID)?.syncState, .confirmed)
+        XCTAssertEqual(
+            store.authoritativePick(
+                for: raceID,
+                owner: .user("user-a")
+            )?.id,
+            newestPick.id
+        )
         XCTAssertEqual(viewModel.serverPick?.id, newestPick.id)
         XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+
+        await api.releaseRequest(id: firstRequest)
+        await firstSync.value
+
+        XCTAssertEqual(store.record(id: secondTicket.recordID)?.revision, secondTicket.revision)
+        XCTAssertEqual(store.record(id: secondTicket.recordID)?.selection, alternateSelection)
+        XCTAssertEqual(store.record(id: secondTicket.recordID)?.syncState, .confirmed)
+        XCTAssertEqual(
+            store.authoritativePick(
+                for: raceID,
+                owner: .user("user-a")
+            )?.id,
+            newestPick.id
+        )
+        XCTAssertEqual(viewModel.serverPick?.id, newestPick.id)
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+
+        let lifecycle = await api.recordedEvents(
+            requestIDs: [firstRequest, secondRequest]
+        )
+        XCTAssertEqual(
+            lifecycle,
+            [
+                .started(firstRequest),
+                .started(secondRequest),
+                .released(secondRequest),
+                .completed(secondRequest),
+                .released(firstRequest),
+                .completed(firstRequest),
+            ]
+        )
     }
 
     func testScopeChangeBeforeCommitRejectsWithoutCrossAccountPersistence() async {
@@ -2885,6 +2932,94 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertNil(ticket.userID)
         XCTAssertEqual(store.record(id: ticket.recordID)?.syncState, .queued)
         XCTAssertEqual(viewModel.submissionState, .savedOnDevice)
+        let requests = await api.recordedRequests()
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testDeletedGuestTicketRehydratesInsteadOfPublishingStaleSuccess() async throws {
+        let api = GatedAPIClientSpy(responses: [:])
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        await viewModel.loadIfNeeded(
+            token: nil,
+            userID: nil,
+            localPickStore: store
+        )
+        let ticket = try commitInitialSelection(
+            on: viewModel,
+            token: nil,
+            userID: nil,
+            store: store
+        )
+        XCTAssertTrue(store.remove(raceId: raceID))
+
+        await viewModel.syncCommittedPick(
+            ticket,
+            token: nil,
+            userID: nil,
+            localPickStore: store
+        )
+
+        XCTAssertNil(store.record(id: ticket.recordID))
+        XCTAssertEqual(viewModel.submissionState, .idle)
+        let requests = await api.recordedRequests()
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testSupersededGuestTicketRehydratesTheCurrentRevision() async throws {
+        let api = GatedAPIClientSpy(responses: [:])
+        let viewModel = makeViewModel(api: api)
+        let store = makeStore()
+        await viewModel.loadIfNeeded(
+            token: nil,
+            userID: nil,
+            localPickStore: store
+        )
+        let ticket = try commitInitialSelection(
+            on: viewModel,
+            token: nil,
+            userID: nil,
+            store: store
+        )
+        guard case .saved = store.save(
+            selection: alternateSelection,
+            race: RaceFixtures.upcoming,
+            owner: .guest,
+            now: TestClock.fixed.now()
+        ) else {
+            return XCTFail("Expected an intermediate superseding revision")
+        }
+        let current: LocalPickRecord
+        switch store.save(
+            selection: ticket.selection,
+            race: RaceFixtures.upcoming,
+            owner: .guest,
+            now: TestClock.fixed.now()
+        ) {
+        case .saved(let record):
+            current = record
+        default:
+            return XCTFail("Expected the current selection at a newer revision")
+        }
+        XCTAssertGreaterThan(current.revision, ticket.revision)
+        XCTAssertTrue(
+            store.transition(
+                id: current.id,
+                revision: current.revision,
+                to: .expired
+            )
+        )
+
+        await viewModel.syncCommittedPick(
+            ticket,
+            token: nil,
+            userID: nil,
+            localPickStore: store
+        )
+
+        XCTAssertEqual(store.record(id: current.id)?.revision, current.revision)
+        XCTAssertEqual(store.record(id: current.id)?.selection, ticket.selection)
+        XCTAssertEqual(viewModel.submissionState, .expired)
         let requests = await api.recordedRequests()
         XCTAssertTrue(requests.isEmpty)
     }
@@ -3147,6 +3282,72 @@ final class RaceDetailViewModelTests: XCTestCase {
         )
 
         let calls = await api.calls(method: "GET", to: pickPath)
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(viewModel.privatePickAuthority, .missing)
+        XCTAssertNil(viewModel.serverPick)
+    }
+
+    func testSameTokenSessionRotationRestartsInFlightPrivateAuthorityLookup() async {
+        let api = GatedAPIClientSpy(
+            responses: [
+                pickKey: [
+                    .json(PickResponse(pick: serverPick)),
+                    .failure(.notFound),
+                ],
+            ],
+            gatedKeys: [pickKey]
+        )
+        let syncManager = SyncManager(api: api, clock: TestClock.fixed)
+        syncManager.setUnauthorizedHandler { _ in }
+        let store = makeStore()
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        let firstLoad = Task {
+            await viewModel.loadIfNeeded(
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            )
+        }
+        let firstRequest = await api.waitForRequest(
+            method: "GET",
+            to: pickPath,
+            ordinal: 1
+        )
+
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: store
+        )
+        let replacementLoad = Task {
+            await viewModel.loadIfNeeded(
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            )
+        }
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        let calls = await api.calls(method: "GET", to: pickPath)
+        if calls == 2 {
+            let replacementRequest = await api.waitForRequest(
+                method: "GET",
+                to: pickPath,
+                ordinal: 2
+            )
+            await api.releaseRequest(id: replacementRequest)
+        }
+        await api.releaseRequest(id: firstRequest)
+        await firstLoad.value
+        await replacementLoad.value
+
         XCTAssertEqual(calls, 2)
         XCTAssertEqual(viewModel.privatePickAuthority, .missing)
         XCTAssertNil(viewModel.serverPick)
