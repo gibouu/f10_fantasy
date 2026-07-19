@@ -175,3 +175,102 @@ test("GET returns 404 before loading dependent race detail data", async () => {
   assert.deepEqual(await response.json(), { error: "Race not found" })
   assert.deepEqual(called, [])
 })
+
+test("GET keeps a worst-case 22 by 24 driver-history response within the payload budget", async () => {
+  const longestFixtureStrings = {
+    raceName: "Formula 1 Qatar Airways Grand Prix du Canada 2026",
+    circuitName: "Circuit de Spa-Francorchamps, Stavelot, Belgium",
+    country: "Kingdom of Belgium",
+    constructorName: "Aston Martin Aramco Formula One Team",
+    constructorShortName: "ASTON MARTIN",
+    constructorSlug: "aston-martin-aramco-formula-one-team",
+  }
+  const historyStatuses = ["CLASSIFIED", "DNF", "DNS", "DSQ"]
+  const entrants = Array.from({ length: 22 }, (_, entrantIndex) => ({
+    ...entrant,
+    id: `driver-${String(entrantIndex + 1).padStart(2, "0")}`,
+    code: `D${String(entrantIndex + 1).padStart(2, "0")}`,
+    firstName: "Maximilian-Alexander",
+    lastName: "Hohenlohe-Langenburg",
+    photoUrl: "/drivers/maximilian-alexander-hohenlohe-langenburg.png",
+    seatKey: `aston-martin-aramco-formula-one-team:${entrantIndex + 1}`,
+    constructor: {
+      ...entrant.constructor,
+      id: "aston-martin-aramco-formula-one-team",
+      name: longestFixtureStrings.constructorName,
+      shortName: longestFixtureStrings.constructorShortName,
+      slug: longestFixtureStrings.constructorSlug,
+      logoUrl: "/teamlogos/aston-martin-aramco-formula-one-team.webp",
+    },
+  }))
+  const seasonForms = new Map(
+    entrants.map((driver) => [
+      driver.id,
+      {
+        averageFinish: 10.5,
+        nonClassifiedCount: 18,
+        results: Array.from({ length: 24 }, (_, historyIndex) => {
+          const status = historyStatuses[historyIndex % historyStatuses.length]
+          return {
+            driverId: driver.id,
+            raceId: `grand-prix-${String(24 - historyIndex).padStart(2, "0")}`,
+            raceName: longestFixtureStrings.raceName,
+            scheduledStartUtc: new Date(
+              Date.UTC(2026, 6, 5 - historyIndex, 14, 0, 0),
+            ),
+            position: status === "CLASSIFIED" ? (historyIndex % 20) + 1 : null,
+            status,
+          }
+        }),
+      },
+    ]),
+  )
+  const getHandler = createRaceDetailGetHandler({
+    getRaceById: async () => ({
+      ...race,
+      name: longestFixtureStrings.raceName,
+      circuitName: longestFixtureStrings.circuitName,
+      country: longestFixtureStrings.country,
+    }),
+    getRaceEntrants: async () => entrants,
+    getDriverSeasonStats: async () => seasonForms,
+    findRaceResults: async () => [],
+    getQualifyingResults: async () => [],
+    getResultScoreGuide: () => ({ p10: 0, winner: 0, dnf: 0 }),
+  })
+
+  const response = await getHandler(new Request("http://localhost/api/races/belgium"), {
+    params: { id: "belgium" },
+  })
+  const body = await response.json()
+  const responseBytes = Buffer.byteLength(JSON.stringify(body))
+
+  assert.equal(response.status, 200)
+  assert.equal(body.entrants.length, 22)
+  assert.ok(body.entrants.every((driver) => driver.seasonResults.length === 24))
+  assert.ok(
+    responseBytes <= 131_072,
+    `race detail response is ${responseBytes} bytes (limit 131072)`,
+  )
+})
+
+test("GET propagates qualifying lookup failures", async () => {
+  const qualifyingFailure = new Error("qualifying lookup failed")
+  const getHandler = createRaceDetailGetHandler({
+    getRaceById: async () => race,
+    getRaceEntrants: async () => [entrant],
+    getDriverSeasonStats: async () => new Map(),
+    findRaceResults: async () => [],
+    getQualifyingResults: async () => {
+      throw qualifyingFailure
+    },
+    getResultScoreGuide: () => ({ p10: 0, winner: 0, dnf: 0 }),
+  })
+
+  await assert.rejects(
+    () => getHandler(new Request("http://localhost/api/races/belgium"), {
+      params: { id: "belgium" },
+    }),
+    qualifyingFailure,
+  )
+})
