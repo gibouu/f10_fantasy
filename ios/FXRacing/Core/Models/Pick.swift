@@ -8,6 +8,8 @@ struct Pick: Codable, Sendable {
     let dnfDriverId: String
     let lockedAt: Date?
     let scoreBreakdown: ScoreBreakdown?
+    var updatedAt: Date? = nil
+    var lockedSubmittedBeforeQualifying: Bool? = nil
 }
 
 struct ScoreBreakdown: Codable, Sendable {

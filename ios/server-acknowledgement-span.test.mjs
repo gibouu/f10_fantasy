@@ -34,8 +34,8 @@ test("server acknowledgement ends only after the current authoritative result is
     spanStart,
   )
 
-  assert.ok(spanStart >= 0, "submit should begin the server acknowledgement span")
-  assert.ok(submitEnd > spanStart, "submit span should be inside submit()")
+  assert.ok(spanStart >= 0, "syncCommittedPick should begin the server acknowledgement span")
+  assert.ok(submitEnd > spanStart, "span should be inside syncCommittedPick()")
 
   const submitSpan = detailModelSource.slice(spanStart, submitEnd)
   const abandon = submitSpan.indexOf(
@@ -44,7 +44,7 @@ test("server acknowledgement ends only after the current authoritative result is
   const request = submitSpan.indexOf("await syncManager.submitExplicit(")
   const scopeGuard = submitSpan.indexOf("guard activeScope == scope", request)
   const recordGuard = submitSpan.indexOf(
-    "guard let currentRecord = localPickStore.record(id: record.id)",
+    "guard let currentRecord = localPickStore.record(id: ticket.recordID)",
     scopeGuard,
   )
   const acknowledgement = submitSpan.indexOf(

@@ -34,7 +34,7 @@ test("detail hydration is summary-first, cached-first, and concurrent", () => {
   assert.match(source, /api\.request\(\.pickForRace\(raceId: raceID\), token: token\)/)
 })
 
-test("selections use stable IDs and local-first save uses the shared sync path", () => {
+test("final selection commits synchronously before the revision-safe sync path", () => {
   for (const selectionID of [
     "selectedWinnerID",
     "selectedP10ID",
@@ -43,20 +43,48 @@ test("selections use stable IDs and local-first save uses the shared sync path",
     assert.match(source, new RegExp(`var ${selectionID}: String\\?`))
   }
 
-  assert.match(source, /localPickStore\.save\(/)
-  assert.match(source, /syncManager\.submitExplicit\(/)
-  assert.match(source, /revision: record\.revision/)
-  assert.doesNotMatch(source, /let api = APIClient\(\)/)
+  const commitStart = source.indexOf("func selectAndCommit(")
+  const syncStart = source.indexOf("func syncCommittedPick(", commitStart)
+  assert.ok(commitStart >= 0, "selectAndCommit should exist")
+  assert.ok(syncStart > commitStart, "syncCommittedPick should follow the local commit")
 
-  const authenticatedSave = source.slice(
-    source.indexOf("guard case .user(let currentUserID)"),
-    source.indexOf("let result = await syncManager.submitExplicit"),
-  )
-  const deviceSaved = authenticatedSave.indexOf("submissionState = .savedOnDevice")
-  const yielded = authenticatedSave.indexOf("await Task.yield()")
-  const syncing = authenticatedSave.indexOf("submissionState = .syncing")
-  assert.ok(deviceSaved >= 0 && deviceSaved < yielded)
-  assert.ok(yielded < syncing)
+  const commit = source.slice(commitStart, syncStart)
+  assert.match(commit, /localPickStore\.save\(/)
+  assert.match(commit, /localPickStore\.record\(id: record\.id\)/)
+  assert.match(commit, /submissionState = \.savedOnDevice/)
+  assert.match(commit, /return \.committed\(/)
+  assert.doesNotMatch(commit, /\bTask\s*\{|await\s/)
+
+  const sync = source.slice(syncStart, source.indexOf("func submit(", syncStart))
+  assert.match(sync, /syncManager\.currentSessionLease\(/)
+  assert.match(sync, /syncManager\.isCurrent\(/)
+  assert.match(sync, /syncManager\.submitExplicit\(/)
+  assert.match(sync, /revision: ticket\.revision/)
+  assert.match(sync, /currentRecord\.revision == ticket\.revision/)
+  assert.doesNotMatch(source, /let api = APIClient\(\)/)
+})
+
+test("private pick recovery authority has explicit captured-session outcomes", () => {
+  assert.match(source, /enum PrivatePickAuthority: Equatable, Sendable/)
+  for (const state of [
+    "notRequired",
+    "checking",
+    "missing",
+    "found",
+    "unavailable",
+    "unauthorized",
+  ]) {
+    assert.match(source, new RegExp(`case(?:\\s+\\w+,)*\\s*${state}|case\\s+${state}`))
+  }
+  assert.match(source, /private\(set\) var privatePickAuthority/)
+  assert.match(source, /struct PrivatePickAuthorityCapture \{[\s\S]*?let requestToken: String\?[\s\S]*?let sessionLease: SyncManager\.SessionLease\?/)
+  assert.match(source, /private var privatePickAuthorityCapture: PrivatePickAuthorityCapture\?/)
+  assert.match(source, /struct LoadFlight \{[\s\S]*?let requestToken: String\?/)
+  assert.match(source, /flight\.scope == scope[\s\S]*?flight\.requestToken == token/)
+  assert.match(source, /privateSessionLease: SyncManager\.SessionLease\?/)
+  assert.match(source, /syncManager\.isCurrent\(privateSessionLease\)/)
+  assert.match(source, /hasCurrentPrivatePickAuthority\(scope: scope, token: token\)/)
+  assert.match(source, /privatePickAuthority == \.missing[\s\S]*?hasCurrentPrivatePickAuthority\(scope: scope, token: token\)/)
 })
 
 test("loading and saving expose explicit non-blocking state", () => {

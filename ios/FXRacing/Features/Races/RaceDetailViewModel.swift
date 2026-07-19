@@ -12,6 +12,35 @@ enum PickSubmissionState: Equatable {
     case expired
 }
 
+struct PickCommitTicket: Equatable, Sendable {
+    let recordID: LocalPickRecordID
+    let revision: UInt64
+    let selection: PickSelection
+    let userID: String?
+    let draftGeneration: UInt64
+}
+
+enum PickSelectionOutcome: Equatable, Sendable {
+    case rejected(String)
+    case incomplete
+    case committed(PickCommitTicket)
+}
+
+enum PrivatePickAuthority: Equatable, Sendable {
+    case notRequired
+    case checking
+    case missing
+    case found
+    case unavailable
+    case unauthorized
+}
+
+enum PickBonusAuthority: Equatable, Sendable {
+    case notEligible
+    case eligible
+    case secured
+}
+
 @Observable
 @MainActor
 final class RaceDetailViewModel {
@@ -30,6 +59,7 @@ final class RaceDetailViewModel {
     private(set) var loadErrorMessage: String?
     private(set) var submissionErrorMessage: String?
     private(set) var hasRecoverableDevicePick = false
+    private(set) var privatePickAuthority: PrivatePickAuthority = .notRequired
 
     var selectedWinner: Driver? { resolve(selectedWinnerID) }
     var selectedP10: Driver? { resolve(selectedP10ID) }
@@ -77,6 +107,18 @@ final class RaceDetailViewModel {
 
     var errorMessage: String? {
         submissionErrorMessage ?? loadErrorMessage
+    }
+
+    var pickBonusAuthority: PickBonusAuthority {
+        guard let serverPick else { return .notEligible }
+        if serverPick.lockedSubmittedBeforeQualifying == true {
+            return .secured
+        }
+        guard let updatedAt = serverPick.updatedAt,
+              let qualifyingStartUtc = race.qualifyingStartUtc,
+              updatedAt < qualifyingStartUtc
+        else { return .notEligible }
+        return .eligible
     }
 
     var canSave: Bool {
@@ -129,7 +171,14 @@ final class RaceDetailViewModel {
         let token: UUID
         let generation: UInt64
         let scope: SessionScope
+        let requestToken: String?
         let task: Task<Void, Never>
+    }
+
+    private struct PrivatePickAuthorityCapture {
+        let scope: SessionScope
+        let requestToken: String?
+        let sessionLease: SyncManager.SessionLease?
     }
 
     private let raceID: String
@@ -146,6 +195,7 @@ final class RaceDetailViewModel {
     private var requiresAccountRepair = false
     private var lastObservedVisibleRecord: LocalPickRecord?
     private var loadFlight: LoadFlight?
+    private var privatePickAuthorityCapture: PrivatePickAuthorityCapture?
 
     init(
         summary: Race,
@@ -186,12 +236,16 @@ final class RaceDetailViewModel {
 
         if !force,
            let flight = loadFlight,
-           flight.scope == scope {
+           flight.scope == scope,
+           flight.requestToken == token {
             await flight.task.value
             return
         }
 
-        if !force, hasLoaded, activeScope == scope {
+        if !force,
+           hasLoaded,
+           activeScope == scope,
+           hasCurrentPrivatePickAuthority(scope: scope, token: token) {
             let currentVisibleRecord = visibleRecord(
                 scope: scope,
                 localPickStore: localPickStore
@@ -264,6 +318,14 @@ final class RaceDetailViewModel {
 
         prepare(scope: scope, localPickStore: localPickStore)
         let capturedDraftGeneration = draftGeneration
+        let privateSessionLease = scope.userID.flatMap { currentUserID in
+            token.flatMap { token in
+                syncManager.currentSessionLease(
+                    currentUserID: currentUserID,
+                    token: token
+                )
+            }
+        }
 
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -273,13 +335,15 @@ final class RaceDetailViewModel {
                 localPickStore: localPickStore,
                 policy: policy,
                 generation: generation,
-                capturedDraftGeneration: capturedDraftGeneration
+                capturedDraftGeneration: capturedDraftGeneration,
+                privateSessionLease: privateSessionLease
             )
         }
         loadFlight = LoadFlight(
             token: flightToken,
             generation: generation,
             scope: scope,
+            requestToken: token,
             task: task
         )
 
@@ -293,7 +357,8 @@ final class RaceDetailViewModel {
         localPickStore: LocalPickStore,
         policy: RaceFetchPolicy,
         generation: UInt64,
-        capturedDraftGeneration: UInt64
+        capturedDraftGeneration: UInt64,
+        privateSessionLease: SyncManager.SessionLease?
     ) async {
         guard generation == loadGeneration, activeScope == scope else { return }
         isLoading = true
@@ -305,6 +370,16 @@ final class RaceDetailViewModel {
         let authenticatedUserID = scope.userID
         let shouldRequestPrivatePick = authenticatedUserID != nil
             && token != nil
+        privatePickAuthorityCapture = shouldRequestPrivatePick
+            ? PrivatePickAuthorityCapture(
+                scope: scope,
+                requestToken: token,
+                sessionLease: privateSessionLease
+            )
+            : nil
+        privatePickAuthority = shouldRequestPrivatePick
+            ? .checking
+            : .notRequired
         let capturedVisibleRecord = visibleRecord(
             scope: scope,
             localPickStore: localPickStore
@@ -380,6 +455,7 @@ final class RaceDetailViewModel {
                             localPickStore: localPickStore,
                             generation: generation,
                             capturedDraftGeneration: capturedDraftGeneration,
+                            privateSessionLease: privateSessionLease,
                             capturedVisibleRecord: capturedVisibleRecord
                         )
                         deferredPrivateOutcome = nil
@@ -399,6 +475,7 @@ final class RaceDetailViewModel {
                                 localPickStore: localPickStore,
                                 generation: generation,
                                 capturedDraftGeneration: capturedDraftGeneration,
+                                privateSessionLease: privateSessionLease,
                                 capturedVisibleRecord: capturedVisibleRecord
                             )
                         }
@@ -415,6 +492,7 @@ final class RaceDetailViewModel {
                             localPickStore: localPickStore,
                             generation: generation,
                             capturedDraftGeneration: capturedDraftGeneration,
+                            privateSessionLease: privateSessionLease,
                             capturedVisibleRecord: capturedVisibleRecord
                         )
                     } else {
@@ -467,9 +545,24 @@ final class RaceDetailViewModel {
         localPickStore: LocalPickStore,
         generation: UInt64,
         capturedDraftGeneration: UInt64,
+        privateSessionLease: SyncManager.SessionLease?,
         capturedVisibleRecord: LocalPickRecord?
     ) {
         guard generation == loadGeneration, activeScope == scope else { return }
+        if case .user = scope {
+            guard syncManager.isCurrent(privateSessionLease) else { return }
+        }
+
+        switch outcome {
+        case .success:
+            privatePickAuthority = .found
+        case .missing:
+            privatePickAuthority = .missing
+        case .unauthorized:
+            privatePickAuthority = .unauthorized
+        case .unavailable:
+            privatePickAuthority = .unavailable
+        }
 
         if case .unauthorized(let rejectedToken) = outcome {
             syncManager.reportUnauthorized(rejectedToken: rejectedToken)
@@ -616,11 +709,13 @@ final class RaceDetailViewModel {
         return true
     }
 
-    func reviewLegacyDevicePick(
+    func selectAndCommit(
+        driver: Driver,
+        for slot: PickSlot,
         token: String?,
         userID: String?,
         localPickStore: LocalPickStore
-    ) {
+    ) -> PickSelectionOutcome {
         let scope = sessionScope(token: token, userID: userID)
         if let activeScope, activeScope != scope {
             switchScope(
@@ -628,80 +723,75 @@ final class RaceDetailViewModel {
                 localPickStore: localPickStore,
                 invalidatingLoad: true
             )
-        } else {
-            activeScope = scope
-        }
-
-        switch localPickStore.recoverLegacyConflict(
-            for: race,
-            owner: scope.owner,
-            now: clock.now()
-        ) {
-        case .recovered:
-            hasUnsavedEdits = false
-            lastObservedVisibleRecord = nil
-            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
-            submissionErrorMessage = "Review these device picks, then save when they look right."
-        case .destinationOccupied:
-            submissionErrorMessage = "A newer device pick already exists for this race."
-        case .locked:
-            submissionErrorMessage = "This saved device pick can no longer be claimed because the race is locked."
-            Haptics.locked()
-        case .invalidOwner, .notFound:
-            hasRecoverableDevicePick = false
-        case .persistenceFailed:
-            submissionErrorMessage = "The device pick could not be recovered. Please try again."
-        }
-    }
-
-    // MARK: - Submit
-
-    func submit(
-        token: String?,
-        userID: String?,
-        localPickStore: LocalPickStore,
-        onLocalSavePublished: () -> Void = {}
-    ) async {
-        guard canSave,
-              let selectedWinnerID,
-              let selectedP10ID,
-              let selectedDNFID
-        else { return }
-
-        let scope = sessionScope(token: token, userID: userID)
-        if let activeScope, activeScope != scope {
-            switchScope(
-                to: scope,
-                localPickStore: localPickStore,
-                invalidatingLoad: true
-            )
-            submissionErrorMessage = "Your account changed. Please confirm your picks again."
-            return
+            let message = "Your account changed. Please confirm your picks again."
+            submissionErrorMessage = message
+            return .rejected(message)
         }
         activeScope = scope
 
-        guard clock.now() < race.lockCutoffUtc else {
-            submissionState = .expired
-            submissionErrorMessage = "This race is now locked."
-            Haptics.locked()
-            return
+        guard select(driver: driver, for: slot) else {
+            return .rejected(
+                submissionErrorMessage
+                    ?? "This driver could not be selected."
+            )
+        }
+        guard let selectedWinnerID,
+              let selectedP10ID,
+              let selectedDNFID
+        else { return .incomplete }
+
+        let selectedIDs = [
+            selectedWinnerID,
+            selectedP10ID,
+            selectedDNFID,
+        ]
+        guard Set(selectedIDs).count == selectedIDs.count,
+              selectedIDs.allSatisfy({ selectedID in
+                  entrants.contains { $0.id == selectedID }
+              })
+        else {
+            let message = "Choose three different drivers from this race."
+            submissionErrorMessage = message
+            return .rejected(message)
         }
 
-        let selection = PickSelection(
-            winnerDriverID: selectedWinnerID,
-            tenthPlaceDriverID: selectedP10ID,
-            dnfDriverID: selectedDNFID
+        return commitCurrentSelection(
+            PickSelection(
+                winnerDriverID: selectedWinnerID,
+                tenthPlaceDriverID: selectedP10ID,
+                dnfDriverID: selectedDNFID
+            ),
+            scope: scope,
+            localPickStore: localPickStore
         )
-        let dirtyGuestDraft: LocalPickRecord? = localPickStore.record(
+    }
+
+    private func commitCurrentSelection(
+        _ selection: PickSelection,
+        scope: SessionScope,
+        localPickStore: LocalPickStore
+    ) -> PickSelectionOutcome {
+        guard activeScope == scope else {
+            let message = "Your account changed. Please confirm your picks again."
+            submissionErrorMessage = message
+            return .rejected(message)
+        }
+        guard clock.now() < race.lockCutoffUtc,
+              serverPick?.lockedAt == nil
+        else {
+            submissionState = .expired
+            let message = "This race is now locked."
+            submissionErrorMessage = message
+            Haptics.locked()
+            return .rejected(message)
+        }
+
+        let dirtyGuestDraft = localPickStore.record(
             for: raceID,
             owner: .guest
         ).flatMap { record in
-            guard isDirty(record.syncState)
-            else { return nil }
-            return record
+            isDirty(record.syncState) ? record : nil
         }
-        draftGeneration &+= 1
-        let capturedDraftGeneration = draftGeneration
         let priorState = submissionState
         submissionState = .savingLocally
         submissionErrorMessage = nil
@@ -734,47 +824,135 @@ final class RaceDetailViewModel {
             record = saved
         case .locked:
             submissionState = .expired
-            submissionErrorMessage = "This race is now locked."
+            let message = "This race is now locked."
+            submissionErrorMessage = message
             Haptics.locked()
-            return
+            return .rejected(message)
         case .invalidOwner, .persistenceFailed:
             submissionState = priorState
-            submissionErrorMessage = "Your picks could not be saved on this device. Please try again."
-            return
+            let message = "Your picks could not be saved on this device. Please try again."
+            submissionErrorMessage = message
+            return .rejected(message)
+        }
+
+        guard let readableRecord = localPickStore.record(id: record.id),
+              readableRecord.revision == record.revision,
+              readableRecord.selection == selection
+        else {
+            submissionState = priorState
+            let message = "Your picks could not be saved on this device. Please try again."
+            submissionErrorMessage = message
+            return .rejected(message)
         }
 
         hasUnsavedEdits = false
         requiresAccountRepair = false
-        lastObservedVisibleRecord = record
+        lastObservedVisibleRecord = readableRecord
+        submissionState = .savedOnDevice
+        submissionErrorMessage = nil
+        return .committed(
+            PickCommitTicket(
+                recordID: readableRecord.id,
+                revision: readableRecord.revision,
+                selection: readableRecord.selection,
+                userID: scope.userID,
+                draftGeneration: draftGeneration
+            )
+        )
+    }
+
+    func reviewLegacyDevicePick(
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore
+    ) {
+        let scope = sessionScope(token: token, userID: userID)
+        if let activeScope, activeScope != scope {
+            switchScope(
+                to: scope,
+                localPickStore: localPickStore,
+                invalidatingLoad: true
+            )
+        } else {
+            activeScope = scope
+        }
+
+        if case .user = scope {
+            guard privatePickAuthority == .missing else {
+                switch privatePickAuthority {
+                case .found:
+                    submissionErrorMessage = "Your account already has picks for this race."
+                case .checking:
+                    submissionErrorMessage = "Checking your account picks. Please wait."
+                case .unavailable:
+                    submissionErrorMessage = "Your account picks are unavailable. Try again when online."
+                case .unauthorized:
+                    submissionErrorMessage = "Sign in again before recovering this device pick."
+                case .notRequired, .missing:
+                    break
+                }
+                return
+            }
+            guard hasCurrentPrivatePickAuthority(scope: scope, token: token) else {
+                submissionErrorMessage = "Your account changed. Check your account picks again before recovering this device pick."
+                return
+            }
+        }
+
+        switch localPickStore.recoverLegacyConflict(
+            for: race,
+            owner: scope.owner,
+            now: clock.now()
+        ) {
+        case .recovered:
+            hasUnsavedEdits = false
+            lastObservedVisibleRecord = nil
+            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            submissionErrorMessage = "Review these device picks, then save when they look right."
+        case .destinationOccupied:
+            submissionErrorMessage = "A newer device pick already exists for this race."
+        case .locked:
+            submissionErrorMessage = "This saved device pick can no longer be claimed because the race is locked."
+            Haptics.locked()
+        case .invalidOwner, .notFound:
+            hasRecoverableDevicePick = false
+        case .persistenceFailed:
+            submissionErrorMessage = "The device pick could not be recovered. Please try again."
+        }
+    }
+
+    // MARK: - Submit
+
+    func syncCommittedPick(
+        _ ticket: PickCommitTicket,
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore
+    ) async {
+        guard !Task.isCancelled else { return }
+        let scope = sessionScope(token: token, userID: userID)
+        guard ticket.userID == userID,
+              activeScope == scope,
+              ticket.draftGeneration == draftGeneration,
+              selectedWinnerID == ticket.selection.winnerDriverID,
+              selectedP10ID == ticket.selection.tenthPlaceDriverID,
+              selectedDNFID == ticket.selection.dnfDriverID
+        else { return }
 
         guard case .user(let currentUserID) = scope,
               let token
         else {
             submissionState = .savedOnDevice
-            onLocalSavePublished()
-            Haptics.success()
             return
         }
-
-        if record.syncState == .confirmed {
-            submissionState = .savedToAccount
-            onLocalSavePublished()
-            Haptics.success()
-            return
-        }
-
-        submissionState = .savedOnDevice
-        onLocalSavePublished()
-        await Task.yield()
-        guard activeScope == scope,
-              capturedDraftGeneration == draftGeneration,
-              selectedWinnerID == selection.winnerDriverID,
-              selectedP10ID == selection.tenthPlaceDriverID,
-              selectedDNFID == selection.dnfDriverID
-        else { return }
-        guard let currentBeforeSync = localPickStore.record(id: record.id),
-              currentBeforeSync.revision == record.revision,
-              currentBeforeSync.selection == selection
+        let sessionLease = syncManager.currentSessionLease(
+            currentUserID: currentUserID,
+            token: token
+        )
+        guard syncManager.isCurrent(sessionLease) else { return }
+        guard let currentBeforeSync = localPickStore.record(id: ticket.recordID),
+              currentBeforeSync.revision == ticket.revision,
+              currentBeforeSync.selection == ticket.selection
         else {
             hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
             return
@@ -789,22 +967,27 @@ final class RaceDetailViewModel {
         let serverAcknowledgementInterval = FXPerformance.begin(.serverAcknowledgement)
         defer { serverAcknowledgementInterval.abandon() }
         let result = await syncManager.submitExplicit(
-            id: record.id,
-            revision: record.revision,
+            id: ticket.recordID,
+            revision: ticket.revision,
             currentUserID: currentUserID,
             token: token,
             localPickStore: localPickStore
         )
 
         guard activeScope == scope,
-              capturedDraftGeneration == draftGeneration,
-              selectedWinnerID == selection.winnerDriverID,
-              selectedP10ID == selection.tenthPlaceDriverID,
-              selectedDNFID == selection.dnfDriverID
+              ticket.userID == userID,
+              ticket.draftGeneration == draftGeneration,
+              selectedWinnerID == ticket.selection.winnerDriverID,
+              selectedP10ID == ticket.selection.tenthPlaceDriverID,
+              selectedDNFID == ticket.selection.dnfDriverID
         else { return }
-        guard let currentRecord = localPickStore.record(id: record.id),
-              currentRecord.revision == record.revision,
-              currentRecord.selection == selection
+        guard syncManager.isCurrent(sessionLease) else {
+            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            return
+        }
+        guard let currentRecord = localPickStore.record(id: ticket.recordID),
+              currentRecord.revision == ticket.revision,
+              currentRecord.selection == ticket.selection
         else {
             hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
             return
@@ -849,6 +1032,55 @@ final class RaceDetailViewModel {
             submissionErrorMessage = "This race is locked. Your device copy was retained."
             Haptics.locked()
         }
+    }
+
+    func submit(
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore,
+        onLocalSavePublished: () -> Void = {}
+    ) async {
+        guard canSave,
+              let selectedWinnerID,
+              let selectedP10ID,
+              let selectedDNFID
+        else { return }
+
+        let scope = sessionScope(token: token, userID: userID)
+        if let activeScope, activeScope != scope {
+            switchScope(
+                to: scope,
+                localPickStore: localPickStore,
+                invalidatingLoad: true
+            )
+            submissionErrorMessage = "Your account changed. Please confirm your picks again."
+            return
+        }
+        activeScope = scope
+
+        let selection = PickSelection(
+            winnerDriverID: selectedWinnerID,
+            tenthPlaceDriverID: selectedP10ID,
+            dnfDriverID: selectedDNFID
+        )
+        guard case .committed(let ticket) = commitCurrentSelection(
+            selection,
+            scope: scope,
+            localPickStore: localPickStore
+        ) else { return }
+        onLocalSavePublished()
+
+        if ticket.userID == nil {
+            Haptics.success()
+            return
+        }
+        await Task.yield()
+        await syncCommittedPick(
+            ticket,
+            token: token,
+            userID: userID,
+            localPickStore: localPickStore
+        )
     }
 
     @discardableResult
@@ -936,6 +1168,8 @@ final class RaceDetailViewModel {
         submissionState = .idle
         loadErrorMessage = nil
         submissionErrorMessage = nil
+        privatePickAuthority = .notRequired
+        privatePickAuthorityCapture = nil
         refreshStoredAuthority(scope: scope, localPickStore: localPickStore)
         hasRecoverableDevicePick = localPickStore.legacyConflict(for: raceID) != nil
         hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
@@ -1079,6 +1313,26 @@ final class RaceDetailViewModel {
     private func sessionScope(token: String?, userID: String?) -> SessionScope {
         guard token != nil, let userID else { return .device }
         return .user(userID)
+    }
+
+    private func hasCurrentPrivatePickAuthority(
+        scope: SessionScope,
+        token: String?
+    ) -> Bool {
+        guard case .user = scope else {
+            return privatePickAuthority == .notRequired
+        }
+        guard let capture = privatePickAuthorityCapture,
+              capture.scope == scope,
+              capture.requestToken == token
+        else { return false }
+        switch privatePickAuthority {
+        case .missing, .found, .unavailable, .unauthorized:
+            break
+        case .notRequired, .checking:
+            return false
+        }
+        return syncManager.isCurrent(capture.sessionLease)
     }
 
     private func refreshStoredAuthority(
