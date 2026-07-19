@@ -399,7 +399,7 @@ XCTAssertEqual(
         decision: .replace(expectedDestinationRevision: destination.revision),
         now: RaceFixtures.now
     ),
-    .adopted(expectedSelection)
+    .adopted(expectedRecord)
 )
 XCTAssertNil(store.legacyConflict(for: RaceFixtures.upcoming.id))
 ```
