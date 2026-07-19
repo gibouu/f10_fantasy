@@ -70,7 +70,7 @@ enum RacePickStatusResolver {
 
         if isCurrentRevisionConfirmed(context) {
             return status(
-                "Saved to account",
+                "Picks saved",
                 detail: confirmedBonusDetail(context.bonusAuthority),
                 systemImage: "checkmark.circle.fill"
             )

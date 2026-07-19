@@ -39,7 +39,7 @@ final class RacePickStatusResolverTests: XCTestCase {
                 bonusAuthority: .eligible
             ),
             status(
-                "Saved to account",
+                "Picks saved",
                 detail: "2× bonus eligible",
                 systemImage: "checkmark.circle.fill"
             )
@@ -52,7 +52,7 @@ final class RacePickStatusResolverTests: XCTestCase {
                 bonusAuthority: .secured
             ),
             status(
-                "Saved to account",
+                "Picks saved",
                 detail: "2× bonus secured",
                 systemImage: "checkmark.circle.fill"
             )
@@ -64,8 +64,33 @@ final class RacePickStatusResolverTests: XCTestCase {
                 acknowledgedRevision: 4,
                 bonusAuthority: .notEligible
             ),
-            status("Saved to account", systemImage: "checkmark.circle.fill")
+            status("Picks saved", systemImage: "checkmark.circle.fill")
         )
+    }
+
+    func testUnacknowledgedStatesNeverUsePicksSavedCopy() {
+        let states: [PickSubmissionState] = [
+            .idle,
+            .savingLocally,
+            .savedOnDevice,
+            .syncing,
+            .reviewRequired,
+            .missingFromAccount,
+            .conflict,
+            .expired,
+        ]
+
+        for state in states {
+            XCTAssertNotEqual(
+                resolve(
+                    submissionState: state,
+                    localRevision: 4,
+                    acknowledgedRevision: nil
+                ).title,
+                "Picks saved",
+                "\(state)"
+            )
+        }
     }
 
     func testStaleAcknowledgementCannotDisplaceTheCurrentQueuedRevision() {

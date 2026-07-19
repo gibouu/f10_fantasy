@@ -61,6 +61,44 @@ enum PickBonusAuthority: Equatable, Sendable {
     case secured
 }
 
+struct PickSlotPresentation: Sendable {
+    let driver: Driver?
+    let storedDriverID: String?
+    let isOccupied: Bool
+    let title: String
+    let detail: String?
+
+    static func empty(title: String, detail: String? = nil) -> PickSlotPresentation {
+        PickSlotPresentation(
+            driver: nil,
+            storedDriverID: nil,
+            isOccupied: false,
+            title: title,
+            detail: detail
+        )
+    }
+
+    static func resolved(_ driver: Driver) -> PickSlotPresentation {
+        PickSlotPresentation(
+            driver: driver,
+            storedDriverID: driver.id,
+            isOccupied: true,
+            title: "\(driver.firstName) \(driver.lastName)",
+            detail: driver.constructor.shortName
+        )
+    }
+
+    static func unresolved(driverID: String) -> PickSlotPresentation {
+        PickSlotPresentation(
+            driver: nil,
+            storedDriverID: driverID,
+            isOccupied: true,
+            title: "Saved pick",
+            detail: "Driver details unavailable"
+        )
+    }
+}
+
 @Observable
 @MainActor
 final class RaceDetailViewModel {
@@ -89,6 +127,22 @@ final class RaceDetailViewModel {
     var officialWinner: Driver? { resolve(serverPick?.winnerDriverId) }
     var officialP10: Driver? { resolve(serverPick?.tenthPlaceDriverId) }
     var officialDNF: Driver? { resolve(serverPick?.dnfDriverId) }
+
+    func selectedPickPresentation(for slot: PickSlot) -> PickSlotPresentation {
+        presentation(
+            for: selectedDriverID(for: slot),
+            emptyTitle: slot.sheetTitle,
+            emptyDetail: slotDescription(slot)
+        )
+    }
+
+    func officialPickPresentation(for slot: PickSlot) -> PickSlotPresentation {
+        presentation(
+            for: officialDriverID(for: slot),
+            emptyTitle: "No pick",
+            emptyDetail: nil
+        )
+    }
 
     var unsubmittedDeviceDraft: PickSelection? {
         guard isPickLocked,
@@ -1570,6 +1624,44 @@ final class RaceDetailViewModel {
     private func resolve(_ driverID: String?) -> Driver? {
         guard let driverID else { return nil }
         return entrants.first { $0.id == driverID }
+    }
+
+    private func presentation(
+        for driverID: String?,
+        emptyTitle: String,
+        emptyDetail: String?
+    ) -> PickSlotPresentation {
+        guard let driverID else {
+            return .empty(title: emptyTitle, detail: emptyDetail)
+        }
+        if let driver = resolve(driverID) {
+            return .resolved(driver)
+        }
+        return .unresolved(driverID: driverID)
+    }
+
+    private func selectedDriverID(for slot: PickSlot) -> String? {
+        switch slot {
+        case .winner: selectedWinnerID
+        case .p10: selectedP10ID
+        case .dnf: selectedDNFID
+        }
+    }
+
+    private func officialDriverID(for slot: PickSlot) -> String? {
+        switch slot {
+        case .winner: serverPick?.winnerDriverId
+        case .p10: serverPick?.tenthPlaceDriverId
+        case .dnf: serverPick?.dnfDriverId
+        }
+    }
+
+    private func slotDescription(_ slot: PickSlot) -> String {
+        switch slot {
+        case .winner: "Race winner"
+        case .p10: "Finishes tenth"
+        case .dnf: "First retirement"
+        }
     }
 
     private var privatePickSnapshot: LegacyPrivatePickSnapshot? {

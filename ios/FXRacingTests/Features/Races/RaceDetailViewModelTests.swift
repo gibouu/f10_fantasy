@@ -1682,6 +1682,175 @@ final class RaceDetailViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.canSave)
     }
 
+    func testServerConfirmedPickBeforeQualifyingStaysOccupiedThroughRefreshRevisitAndLock() async {
+        let unresolvedDetail = makeDetail(
+            savedAt: RaceFixtures.now,
+            entrants: [
+                DriverFixtures.norris,
+                DriverFixtures.piastri,
+            ],
+            race: RaceFixtures.upcoming,
+            qualifyingResults: [
+                QualifyingResultRow(driverId: DriverFixtures.norris.id, position: 1),
+                QualifyingResultRow(driverId: DriverFixtures.piastri.id, position: 2),
+            ]
+        )
+        let lockedRace = RaceFixtures.race(
+            id: raceID,
+            round: RaceFixtures.upcoming.round,
+            status: .live,
+            startOffset: -60
+        )
+        let lockedDetail = RaceDetailSnapshot(
+            schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
+            savedAt: RaceFixtures.now,
+            race: lockedRace,
+            entrants: refreshedDrivers,
+            results: [],
+            qualifyingResults: [
+                QualifyingResultRow(driverId: DriverFixtures.norris.id, position: 3),
+            ]
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                detailKey: [
+                    .json(
+                        RaceDetailPayload(
+                            race: RaceFixtures.upcoming,
+                            entrants: drivers,
+                            results: [],
+                            qualifyingResults: []
+                        )
+                    ),
+                    .json(
+                        RaceDetailPayload(
+                            race: RaceFixtures.upcoming,
+                            entrants: unresolvedDetail.entrants,
+                            results: [],
+                            qualifyingResults: unresolvedDetail.qualifyingResults
+                        )
+                    ),
+                    .json(
+                        RaceDetailPayload(
+                            race: lockedRace,
+                            entrants: lockedDetail.entrants,
+                            results: [],
+                            qualifyingResults: lockedDetail.qualifyingResults
+                        )
+                    ),
+                ],
+                pickKey: [
+                    .json(PickResponse(pick: serverPick)),
+                    .json(PickResponse(pick: serverPick)),
+                    .json(PickResponse(pick: makePick(
+                        id: serverPick.id,
+                        winner: serverPick.winnerDriverId,
+                        p10: serverPick.tenthPlaceDriverId,
+                        dnf: serverPick.dnfDriverId,
+                        lockedAt: RaceFixtures.now
+                    ))),
+                    .json(PickResponse(pick: makePick(
+                        id: serverPick.id,
+                        winner: serverPick.winnerDriverId,
+                        p10: serverPick.tenthPlaceDriverId,
+                        dnf: serverPick.dnfDriverId,
+                        lockedAt: RaceFixtures.now
+                    ))),
+                ],
+            ]
+        )
+        let repository = RaceRepository(
+            api: api,
+            cache: MemoryRaceSnapshotCache(),
+            clock: TestClock.fixed
+        )
+        let store = makeStore()
+        let viewModel = RaceDetailViewModel(
+            summary: RaceFixtures.upcoming,
+            repository: repository,
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        XCTAssertEqual(viewModel.submissionState, .savedToAccount)
+        XCTAssertEqual(viewModel.selectedWinnerID, serverPick.winnerDriverId)
+        XCTAssertEqual(viewModel.selectedPickPresentation(for: .winner).title, "Charles Leclerc")
+
+        await viewModel.refresh(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        XCTAssertEqual(viewModel.selectedWinnerID, serverPick.winnerDriverId)
+        XCTAssertTrue(viewModel.selectedPickPresentation(for: .winner).isOccupied)
+        XCTAssertEqual(viewModel.selectedPickPresentation(for: .winner).title, "Saved pick")
+        XCTAssertEqual(
+            viewModel.selectedPickPresentation(for: .winner).detail,
+            "Driver details unavailable"
+        )
+
+        let relaunched = RaceDetailViewModel(
+            summary: RaceFixtures.upcoming,
+            repository: repository,
+            api: api,
+            syncManager: SyncManager(api: api, clock: TestClock.fixed),
+            clock: TestClock.fixed
+        )
+        await relaunched.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        relaunched.updateSummary(lockedRace)
+        await relaunched.refresh(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertTrue(relaunched.isPickLocked)
+        XCTAssertEqual(relaunched.selectedWinnerID, serverPick.winnerDriverId)
+        XCTAssertEqual(relaunched.selectedPickPresentation(for: .winner).title, "Charles Leclerc")
+    }
+
+    func testUnresolvedOfficialSavedPickRemainsOccupiedInsteadOfNoPick() async {
+        let lockedPick = makePick(
+            id: "locked-server",
+            winner: DriverFixtures.norris.id,
+            p10: DriverFixtures.piastri.id,
+            dnf: DriverFixtures.leclerc.id,
+            lockedAt: RaceFixtures.now
+        )
+        let api = GatedAPIClientSpy(
+            responses: [pickKey: [.json(PickResponse(pick: lockedPick))]]
+        )
+        let repository = ImmediateRaceRepository(
+            detail: makeDetail(
+                savedAt: RaceFixtures.now,
+                entrants: [DriverFixtures.piastri, DriverFixtures.leclerc]
+            )
+        )
+        let viewModel = makeViewModel(api: api, repository: repository)
+
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: makeStore()
+        )
+
+        let winner = viewModel.officialPickPresentation(for: .winner)
+        XCTAssertTrue(winner.isOccupied)
+        XCTAssertEqual(winner.title, "Saved pick")
+        XCTAssertEqual(winner.detail, "Driver details unavailable")
+        XCTAssertEqual(viewModel.serverPick?.winnerDriverId, DriverFixtures.norris.id)
+    }
+
     func testExternalNewerRevisionDuringPOSTDoesNotLeaveViewModelSyncing() async {
         let api = GatedAPIClientSpy(
             responses: [
@@ -3724,15 +3893,17 @@ final class RaceDetailViewModelTests: XCTestCase {
 
     private func makeDetail(
         savedAt: Date,
-        entrants: [Driver]
+        entrants: [Driver],
+        race: Race = RaceFixtures.upcoming,
+        qualifyingResults: [QualifyingResultRow] = []
     ) -> RaceDetailSnapshot {
         RaceDetailSnapshot(
             schemaVersion: RaceDetailSnapshot.currentSchemaVersion,
             savedAt: savedAt,
-            race: RaceFixtures.upcoming,
+            race: race,
             entrants: entrants,
             results: [],
-            qualifyingResults: []
+            qualifyingResults: qualifyingResults
         )
     }
 

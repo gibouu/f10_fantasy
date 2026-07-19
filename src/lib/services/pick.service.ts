@@ -16,7 +16,9 @@ import { z } from 'zod'
 import type { PickSetData, PickSetWithScore } from '@/types/domain'
 import { buildSeatLookup, inferSeatKeyFromDriver } from '@/lib/f1/seats'
 import { resolveTeam } from '@/lib/f1/teams'
+import { resolvePickAgainstEntrants } from '@/lib/services/pick-resolution'
 import { mapRaceToSummary } from './race-summary.mapper'
+import { getRaceEntrants } from './race.service'
 
 /**
  * Thrown when a pick cannot be created/updated because either the race-level
@@ -368,8 +370,9 @@ export async function getPickForRace(
 
   if (!pickSet) return null
 
-  return {
-    ...mapPickSetToData({
+  const entrants = await getRaceEntrants(raceId)
+  const resolved = resolvePickAgainstEntrants(
+    mapPickSetToData({
       ...pickSet,
       tenthPlaceSeatKey: resolveStoredSeatKey(
         pickSet.tenthPlaceSeatKey,
@@ -384,6 +387,11 @@ export async function getPickForRace(
         pickSet.dnfDriver,
       ),
     }),
+    entrants,
+  )
+
+  return {
+    ...resolved,
     race: mapRaceToSummary(pickSet.race),
     scoreBreakdown: pickSet.scoreBreakdown
       ? {

@@ -35,11 +35,11 @@ struct RacePickPanel: View {
             }
             .padding(.bottom, 8)
 
-            pickRow(.winner, driver: viewModel.selectedWinner)
+            pickRow(.winner, presentation: viewModel.selectedPickPresentation(for: .winner))
             Divider().padding(.leading, 52)
-            pickRow(.p10, driver: viewModel.selectedP10)
+            pickRow(.p10, presentation: viewModel.selectedPickPresentation(for: .p10))
             Divider().padding(.leading, 52)
-            pickRow(.dnf, driver: viewModel.selectedDNF)
+            pickRow(.dnf, presentation: viewModel.selectedPickPresentation(for: .dnf))
 
             RacePickStatusRail(status: pickStatus, onAction: handleStatusAction)
                 .padding(.top, 12)
@@ -98,7 +98,7 @@ struct RacePickPanel: View {
         .accessibilityLabel("\(selectionCount) of 3 picks selected")
     }
 
-    private func pickRow(_ slot: PickSlot, driver: Driver?) -> some View {
+    private func pickRow(_ slot: PickSlot, presentation: PickSlotPresentation) -> some View {
         Button {
             guard !isLocked else {
                 Haptics.locked()
@@ -111,8 +111,8 @@ struct RacePickPanel: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     slotLabel(slot, fixedWidth: true)
-                    DriverBubbleView(driver: driver, size: 36)
-                    driverIdentity(slot, driver: driver, allowsWrapping: false)
+                    DriverBubbleView(driver: presentation.driver, size: 36)
+                    driverIdentity(presentation, allowsWrapping: false)
                     Spacer(minLength: 0)
                     trailingIcon
                 }
@@ -124,8 +124,8 @@ struct RacePickPanel: View {
                         trailingIcon
                     }
                     HStack(alignment: .top, spacing: 12) {
-                        DriverBubbleView(driver: driver, size: 36)
-                        driverIdentity(slot, driver: driver, allowsWrapping: true)
+                        DriverBubbleView(driver: presentation.driver, size: 36)
+                        driverIdentity(presentation, allowsWrapping: true)
                         Spacer(minLength: 0)
                     }
                 }
@@ -148,19 +148,20 @@ struct RacePickPanel: View {
     }
 
     private func driverIdentity(
-        _ slot: PickSlot,
-        driver: Driver?,
+        _ presentation: PickSlotPresentation,
         allowsWrapping: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(driver.map { "\($0.firstName) \($0.lastName)" } ?? slot.sheetTitle)
+            Text(presentation.title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(driver == nil ? .secondary : .primary)
+                .foregroundStyle(presentation.isOccupied ? .primary : .secondary)
                 .lineLimit(allowsWrapping ? 3 : 1)
-            Text(driver?.constructor.shortName ?? slotDescription(slot))
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(allowsWrapping ? 2 : 1)
+            if let detail = presentation.detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(allowsWrapping ? 2 : 1)
+            }
         }
     }
 
@@ -185,14 +186,6 @@ struct RacePickPanel: View {
         if isLocked { return "Picks are locked" }
         if !isDriverSelectionReady { return "Drivers are loading" }
         return "Opens the driver picker"
-    }
-
-    private func slotDescription(_ slot: PickSlot) -> String {
-        switch slot {
-        case .winner: "Race winner"
-        case .p10: "Finishes tenth"
-        case .dnf: "First retirement"
-        }
     }
 
     private func slotColor(_ slot: PickSlot) -> Color {

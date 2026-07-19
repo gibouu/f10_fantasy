@@ -95,24 +95,35 @@ struct PastRaceCard: View {
         let breakdown = detail.serverPick?.scoreBreakdown
 
         return VStack(spacing: 0) {
-            scoreRow("P1", driver: detail.officialWinner, points: breakdown?.winnerBonus)
+            scoreRow("P1", presentation: detail.officialPickPresentation(for: .winner), points: breakdown?.winnerBonus)
             Divider().padding(.leading, 40)
-            scoreRow("P10", driver: detail.officialP10, points: breakdown?.tenthPlaceScore)
+            scoreRow("P10", presentation: detail.officialPickPresentation(for: .p10), points: breakdown?.tenthPlaceScore)
             Divider().padding(.leading, 40)
-            scoreRow("DNF", driver: detail.officialDNF, points: breakdown?.dnfBonus)
+            scoreRow("DNF", presentation: detail.officialPickPresentation(for: .dnf), points: breakdown?.dnfBonus)
         }
     }
 
-    private func scoreRow(_ slot: String, driver: Driver?, points: Int?) -> some View {
-        HStack(spacing: 10) {
+    private func scoreRow(_ slot: String, presentation: PickSlotPresentation, points: Int?) -> some View {
+        let driver = presentation.driver
+
+        return HStack(spacing: 10) {
             Text(slot)
                 .font(.system(size: 10, weight: .black, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .frame(width: 32, alignment: .leading)
             DriverBubbleView(driver: driver, size: 30)
-            Text(driver.map { "\($0.firstName) \($0.lastName)" } ?? "No pick")
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(presentation.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(presentation.isOccupied ? .primary : .secondary)
+                    .lineLimit(2)
+                if let detail = presentation.detail, driver == nil, presentation.isOccupied {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                }
+            }
             Spacer(minLength: 4)
             Text(points.map { "+\($0)" } ?? "—")
                 .font(.system(size: 13, weight: .bold, design: .monospaced))
@@ -135,9 +146,9 @@ struct PastRaceCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                draftRow("P1", driver: detail.selectedWinner)
-                draftRow("P10", driver: detail.selectedP10)
-                draftRow("DNF", driver: detail.selectedDNF)
+                draftRow("P1", presentation: detail.selectedPickPresentation(for: .winner))
+                draftRow("P10", presentation: detail.selectedPickPresentation(for: .p10))
+                draftRow("DNF", presentation: detail.selectedPickPresentation(for: .dnf))
             }
             .padding(12)
             .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -146,17 +157,28 @@ struct PastRaceCard: View {
         }
     }
 
-    private func draftRow(_ slot: String, driver: Driver?) -> some View {
-        HStack(spacing: 10) {
+    private func draftRow(_ slot: String, presentation: PickSlotPresentation) -> some View {
+        let driver = presentation.driver
+
+        return HStack(spacing: 10) {
             Text(slot)
                 .font(.system(size: 10, weight: .black, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .frame(width: 32, alignment: .leading)
             DriverBubbleView(driver: driver, size: 26)
-            Text(driver.map { "\($0.firstName) \($0.lastName)" } ?? "No pick")
-                .font(.caption.weight(.semibold))
-                .lineLimit(2)
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(presentation.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(presentation.isOccupied ? .primary : .secondary)
+                    .lineLimit(2)
+                if let detail = presentation.detail, driver == nil, presentation.isOccupied {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 4)
         }
         .frame(minHeight: 34)
     }

@@ -92,7 +92,7 @@ final class MainShellUITests: XCTestCase {
         XCTAssertFalse(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
         XCTAssertTrue(
             app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 2)
-                || app.staticTexts["Saved to account"].exists
+                || app.staticTexts["Picks saved"].exists
         )
         XCTAssertFalse(app.buttons["save-picks-spa"].exists)
     }
