@@ -618,6 +618,8 @@ git commit -m $'Replace pick buttons with autosave status\n\n— gib'
 
 ### Task 6: Guarantee stable race-card geometry and center Schedule
 
+**Status:** Complete in `ed344cb8764db00e209dd1a4681ea4c5b3c8f31c`.
+
 **Task 5C baseline:** `03ad7e06451aba6eeec8c46dd3eda85de56a1a39`
 
 Preserve Task 5C invariants while doing layout work: saved picks must not disappear solely because driver metadata is temporarily unavailable; metadata refreshes must not mutate or invalidate persisted user selections; UI presentation and persistence stay decoupled. Keep the generic unresolved-pick fallback (`Saved pick` / `Driver details unavailable`) unless a future UX task explicitly replaces it. Do not reintroduce `Review device picks` or any equivalent card-level recovery action.
@@ -638,7 +640,7 @@ Preserve Task 5C invariants while doing layout work: saved picks must not disapp
 - Produces: deterministic `UpcomingCardLayoutMetrics.cardHeight(for:)`.
 - Changes: iPhone `RacePagerGeometry.spacing` from 10 to 18 and `adjacentPeek` to zero.
 
-- [ ] **Step 1: Write failing geometry tests**
+- [x] **Step 1: Write failing geometry tests**
 
 ```swift
 for width in [320.0, 375.0, 393.0, 402.0, 430.0] {
@@ -651,23 +653,23 @@ for width in [320.0, 375.0, 393.0, 402.0, 430.0] {
 
 Assert layout floors are monotonic across Dynamic Type classes and are identical for placeholder, hydrated, saving, conflict, and recovery-available inputs.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run centered-pager, layout-metrics, and Schedule tests; expected failures are spacing 10, missing metrics, and translucent/leading sheet contract.
 
-- [ ] **Step 3: Implement precomputed floors**
+- [x] **Step 3: Implement precomputed floors**
 
 `UpcomingCardLayoutMetrics` maps each supported `DynamicTypeSize` to a calibrated fixed height covering two race-name lines, two circuit lines, three pick rows, and the two-line rail. It is chosen before interaction and never learned from hydration. Apply the same `.frame(height:)` to placeholder and hydrated cards; detailed errors remain outside.
 
-- [ ] **Step 4: Remove optical pager shift**
+- [x] **Step 4: Remove optical pager shift**
 
 Use 18-point spacing for iPhone widths, preserve centered offset math, snapping, Reduce Motion, and VoiceOver adjustable actions. Keep wider compatibility layouts composed of complete cards, never clipped slivers.
 
-- [ ] **Step 5: Center and opacify Schedule**
+- [x] **Step 5: Center and opacify Schedule**
 
 Use an opaque dark system presentation background, a centered independent title, equal 18-point margins inside a centered max-width container, and existing medium/large detents plus drag indicator.
 
-- [ ] **Step 6: Verify UI frames and commit**
+- [x] **Step 6: Verify UI frames and commit**
 
 XCUITest compares first/middle/last standard frames, placeholder-to-hydrated frames, and one accessibility content-size launch; Schedule test verifies its content centerline. Run `npm run test:ios` and generic build-for-testing; commit:
 
