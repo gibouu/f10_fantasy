@@ -2,7 +2,7 @@
 
 > Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-Last updated: 2026-07-19T18:05:59Z
+Last updated: 2026-07-19T18:08:02Z
 
 ## Project purpose
 
@@ -21,7 +21,7 @@ Primary journeys:
 - Repository: `gibouu/f10_fantasy`
 - Default branch: `main`
 - Active branch: `feat/367-ios-autosave-release-polish`
-- Active branch HEAD at this handoff: `d2fab3ce8184ac76af163b7f1b2d7453810b1e02`
+- Active branch HEAD at this handoff: `d44f0bf93d1abbcb5bebb6cfe5ea5fe532b45b63`
 - Remote: `https://github.com/gibouu/f10_fantasy.git`
 - Upstream: `origin/feat/367-ios-autosave-release-polish`
 - Draft PR: #373 — `Polish FX Racing iOS autosave and release handoff`
@@ -105,6 +105,7 @@ Grouped milestones on `feat/367-ios-autosave-release-polish`:
   - Automated checks are green, but simulator/manual verification remains pending.
 - Handoff preservation.
   - `d2fab3ce8184ac76af163b7f1b2d7453810b1e02` — `Add FX Racing handoff memory`
+  - `d44f0bf93d1abbcb5bebb6cfe5ea5fe532b45b63` — `Update FX Racing handoff instructions`
 
 ## Decisions and rationale
 
@@ -244,7 +245,7 @@ Safe recovery guidance:
 
 ## Last updated
 
-- UTC timestamp: 2026-07-19T18:05:59Z
+- UTC timestamp: 2026-07-19T18:08:02Z
 - Branch: `feat/367-ios-autosave-release-polish`
-- Commit SHA at update start: `d2fab3ce8184ac76af163b7f1b2d7453810b1e02`
+- Commit SHA at update start: `d44f0bf93d1abbcb5bebb6cfe5ea5fe532b45b63`
 - Authoring environment: Codex desktop session
