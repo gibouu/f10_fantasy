@@ -453,7 +453,9 @@ git commit -m $'Make legacy pick recovery atomic\n\n— gib'
 
 **Files:**
 - Modify: `ios/FXRacing/Core/Models/Pick.swift`
+- Modify: `ios/FXRacing/Core/Sync/SyncManager.swift`
 - Modify: `ios/FXRacing/Features/Races/RaceDetailViewModel.swift`
+- Modify: `ios/FXRacingTests/Core/Sync/SyncManagerTests.swift`
 - Modify: `ios/FXRacingTests/Features/Races/RaceDetailViewModelTests.swift`
 - Modify: `ios/race-detail-load-reset.test.mjs`
 - Modify: `ios/server-acknowledgement-span.test.mjs`
@@ -462,6 +464,7 @@ git commit -m $'Make legacy pick recovery atomic\n\n— gib'
 - Produces: `selectAndCommit(driver:for:token:userID:localPickStore:) -> PickSelectionOutcome`.
 - Produces: `syncCommittedPick(_:token:userID:localPickStore:) async`.
 - Produces: explicit private-pick authority state for recovery presentation.
+- Produces: `SyncManager.currentSessionLease(currentUserID:token:)` and `SyncManager.isCurrent(_:)` for tap-time recovery revalidation.
 
 - [ ] **Step 1: Write failing ViewModel tests**
 
