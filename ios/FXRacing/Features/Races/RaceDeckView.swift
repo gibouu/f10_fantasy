@@ -823,6 +823,7 @@ struct RaceDeckView: View {
                     tenthPlaceDriverID: $0.tenthPlaceDriverId,
                     dnfDriverID: $0.dnfDriverId
                 ),
+                lockedAt: $0.lockedAt,
                 updatedAt: $0.updatedAt
             )
         }

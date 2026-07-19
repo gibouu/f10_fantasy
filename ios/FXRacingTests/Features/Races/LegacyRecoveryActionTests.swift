@@ -238,6 +238,43 @@ final class LegacyRecoveryActionTests: XCTestCase {
         XCTAssertEqual(store.legacyConflict(for: race.id), legacy)
     }
 
+    func testSignedDiscardRejectsChangedDestinationRevisionAndRetainsLegacySource() async throws {
+        let (store, legacy) = try makeStoreWithLegacy()
+        let current = try XCTUnwrap(savedCurrent(in: store))
+        let api = GatedAPIClientSpy(
+            responses: ["GET /api/picks": [.failure(.notFound)]]
+        )
+        let syncManager = activeSyncManager(api: api, store: store)
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        _ = store.save(
+            selection: selection,
+            race: race,
+            owner: .user("user-a"),
+            now: RaceFixtures.now.addingTimeInterval(1),
+            forceNewRevision: true
+        )
+
+        XCTAssertEqual(
+            viewModel.resolveLegacyDevicePick(
+                action: .discard,
+                expectedOwner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                expectedDestinationRevision: current.revision,
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .rejected("Your current picks changed. Close this sheet and review them again.")
+        )
+        XCTAssertEqual(store.legacyConflict(for: race.id), legacy)
+    }
+
     func testSignedKeepRejectsChangedServerFingerprintAndRetainsLegacySource() async throws {
         let (store, legacy) = try makeStoreWithLegacy()
         let current = try XCTUnwrap(savedCurrent(in: store))
@@ -270,6 +307,64 @@ final class LegacyRecoveryActionTests: XCTestCase {
         let captured = LegacyPrivatePickSnapshot(
             id: original.id,
             selection: selection,
+            lockedAt: original.lockedAt,
+            updatedAt: original.updatedAt
+        )
+        await viewModel.refresh(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(
+            viewModel.resolveLegacyDevicePick(
+                action: .keepCurrent,
+                expectedOwner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                expectedDestinationRevision: current.revision,
+                expectedServerPick: captured,
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .rejected("Your current picks changed. Close this sheet and review them again.")
+        )
+        XCTAssertEqual(store.legacyConflict(for: race.id), legacy)
+    }
+
+    func testSignedKeepRejectsChangedServerLockStateAndRetainsLegacySource() async throws {
+        let (store, legacy) = try makeStoreWithLegacy()
+        let current = try XCTUnwrap(savedCurrent(in: store))
+        let original = serverPick
+        let locked = Pick(
+            id: original.id,
+            raceId: original.raceId,
+            tenthPlaceDriverId: original.tenthPlaceDriverId,
+            winnerDriverId: original.winnerDriverId,
+            dnfDriverId: original.dnfDriverId,
+            lockedAt: RaceFixtures.now,
+            scoreBreakdown: original.scoreBreakdown,
+            updatedAt: original.updatedAt
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET /api/picks": [
+                    .json(PickResponse(pick: original)),
+                    .json(PickResponse(pick: locked)),
+                ],
+            ]
+        )
+        let syncManager = activeSyncManager(api: api, store: store)
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        let captured = LegacyPrivatePickSnapshot(
+            id: original.id,
+            selection: selection,
+            lockedAt: original.lockedAt,
             updatedAt: original.updatedAt
         )
         await viewModel.refresh(

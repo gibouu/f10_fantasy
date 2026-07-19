@@ -201,6 +201,7 @@ final class LegacyRecoveryPresentationSessionTests: XCTestCase {
                 tenthPlaceDriverID: "p10",
                 dnfDriverID: "dnf"
             ),
+            lockedAt: nil,
             updatedAt: Date(timeIntervalSince1970: 2)
         )
         let found = checking.refreshed(

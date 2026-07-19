@@ -42,6 +42,7 @@ enum LegacyRecoveryActionOutcome: Equatable, Sendable {
 struct LegacyPrivatePickSnapshot: Equatable, Sendable {
     let id: String
     let selection: PickSelection
+    let lockedAt: Date?
     let updatedAt: Date?
 }
 
@@ -1025,6 +1026,15 @@ final class RaceDetailViewModel {
             guard privatePickSnapshot == expectedServerPick else {
                 return .rejected("Your current picks changed. Close this sheet and review them again.")
             }
+            if action == .discard {
+                let currentDestination = localPickStore.record(
+                    for: raceID,
+                    owner: scope.owner
+                )
+                guard currentDestination?.revision == expectedDestinationRevision else {
+                    return .rejected("Your current picks changed. Close this sheet and review them again.")
+                }
+            }
         }
 
         let decision: LegacyPickDecision
@@ -1571,6 +1581,7 @@ final class RaceDetailViewModel {
                     tenthPlaceDriverID: $0.tenthPlaceDriverId,
                     dnfDriverID: $0.dnfDriverId
                 ),
+                lockedAt: $0.lockedAt,
                 updatedAt: $0.updatedAt
             )
         }
