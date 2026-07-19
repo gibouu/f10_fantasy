@@ -755,6 +755,9 @@ enum PerformanceFixtureState {
         }
 
         reset()
+        if arguments.contains("--legacy-recovery") {
+            seedLegacyRecoveryPick()
+        }
         return LocalPickStore(clock: PerformanceClock())
     }
 
@@ -772,6 +775,21 @@ enum PerformanceFixtureState {
     private static func reset() {
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
         UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
+    }
+
+    private static func seedLegacyRecoveryPick() {
+        let legacy = LegacyLocalPickV1(
+            raceId: PerformanceFixtures.liveSpa.id,
+            winnerId: "norris",
+            p10Id: "hamilton",
+            dnfId: "leclerc",
+            savedAt: PerformanceFixtures.now,
+            synced: false
+        )
+        guard let data = try? JSONEncoder().encode([
+            PerformanceFixtures.liveSpa.id: legacy,
+        ]) else { return }
+        UserDefaults.standard.set(data, forKey: "localPicks_v1")
     }
 }
 

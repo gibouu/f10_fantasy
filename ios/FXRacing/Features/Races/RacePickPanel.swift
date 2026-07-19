@@ -6,6 +6,7 @@ struct RacePickPanel: View {
     let onSelectSlot: (PickSlot) -> Void
     let onRetryCommit: () -> PickSelectionOutcome
     let onSignIn: () -> Void
+    let onResolveConflict: () -> Void
     let isAuthenticated: Bool
 
     private var isLocked: Bool {
@@ -78,7 +79,7 @@ struct RacePickPanel: View {
         case .signIn:
             onSignIn()
         case .resolveConflict:
-            onSelectSlot(.winner)
+            onResolveConflict()
         }
     }
 

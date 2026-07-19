@@ -98,6 +98,32 @@ final class MainShellUITests: XCTestCase {
     }
 
     @MainActor
+    func testLegacyRecoveryPresentsOnceAcrossSectionSwitchAndNotNowPreservesIt() {
+        let app = launch(.gameplay, extraArguments: ["--legacy-recovery"])
+
+        XCTAssertTrue(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.staticTexts["P1"].exists)
+        XCTAssertTrue(app.staticTexts["P10"].exists)
+        XCTAssertTrue(app.staticTexts["DNF"].exists)
+        app.buttons["Not now"].tap()
+        XCTAssertFalse(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 1)
+        )
+
+        app.buttons["Past"].tap()
+        app.buttons["Upcoming"].tap()
+
+        XCTAssertFalse(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 1)
+        )
+    }
+
+    @MainActor
     func testUpcomingSeasonFormAndDriverPickerCoverTheFull2026Field() {
         let app = launch(.gameplay)
         let deck = element(in: app, identifier: "race-deck")

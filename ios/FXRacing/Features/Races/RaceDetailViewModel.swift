@@ -26,6 +26,25 @@ enum PickSelectionOutcome: Equatable, Sendable {
     case committed(PickCommitTicket)
 }
 
+enum LegacyRecoveryAction: Equatable, Sendable {
+    case use
+    case discard
+    case keepCurrent
+    case replace
+}
+
+enum LegacyRecoveryActionOutcome: Equatable, Sendable {
+    case resolved
+    case committed(PickCommitTicket)
+    case rejected(String)
+}
+
+struct LegacyPrivatePickSnapshot: Equatable, Sendable {
+    let id: String
+    let selection: PickSelection
+    let updatedAt: Date?
+}
+
 enum PrivatePickAuthority: Equatable, Sendable {
     case notRequired
     case checking
@@ -978,6 +997,115 @@ final class RaceDetailViewModel {
         }
     }
 
+    func resolveLegacyDevicePick(
+        action: LegacyRecoveryAction,
+        expectedOwner: PickOwnerScope,
+        expectedLegacyRevision: UInt64,
+        expectedDestinationRevision: UInt64?,
+        expectedServerPick: LegacyPrivatePickSnapshot? = nil,
+        token: String?,
+        userID: String?,
+        localPickStore: LocalPickStore
+    ) -> LegacyRecoveryActionOutcome {
+        let scope = sessionScope(token: token, userID: userID)
+        guard scope.owner == expectedOwner else {
+            return .rejected("Your account changed. Review these picks again.")
+        }
+        guard activeScope == scope else {
+            return .rejected("Your account changed. Review these picks again.")
+        }
+
+        if case .user = scope, action != .discard {
+            guard hasCurrentPrivatePickAuthority(scope: scope, token: token) else {
+                return .rejected("Connect to check account picks, then retry.")
+            }
+            guard privatePickAuthority == .missing || privatePickAuthority == .found else {
+                return .rejected("Connect to check account picks, then retry.")
+            }
+            guard privatePickSnapshot == expectedServerPick else {
+                return .rejected("Your current picks changed. Close this sheet and review them again.")
+            }
+        }
+
+        let decision: LegacyPickDecision
+        switch action {
+        case .use:
+            if case .user = scope, privatePickAuthority != .missing {
+                return .rejected("Your account already has picks. Choose which picks to keep.")
+            }
+            decision = .adopt
+        case .discard:
+            decision = .discard
+        case .keepCurrent:
+            decision = .keepCurrent(
+                expectedDestinationRevision: expectedDestinationRevision
+            )
+        case .replace:
+            if let expectedDestinationRevision {
+                decision = .replace(
+                    expectedDestinationRevision: expectedDestinationRevision
+                )
+            } else {
+                // A server-owned destination has no local revision. The
+                // private-authority capture above proves it exists; adopting a
+                // new owner-scoped revision is the atomic replacement draft.
+                decision = .adopt
+            }
+        }
+
+        let result = localPickStore.resolveLegacyConflict(
+            race: race,
+            owner: scope.owner,
+            expectedLegacyRevision: expectedLegacyRevision,
+            decision: decision,
+            now: clock.now()
+        )
+
+        switch result {
+        case .adopted(let record):
+            guard let readableRecord = localPickStore.record(id: record.id),
+                  readableRecord.revision == record.revision,
+                  readableRecord.selection == record.selection,
+                  localPickStore.legacyConflict(for: raceID) == nil
+            else {
+                return .rejected("The found picks could not be saved. They remain available to retry.")
+            }
+            hasUnsavedEdits = false
+            requiresAccountRepair = false
+            lastObservedVisibleRecord = nil
+            hydrateLocalDraft(scope: scope, localPickStore: localPickStore)
+            submissionErrorMessage = nil
+            return .committed(
+                PickCommitTicket(
+                    recordID: readableRecord.id,
+                    revision: readableRecord.revision,
+                    selection: readableRecord.selection,
+                    userID: scope.userID,
+                    draftGeneration: draftGeneration
+                )
+            )
+        case .discarded, .keptCurrent:
+            hasRecoverableDevicePick = false
+            submissionErrorMessage = nil
+            reconcileLocalState(
+                token: token,
+                userID: userID,
+                localPickStore: localPickStore
+            )
+            return .resolved
+        case .locked:
+            return .rejected("This race is locked. The found picks remain available.")
+        case .staleLegacy:
+            return .rejected("The found picks changed. Close this sheet and try again.")
+        case .destinationOccupied, .destinationChanged:
+            return .rejected("Your current picks changed. Close this sheet and review them again.")
+        case .invalidOwner:
+            return .rejected("Your account changed. Review these picks again.")
+        case .persistenceFailed:
+            return .rejected("The found picks could not be saved. They remain available to retry.")
+        }
+    }
+
     // MARK: - Submit
 
     func syncCommittedPick(
@@ -1432,6 +1560,20 @@ final class RaceDetailViewModel {
     private func resolve(_ driverID: String?) -> Driver? {
         guard let driverID else { return nil }
         return entrants.first { $0.id == driverID }
+    }
+
+    private var privatePickSnapshot: LegacyPrivatePickSnapshot? {
+        serverPick.map {
+            LegacyPrivatePickSnapshot(
+                id: $0.id,
+                selection: PickSelection(
+                    winnerDriverID: $0.winnerDriverId,
+                    tenthPlaceDriverID: $0.tenthPlaceDriverId,
+                    dnfDriverID: $0.dnfDriverId
+                ),
+                updatedAt: $0.updatedAt
+            )
+        }
     }
 
     private func matches(_ pick: Pick, selection: PickSelection) -> Bool {

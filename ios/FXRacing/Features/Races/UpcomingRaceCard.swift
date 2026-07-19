@@ -9,6 +9,7 @@ struct UpcomingRaceCard: View {
     let onSelectSlot: (PickSlot) -> Void
     let onRetryCommit: () -> PickSelectionOutcome
     let onSignIn: () -> Void
+    let onResolveConflict: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -29,6 +30,7 @@ struct UpcomingRaceCard: View {
                     onSelectSlot: onSelectSlot,
                     onRetryCommit: onRetryCommit,
                     onSignIn: onSignIn,
+                    onResolveConflict: onResolveConflict,
                     isAuthenticated: isAuthenticated
                 )
             } else {

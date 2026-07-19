@@ -8,6 +8,7 @@ private struct RaceSelectionPerformanceSpan {
 
 struct RaceDeckView: View {
     @Bindable var viewModel: RaceDeckViewModel
+    let legacyRecoveryPresentationSession: LegacyRecoveryPresentationSession
     let section: RaceDeckSection
 
     @Environment(AuthManager.self) private var authManager
@@ -33,6 +34,8 @@ struct RaceDeckView: View {
     @State private var raceSelectionReadySpan: RaceSelectionPerformanceSpan?
     @State private var imagePrefetchOwnerID: UUID?
     @State private var foregroundRefreshTask: Task<Void, Never>?
+    @State private var legacyRecoveryPresentation: LegacyRecoveryPresentation?
+    @State private var legacyRecoveryErrorMessage: String?
 
     private var races: [Race] {
         switch section {
@@ -89,6 +92,11 @@ struct RaceDeckView: View {
         return localPickStore.record(for: selectedRaceID, owner: .user(userID))
     }
 
+    private var observedLegacyRecord: LocalPickRecord? {
+        guard let selectedRaceID else { return nil }
+        return localPickStore.legacyConflict(for: selectedRaceID)
+    }
+
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.races.isEmpty {
@@ -129,8 +137,17 @@ struct RaceDeckView: View {
                 reason: "Sign in to sync your picks and track your score against friends."
             )
         }
+        .sheet(
+            item: $legacyRecoveryPresentation,
+            onDismiss: { dismissLegacyRecovery() }
+        ) { presentation in
+            legacyRecoverySheet(presentation)
+        }
         .task(id: detailTaskKey) {
             await loadSelectedDetail()
+        }
+        .task(id: legacyRecoveryTaskKey) {
+            _ = presentLegacyRecoveryIfNeeded()
         }
         .task(id: imagePrefetchTaskKey) {
             let previousOwnerID = imagePrefetchOwnerID
@@ -189,6 +206,7 @@ struct RaceDeckView: View {
             foregroundRefreshTask?.cancel()
             foregroundRefreshTask = nil
             isShowingPicker = false
+            dismissLegacyRecovery()
         }
         .onChange(of: viewModel.transitionedRaceID) { _, raceID in
             guard let raceID else { return }
@@ -208,6 +226,7 @@ struct RaceDeckView: View {
             selectedDetailScopeID = nil
             finishPickerPresentation()
             finishSchedulePresentation()
+            dismissLegacyRecovery()
             abandonRaceSelection()
             let ownerID = imagePrefetchOwnerID
             imagePrefetchOwnerID = nil
@@ -230,6 +249,18 @@ struct RaceDeckView: View {
             section == .upcoming ? "upcoming" : "past",
             viewModel.imagePrefetchCohortKey,
             String(describing: displayScale),
+        ].joined(separator: ":")
+    }
+
+    private var legacyRecoveryTaskKey: String {
+        [
+            section == .upcoming ? "upcoming" : "past",
+            selectedRaceID ?? "none",
+            privateScopeID,
+            observedLegacyRecord.map { String($0.revision) } ?? "none",
+            scopedSelectedDetail.map { String($0.entrants.count) } ?? "0",
+            scopedSelectedDetail.map { String(describing: $0.privatePickAuthority) }
+                ?? "not-ready",
         ].joined(separator: ":")
     }
 
@@ -310,7 +341,8 @@ struct RaceDeckView: View {
                     }
                     return retryCurrentSelectionCommit(detail: detail)
                 },
-                onSignIn: { isShowingSignIn = true }
+                onSignIn: { isShowingSignIn = true },
+                onResolveConflict: { resolvePickConflict(for: race) }
             )
         case .past:
             PastRaceCard(
@@ -597,6 +629,193 @@ struct RaceDeckView: View {
             )
         }
         return outcome
+    }
+
+    @ViewBuilder
+    private func legacyRecoverySheet(
+        _ presentation: LegacyRecoveryPresentation
+    ) -> some View {
+        if let detail = scopedSelectedDetail,
+           detail.race.id == presentation.raceID,
+           presentation.privateScopeID == privateScopeID {
+            LegacyPickRecoverySheet(
+                presentation: presentation,
+                authority: detail.privatePickAuthority,
+                isLocked: detail.isPickLocked,
+                errorMessage: legacyRecoveryErrorMessage,
+                onAction: { action in
+                    handleLegacyRecoveryAction(
+                        action,
+                        presentation: presentation,
+                        detail: detail
+                    )
+                }
+            )
+        }
+    }
+
+    @discardableResult
+    private func presentLegacyRecoveryIfNeeded() -> Bool {
+        if legacyRecoveryPresentation != nil { return true }
+        guard section == .upcoming,
+              let race = selectedRace,
+              let detail = scopedSelectedDetail,
+              detail.race.id == race.id,
+              !detail.entrants.isEmpty,
+              let legacy = localPickStore.legacyConflict(for: race.id),
+              legacyRecoveryPresentationSession.claim(
+                  raceID: race.id,
+                  privateScopeID: privateScopeID
+              )
+        else { return false }
+
+        let userID = authManager.authenticatedUser?.id
+        let owner: PickOwnerScope = userID.map(PickOwnerScope.user) ?? .guest
+        let destination = localPickStore.record(for: race.id, owner: owner)
+        let currentSelection = destination?.selection
+            ?? serverSelection(detail.serverPick, userID: userID)
+        legacyRecoveryErrorMessage = nil
+        legacyRecoveryPresentation = LegacyRecoveryPresentation(
+            raceID: race.id,
+            privateScopeID: privateScopeID,
+            userID: userID,
+            isSignedIn: authManager.accessToken != nil,
+            requiresConnection: isAccountUnavailable,
+            legacyRevision: legacy.revision,
+            destinationRevision: destination?.revision,
+            serverPick: privatePickSnapshot(detail.serverPick),
+            found: triplet(legacy.selection, entrants: detail.entrants),
+            current: currentSelection.map {
+                triplet($0, entrants: detail.entrants)
+            }
+        )
+        return true
+    }
+
+    private func resolvePickConflict(for race: Race) {
+        if presentLegacyRecoveryIfNeeded() { return }
+        openPicker(.winner, for: race)
+    }
+
+    private func handleLegacyRecoveryAction(
+        _ action: LegacyRecoverySheetAction,
+        presentation: LegacyRecoveryPresentation,
+        detail: RaceDetailViewModel
+    ) {
+        guard legacyRecoveryPresentation?.id == presentation.id,
+              presentation.privateScopeID == privateScopeID,
+              presentation.userID == authManager.authenticatedUser?.id
+        else {
+            dismissLegacyRecovery()
+            return
+        }
+
+        switch action {
+        case .notNow:
+            dismissLegacyRecovery()
+        case .retry:
+            legacyRecoveryErrorMessage = nil
+            Task {
+                await detail.refresh(
+                    token: authManager.accessToken,
+                    userID: authManager.authenticatedUser?.id,
+                    localPickStore: localPickStore
+                )
+            }
+        case .use, .discard, .keepCurrent, .replace:
+            let recoveryAction: LegacyRecoveryAction = switch action {
+            case .use: .use
+            case .discard: .discard
+            case .keepCurrent: .keepCurrent
+            case .replace: .replace
+            case .retry, .notNow: preconditionFailure("Handled above")
+            }
+            let token = authManager.accessToken
+            let userID = authManager.authenticatedUser?.id
+            let owner: PickOwnerScope = userID.map(PickOwnerScope.user) ?? .guest
+            let outcome = detail.resolveLegacyDevicePick(
+                action: recoveryAction,
+                expectedOwner: owner,
+                expectedLegacyRevision: presentation.legacyRevision,
+                expectedDestinationRevision: presentation.destinationRevision,
+                expectedServerPick: presentation.serverPick,
+                token: token,
+                userID: userID,
+                localPickStore: localPickStore
+            )
+            switch outcome {
+            case .resolved:
+                dismissLegacyRecovery()
+            case .committed(let ticket):
+                dismissLegacyRecovery()
+                Task {
+                    await detail.syncCommittedPick(
+                        ticket,
+                        token: token,
+                        userID: userID,
+                        localPickStore: localPickStore
+                    )
+                }
+            case .rejected(let message):
+                legacyRecoveryErrorMessage = message
+            }
+        }
+    }
+
+    private func dismissLegacyRecovery() {
+        legacyRecoveryPresentation = nil
+        legacyRecoveryErrorMessage = nil
+    }
+
+    private func serverSelection(_ pick: Pick?, userID: String?) -> PickSelection? {
+        guard userID != nil, let pick else { return nil }
+        return PickSelection(
+            winnerDriverID: pick.winnerDriverId,
+            tenthPlaceDriverID: pick.tenthPlaceDriverId,
+            dnfDriverID: pick.dnfDriverId
+        )
+    }
+
+    private func privatePickSnapshot(
+        _ pick: Pick?
+    ) -> LegacyPrivatePickSnapshot? {
+        pick.map {
+            LegacyPrivatePickSnapshot(
+                id: $0.id,
+                selection: PickSelection(
+                    winnerDriverID: $0.winnerDriverId,
+                    tenthPlaceDriverID: $0.tenthPlaceDriverId,
+                    dnfDriverID: $0.dnfDriverId
+                ),
+                updatedAt: $0.updatedAt
+            )
+        }
+    }
+
+    private var isAccountUnavailable: Bool {
+        if case .accountUnavailable = authManager.state { return true }
+        return false
+    }
+
+    private func triplet(
+        _ selection: PickSelection,
+        entrants: [Driver]
+    ) -> LegacyPickTriplet {
+        LegacyPickTriplet(
+            winner: driverName(selection.winnerDriverID, entrants: entrants),
+            tenthPlace: driverName(
+                selection.tenthPlaceDriverID,
+                entrants: entrants
+            ),
+            dnf: driverName(selection.dnfDriverID, entrants: entrants)
+        )
+    }
+
+    private func driverName(_ id: String, entrants: [Driver]) -> String {
+        guard let driver = entrants.first(where: { $0.id == id }) else {
+            return "Unknown driver"
+        }
+        return "\(driver.firstName) \(driver.lastName)"
     }
 
     @MainActor

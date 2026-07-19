@@ -13,6 +13,7 @@
 		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
 		06DA7DE5EBDACF2F364058A5 /* PastRaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */; };
 		09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */; };
+		0AA15C3ED7B5B83468B5FBC7 /* LegacyRecoveryPresentationSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */; };
 		107B193C54672BDF07C00458 /* RacePickStatusRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */; };
 		12092150C4EDD14BEDDD0CE7 /* RaceScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F7BFA78AE9988B7DE59FB7 /* RaceScheduleSheet.swift */; };
 		13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB930FED2C9918990560892D /* ProfileView.swift */; };
@@ -40,6 +41,8 @@
 		5771DC391FADB666B9DFE228 /* APIRequesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718194229A0DEFC8E011350D /* APIRequesting.swift */; };
 		5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC608F5043DC5E71554B62 /* Pick.swift */; };
 		63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729249B04B9379843CF60133 /* FXTheme.swift */; };
+		667D8D35474345402E06DEF7 /* LegacyPickRecoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */; };
+		66BD16767CE574428D60B7C2 /* LegacyRecoveryActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */; };
 		69D38A4E3DB82884C468F535 /* FXPerformance.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB19BEA1291D1C965AE340A9 /* FXPerformance.swift */; };
 		6A0B9B3F5A9DC34AEABDB6A4 /* FXGlassSurfaceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734BB3905A648BEA9DB0860F /* FXGlassSurfaceResolverTests.swift */; };
 		6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */; };
@@ -113,6 +116,7 @@
 		ECDDF6C368290A22CBFEBD50 /* CenteredRacePager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BC4C761521F761AC1C8FDE /* CenteredRacePager.swift */; };
 		ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */; };
 		F1C484E415257624A34C25AC /* PerformanceResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9611A96FA6D5FF451F54BD /* PerformanceResult.swift */; };
+		F32B3E6C6676C9AF8CD786CD /* LegacyRecoveryPresentationSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */; };
 		F39C32DA49B1F4C6489C168E /* DriverFormSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD4110A6C32DC6B56CB5D95 /* DriverFormSheetTests.swift */; };
 		F4E2477299E2F5A82EE7C678 /* RaceDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE3160AD8D4B0D6C05FED63 /* RaceDeckViewModel.swift */; };
 		F836B54966B7599C327828F4 /* HomeSectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A537F31BBF66358925FCC4 /* HomeSectionPicker.swift */; };
@@ -141,6 +145,7 @@
 
 /* Begin PBXFileReference section */
 		01036942B56AA148BF82E8C5 /* DeterministicFailureURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeterministicFailureURLProtocol.swift; sourceTree = "<group>"; };
+		0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryPresentationSession.swift; sourceTree = "<group>"; };
 		081B893A7A9D248C607360F4 /* AuthManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManagerTests.swift; sourceTree = "<group>"; };
 		092C369B26A52C1665C301C2 /* FXRacingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0AEA36AA0DE5797FE43ECA51 /* FXImagePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXImagePipeline.swift; sourceTree = "<group>"; };
@@ -164,6 +169,7 @@
 		347020C4691D77E3D65C73AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		35A864F93E4C4068E6DF3A9C /* UpcomingRaceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingRaceCard.swift; sourceTree = "<group>"; };
 		38466ACFC9DCC1DC84C22141 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryPresentationSessionTests.swift; sourceTree = "<group>"; };
 		3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualifyingResultsView.swift; sourceTree = "<group>"; };
 		3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		3F9611A96FA6D5FF451F54BD /* PerformanceResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceResult.swift; sourceTree = "<group>"; };
@@ -245,12 +251,14 @@
 		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryActionTests.swift; sourceTree = "<group>"; };
 		DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusResolverTests.swift; sourceTree = "<group>"; };
 		E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickRecord.swift; sourceTree = "<group>"; };
 		E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDeckViewModelTests.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
 		EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepository.swift; sourceTree = "<group>"; };
+		F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyPickRecoverySheet.swift; sourceTree = "<group>"; };
 		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryRaceSnapshotCache.swift; sourceTree = "<group>"; };
 		F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceScenario.swift; sourceTree = "<group>"; };
@@ -267,6 +275,8 @@
 				B1BC4C761521F761AC1C8FDE /* CenteredRacePager.swift */,
 				5CC323C1ED58017E45B580EF /* DriverFormSheet.swift */,
 				C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */,
+				F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */,
+				0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */,
 				68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */,
 				975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */,
 				3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */,
@@ -326,6 +336,8 @@
 				7313B959186C22E187ED400F /* CenteredRacePagerGeometryTests.swift */,
 				9DD4110A6C32DC6B56CB5D95 /* DriverFormSheetTests.swift */,
 				4FD9E9826EDF14D20BD6C10F /* DriverPickerStateTests.swift */,
+				DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */,
+				38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */,
 				FE31EF43B1EF82B0DF50150E /* RaceContextResolverTests.swift */,
 				E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */,
 				FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */,
@@ -805,6 +817,8 @@
 				6A0B9B3F5A9DC34AEABDB6A4 /* FXGlassSurfaceResolverTests.swift in Sources */,
 				891E6F8893B0C988E12B9442 /* FXImagePipelineTests.swift in Sources */,
 				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
+				66BD16767CE574428D60B7C2 /* LegacyRecoveryActionTests.swift in Sources */,
+				0AA15C3ED7B5B83468B5FBC7 /* LegacyRecoveryPresentationSessionTests.swift in Sources */,
 				A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */,
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
 				ADD7CCDC124F8246882EA5D0 /* RaceContextResolverTests.swift in Sources */,
@@ -878,6 +892,8 @@
 				8DDEC8406C5A0D7FACC61884 /* LeaderboardRowView.swift in Sources */,
 				44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */,
 				C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */,
+				667D8D35474345402E06DEF7 /* LegacyPickRecoverySheet.swift in Sources */,
+				F32B3E6C6676C9AF8CD786CD /* LegacyRecoveryPresentationSession.swift in Sources */,
 				B8C1F6B3F3CFD9B81A0E3570 /* LocalPickRecord.swift in Sources */,
 				7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */,
 				BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */,
