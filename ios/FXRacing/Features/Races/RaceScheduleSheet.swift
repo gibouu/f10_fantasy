@@ -16,31 +16,35 @@ struct RaceScheduleSheet: View {
             .padding(.horizontal, 18)
             .padding(.top, FXTheme.Spacing.lg)
             .padding(.bottom, FXTheme.Spacing.xl)
+            .frame(maxWidth: 430, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .background(Color(uiColor: .systemBackground))
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("race-schedule-sheet")
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 14) {
+        VStack(alignment: .center, spacing: FXTheme.Spacing.sm) {
             Text(race.flagEmoji)
                 .font(.system(size: 38))
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: FXTheme.Spacing.xs) {
-                Text("Schedule")
-                    .font(.largeTitle.weight(.bold))
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("schedule-sheet-title")
+            Text("Schedule")
+                .font(.largeTitle.weight(.bold))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("schedule-sheet-title")
 
-                Text("\(race.name)  ·  \(race.roundLabel)")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
+            Text("\(race.name)  ·  \(race.roundLabel)")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var schedule: some View {
@@ -54,7 +58,10 @@ struct RaceScheduleSheet: View {
                 }
             }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
+        )
         .overlay {
             RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
                 .stroke(.primary.opacity(0.09), lineWidth: 0.5)
@@ -67,7 +74,7 @@ struct RaceScheduleSheet: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(row.kind == .bonusCutoff ? FXTheme.Colors.gold : .primary)
                 .frame(width: 36, height: 36)
-                .background(.thinMaterial, in: Circle())
+                .background(Color(uiColor: .tertiarySystemBackground), in: Circle())
                 .accessibilityHidden(true)
 
             ViewThatFits(in: .horizontal) {

@@ -618,6 +618,10 @@ git commit -m $'Replace pick buttons with autosave status\n\n— gib'
 
 ### Task 6: Guarantee stable race-card geometry and center Schedule
 
+**Task 5C baseline:** `03ad7e06451aba6eeec8c46dd3eda85de56a1a39`
+
+Preserve Task 5C invariants while doing layout work: saved picks must not disappear solely because driver metadata is temporarily unavailable; metadata refreshes must not mutate or invalidate persisted user selections; UI presentation and persistence stay decoupled. Keep the generic unresolved-pick fallback (`Saved pick` / `Driver details unavailable`) unless a future UX task explicitly replaces it. Do not reintroduce `Review device picks` or any equivalent card-level recovery action.
+
 **Files:**
 - Create: `ios/FXRacing/Features/Races/UpcomingCardLayoutMetrics.swift`
 - Modify: `ios/FXRacing/Features/Races/UpcomingRaceCard.swift`

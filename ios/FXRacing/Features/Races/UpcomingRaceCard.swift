@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct UpcomingRaceCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let race: Race
     let detail: RaceDetailViewModel?
     let isSelected: Bool
@@ -18,7 +20,13 @@ struct UpcomingRaceCard: View {
     }
 
     private func card(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let contentState = detail.map(cardContentState) ?? .placeholder
+        let cardHeight = UpcomingCardLayoutMetrics.cardHeight(
+            for: dynamicTypeSize,
+            contentState: contentState
+        )
+
+        return VStack(alignment: .leading, spacing: 16) {
             header(now: now)
 
             Divider().opacity(0.4)
@@ -38,7 +46,7 @@ struct UpcomingRaceCard: View {
             }
         }
         .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 412, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight, alignment: .topLeading)
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
         .overlay {
@@ -48,6 +56,17 @@ struct UpcomingRaceCard: View {
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("race-card-\(race.id)")
+    }
+
+    private func cardContentState(for detail: RaceDetailViewModel) -> UpcomingCardContentState {
+        return switch detail.submissionState {
+        case .savingLocally, .syncing:
+            .saving
+        case .reviewRequired, .missingFromAccount, .conflict:
+            .conflict
+        case .idle, .savedOnDevice, .savedToAccount, .expired:
+            detail.hasRecoverableDevicePick ? .recoveryAvailable : .hydrated
+        }
     }
 
     private func header(now: Date) -> some View {
