@@ -1288,6 +1288,59 @@ final class LocalPickStoreTests: XCTestCase {
         XCTAssertTrue(store.queuedRecords(currentUserID: nil).isEmpty)
     }
 
+    func testLockedDiscardAndKeepCurrentStillResolveWithoutChangingDestination() throws {
+        let discardPersistence = LocalPickPersistenceSpy()
+        let (discardStore, discardLegacy) = try makeStoreWithLegacyConflict(
+            persistence: discardPersistence
+        )
+        let discardDestination = try saveRecord(
+            in: discardStore,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+
+        XCTAssertEqual(
+            discardStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: discardLegacy.revision,
+                decision: .discard,
+                now: RaceFixtures.upcoming.lockCutoffUtc
+            ),
+            .discarded
+        )
+        XCTAssertNil(discardStore.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(
+            discardStore.record(id: discardDestination.id),
+            discardDestination
+        )
+
+        let keepPersistence = LocalPickPersistenceSpy()
+        let (keepStore, keepLegacy) = try makeStoreWithLegacyConflict(
+            persistence: keepPersistence
+        )
+        let keepDestination = try saveRecord(
+            in: keepStore,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+
+        XCTAssertEqual(
+            keepStore.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: keepLegacy.revision,
+                decision: .keepCurrent(
+                    expectedDestinationRevision: keepDestination.revision
+                ),
+                now: RaceFixtures.upcoming.lockCutoffUtc
+            ),
+            .keptCurrent
+        )
+        XCTAssertNil(keepStore.legacyConflict(for: RaceFixtures.upcoming.id))
+        XCTAssertEqual(keepStore.record(id: keepDestination.id), keepDestination)
+    }
+
     func testResolutionRejectsLockedAdoptionAndInvalidOwnerWithoutMutation() throws {
         let lockedPersistence = LocalPickPersistenceSpy()
         let (lockedStore, lockedLegacy) = try makeStoreWithLegacyConflict(
@@ -1549,6 +1602,84 @@ final class LocalPickStoreTests: XCTestCase {
         XCTAssertEqual(adopted.revision, destination.revision + 1)
     }
 
+    func testMismatchedReadbackAfterAdoptRestoresSourceAndNextRevision() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        persistence.mismatchesNextReadbackAfterWrite = true
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .adopt,
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertNil(
+            store.record(
+                for: RaceFixtures.upcoming.id,
+                owner: .user("user-a")
+            )
+        )
+
+        let retried = store.resolveLegacyConflict(
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a"),
+            expectedLegacyRevision: legacy.revision,
+            decision: .adopt,
+            now: RaceFixtures.now
+        )
+        guard case .adopted(let adopted) = retried else {
+            return XCTFail("Expected retry after mismatched readback to adopt")
+        }
+        XCTAssertEqual(adopted.revision, legacy.revision + 1)
+    }
+
+    func testMismatchedReadbackAfterReplaceRestoresSourceDestinationAndRevision() throws {
+        let persistence = LocalPickPersistenceSpy()
+        let (store, legacy) = try makeStoreWithLegacyConflict(
+            persistence: persistence
+        )
+        let destination = try saveRecord(
+            in: store,
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a")
+        )
+        persistence.mismatchesNextReadbackAfterWrite = true
+
+        XCTAssertEqual(
+            store.resolveLegacyConflict(
+                race: RaceFixtures.upcoming,
+                owner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                decision: .replace(
+                    expectedDestinationRevision: destination.revision
+                ),
+                now: RaceFixtures.now
+            ),
+            .persistenceFailed
+        )
+        XCTAssertEqual(store.legacyConflict(for: RaceFixtures.upcoming.id), legacy)
+        XCTAssertEqual(store.record(id: destination.id), destination)
+
+        let retried = store.resolveLegacyConflict(
+            race: RaceFixtures.upcoming,
+            owner: .user("user-a"),
+            expectedLegacyRevision: legacy.revision,
+            decision: .replace(expectedDestinationRevision: destination.revision),
+            now: RaceFixtures.now
+        )
+        guard case .adopted(let adopted) = retried else {
+            return XCTFail("Expected retry after mismatched readback to replace")
+        }
+        XCTAssertEqual(adopted.revision, destination.revision + 1)
+    }
+
     func testLegacyRecoveryCopiesIntoDormantDraftAndOnlyRemovesLegacyAfterPersistence() throws {
         let persistence = LocalPickPersistenceSpy()
         let legacy = LegacyLocalPickV1(
@@ -1761,7 +1892,9 @@ private enum TestFailure: Error {
 @MainActor
 private final class LocalPickPersistenceSpy: LocalPickPersisting {
     var rejectsWrites: Bool
+    var mismatchesNextReadbackAfterWrite = false
     private(set) var setDataCallCount = 0
+    private var mismatchedReadbackKeys = Set<String>()
     private var values: [String: Data] = [:]
 
     init(rejectsWrites: Bool = false) {
@@ -1769,13 +1902,20 @@ private final class LocalPickPersistenceSpy: LocalPickPersisting {
     }
 
     func data(forKey key: String) -> Data? {
-        values[key]
+        if mismatchedReadbackKeys.remove(key) != nil {
+            return Data("mismatched-readback".utf8)
+        }
+        return values[key]
     }
 
     func setData(_ data: Data, forKey key: String) {
         setDataCallCount += 1
         guard !rejectsWrites else { return }
         values[key] = data
+        if mismatchesNextReadbackAfterWrite {
+            mismatchesNextReadbackAfterWrite = false
+            mismatchedReadbackKeys.insert(key)
+        }
     }
 
     func removeData(forKey key: String) {
