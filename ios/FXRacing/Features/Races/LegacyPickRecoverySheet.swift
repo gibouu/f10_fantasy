@@ -1,5 +1,37 @@
 import SwiftUI
 
+enum LegacyRecoveryAccountContext: Equatable, Sendable {
+    case guest
+    case signedIn(userID: String?)
+    case unavailable
+
+    static func resolve(authState: AuthManager.State) -> Self {
+        switch authState {
+        case .unauthenticated:
+            return .guest
+        case .authenticated(let user):
+            return .signedIn(userID: user.id)
+        case .unknown, .accountUnavailable:
+            return .unavailable
+        }
+    }
+
+    var isSignedIn: Bool {
+        if case .guest = self { return false }
+        return true
+    }
+
+    var requiresConnection: Bool {
+        if case .unavailable = self { return true }
+        return false
+    }
+
+    var userID: String? {
+        if case .signedIn(let userID) = self { return userID }
+        return nil
+    }
+}
+
 enum LegacyRecoverySheetMode: Equatable, Sendable {
     case guest
     case checking
@@ -35,6 +67,44 @@ enum LegacyRecoverySheetAction: Equatable, Sendable {
     case notNow
 }
 
+struct LegacyRecoverySheetActionMatrix: Equatable, Sendable {
+    let actions: [LegacyRecoverySheetAction]
+    private let disabledActions: Set<LegacyRecoverySheetAction>
+
+    static func resolve(
+        mode: LegacyRecoverySheetMode,
+        isLocked: Bool
+    ) -> Self {
+        switch mode {
+        case .guest:
+            return Self(
+                actions: [.use, .discard, .notNow],
+                disabledActions: isLocked ? [.use] : []
+            )
+        case .checking, .unavailable:
+            return Self(actions: [.retry, .notNow], disabledActions: [])
+        case .emptyAccount:
+            return Self(
+                actions: [.use, .discard, .notNow],
+                disabledActions: isLocked ? [.use] : []
+            )
+        case .conflict:
+            return Self(
+                actions: [.keepCurrent, .replace, .discard, .notNow],
+                disabledActions: isLocked ? [.replace] : []
+            )
+        }
+    }
+
+    func isEnabled(_ action: LegacyRecoverySheetAction) -> Bool {
+        !disabledActions.contains(action)
+    }
+
+    func requiresConfirmation(_ action: LegacyRecoverySheetAction) -> Bool {
+        action == .replace
+    }
+}
+
 struct LegacyPickTriplet: Equatable, Sendable {
     let winner: String
     let tenthPlace: String
@@ -54,6 +124,37 @@ struct LegacyRecoveryPresentation: Identifiable, Equatable, Sendable {
     let current: LegacyPickTriplet?
 
     var id: String { "\(privateScopeID):\(raceID):\(legacyRevision)" }
+
+    var mutationOwner: PickOwnerScope? {
+        if requiresConnection { return nil }
+        if isSignedIn {
+            return userID.map(PickOwnerScope.user)
+        }
+        return .guest
+    }
+
+    func refreshed(
+        userID: String? = nil,
+        isSignedIn: Bool? = nil,
+        requiresConnection: Bool? = nil,
+        destinationRevision: UInt64?,
+        serverPick: LegacyPrivatePickSnapshot?,
+        found: LegacyPickTriplet? = nil,
+        current: LegacyPickTriplet?
+    ) -> Self {
+        Self(
+            raceID: raceID,
+            privateScopeID: privateScopeID,
+            userID: userID ?? self.userID,
+            isSignedIn: isSignedIn ?? self.isSignedIn,
+            requiresConnection: requiresConnection ?? self.requiresConnection,
+            legacyRevision: legacyRevision,
+            destinationRevision: destinationRevision,
+            serverPick: serverPick,
+            found: found ?? self.found,
+            current: current
+        )
+    }
 }
 
 struct LegacyPickRecoverySheet: View {
@@ -72,6 +173,10 @@ struct LegacyPickRecoverySheet: View {
             authority: presentation.requiresConnection ? .unavailable : authority,
             hasDestination: presentation.current != nil
         )
+    }
+
+    private var actionMatrix: LegacyRecoverySheetActionMatrix {
+        LegacyRecoverySheetActionMatrix.resolve(mode: mode, isLocked: isLocked)
     }
 
     var body: some View {
@@ -111,11 +216,6 @@ struct LegacyPickRecoverySheet: View {
             .background(Color(uiColor: .systemBackground))
             .navigationTitle("Picks found on this iPhone")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Not now") { perform(.notNow) }
-                }
-            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -148,7 +248,7 @@ struct LegacyPickRecoverySheet: View {
             switch mode {
             case .guest:
                 primaryButton("Use on this iPhone", action: .use)
-                    .disabled(isLocked)
+                    .disabled(!actionMatrix.isEnabled(.use))
                 destructiveButton("Discard") { perform(.discard) }
             case .checking:
                 statusRow("Checking account picks...", showsProgress: true)
@@ -158,7 +258,7 @@ struct LegacyPickRecoverySheet: View {
                 secondaryButton("Retry") { perform(.retry) }
             case .emptyAccount:
                 primaryButton("Use these picks", action: .use)
-                    .disabled(isLocked)
+                    .disabled(!actionMatrix.isEnabled(.use))
                 destructiveButton("Discard") { perform(.discard) }
             case .conflict:
                 secondaryButton("Keep current picks") { perform(.keepCurrent) }
@@ -170,11 +270,13 @@ struct LegacyPickRecoverySheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(FXTheme.Colors.danger)
-                .disabled(isLocked)
+                .disabled(!actionMatrix.isEnabled(.replace))
                 .accessibilityIdentifier("replace-found-picks")
+                destructiveButton("Discard") { perform(.discard) }
             }
 
             secondaryButton("Not now") { perform(.notNow) }
+                .accessibilityIdentifier("legacy-recovery-not-now")
         }
     }
 

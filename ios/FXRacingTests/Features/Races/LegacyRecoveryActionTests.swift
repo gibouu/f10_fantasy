@@ -204,6 +204,96 @@ final class LegacyRecoveryActionTests: XCTestCase {
         XCTAssertNil(discardStore.legacyConflict(for: race.id))
     }
 
+    func testSignedDiscardRejectsRotatedTokenOrLeaseAndRetainsLegacySource() async throws {
+        let (store, legacy) = try makeStoreWithLegacy()
+        let api = GatedAPIClientSpy(
+            responses: ["GET /api/picks": [.failure(.notFound)]]
+        )
+        let syncManager = activeSyncManager(api: api, store: store)
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        _ = syncManager.beginSession(
+            currentUserID: "user-a",
+            token: "token-b",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(
+            viewModel.resolveLegacyDevicePick(
+                action: .discard,
+                expectedOwner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                expectedDestinationRevision: nil,
+                token: "token-b",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .rejected("Connect to check account picks, then retry.")
+        )
+        XCTAssertEqual(store.legacyConflict(for: race.id), legacy)
+    }
+
+    func testSignedKeepRejectsChangedServerFingerprintAndRetainsLegacySource() async throws {
+        let (store, legacy) = try makeStoreWithLegacy()
+        let current = try XCTUnwrap(savedCurrent(in: store))
+        let original = serverPick
+        let changed = Pick(
+            id: original.id,
+            raceId: original.raceId,
+            tenthPlaceDriverId: original.tenthPlaceDriverId,
+            winnerDriverId: original.winnerDriverId,
+            dnfDriverId: original.dnfDriverId,
+            lockedAt: original.lockedAt,
+            scoreBreakdown: original.scoreBreakdown,
+            updatedAt: Date(timeIntervalSince1970: 5)
+        )
+        let api = GatedAPIClientSpy(
+            responses: [
+                "GET /api/picks": [
+                    .json(PickResponse(pick: original)),
+                    .json(PickResponse(pick: changed)),
+                ],
+            ]
+        )
+        let syncManager = activeSyncManager(api: api, store: store)
+        let viewModel = makeViewModel(api: api, syncManager: syncManager)
+        await viewModel.loadIfNeeded(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+        let captured = LegacyPrivatePickSnapshot(
+            id: original.id,
+            selection: selection,
+            updatedAt: original.updatedAt
+        )
+        await viewModel.refresh(
+            token: "token-a",
+            userID: "user-a",
+            localPickStore: store
+        )
+
+        XCTAssertEqual(
+            viewModel.resolveLegacyDevicePick(
+                action: .keepCurrent,
+                expectedOwner: .user("user-a"),
+                expectedLegacyRevision: legacy.revision,
+                expectedDestinationRevision: current.revision,
+                expectedServerPick: captured,
+                token: "token-a",
+                userID: "user-a",
+                localPickStore: store
+            ),
+            .rejected("Your current picks changed. Close this sheet and review them again.")
+        )
+        XCTAssertEqual(store.legacyConflict(for: race.id), legacy)
+    }
+
     private var race: Race { RaceFixtures.upcoming }
     private var selection: PickSelection {
         PickSelection(

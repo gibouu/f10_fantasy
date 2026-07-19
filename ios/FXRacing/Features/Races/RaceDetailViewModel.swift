@@ -1015,7 +1015,7 @@ final class RaceDetailViewModel {
             return .rejected("Your account changed. Review these picks again.")
         }
 
-        if case .user = scope, action != .discard {
+        if case .user = scope {
             guard hasCurrentPrivatePickAuthority(scope: scope, token: token) else {
                 return .rejected("Connect to check account picks, then retry.")
             }

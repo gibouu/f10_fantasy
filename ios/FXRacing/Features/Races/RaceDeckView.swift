@@ -60,6 +60,10 @@ struct RaceDeckView: View {
         authManager.authenticatedUser.map { "user:\($0.id)" } ?? "device"
     }
 
+    private var legacyRecoveryAccountContext: LegacyRecoveryAccountContext {
+        LegacyRecoveryAccountContext.resolve(authState: authManager.state)
+    }
+
     private var scopedSelectedDetail: RaceDetailViewModel? {
         guard selectedDetailScopeID == privateScopeID else { return nil }
         return selectedDetail
@@ -261,6 +265,7 @@ struct RaceDeckView: View {
             scopedSelectedDetail.map { String($0.entrants.count) } ?? "0",
             scopedSelectedDetail.map { String(describing: $0.privatePickAuthority) }
                 ?? "not-ready",
+            String(describing: legacyRecoveryAccountContext),
         ].joined(separator: ":")
     }
 
@@ -656,31 +661,57 @@ struct RaceDeckView: View {
 
     @discardableResult
     private func presentLegacyRecoveryIfNeeded() -> Bool {
-        if legacyRecoveryPresentation != nil { return true }
         guard section == .upcoming,
               let race = selectedRace,
               let detail = scopedSelectedDetail,
               detail.race.id == race.id,
               !detail.entrants.isEmpty,
-              let legacy = localPickStore.legacyConflict(for: race.id),
-              legacyRecoveryPresentationSession.claim(
-                  raceID: race.id,
-                  privateScopeID: privateScopeID
-              )
+              let legacy = localPickStore.legacyConflict(for: race.id)
         else { return false }
 
-        let userID = authManager.authenticatedUser?.id
-        let owner: PickOwnerScope = userID.map(PickOwnerScope.user) ?? .guest
+        let refreshedPresentation = legacyRecoveryPresentation(
+            race: race,
+            detail: detail,
+            legacy: legacy
+        )
+        if let activePresentation = legacyRecoveryPresentation {
+            legacyRecoveryPresentation = activePresentation.refreshed(
+                userID: refreshedPresentation.userID,
+                isSignedIn: refreshedPresentation.isSignedIn,
+                requiresConnection: refreshedPresentation.requiresConnection,
+                destinationRevision: refreshedPresentation.destinationRevision,
+                serverPick: refreshedPresentation.serverPick,
+                found: refreshedPresentation.found,
+                current: refreshedPresentation.current
+            )
+            return true
+        }
+        guard legacyRecoveryPresentationSession.claim(
+            raceID: race.id,
+            privateScopeID: privateScopeID
+        ) else { return false }
+
+        legacyRecoveryErrorMessage = nil
+        legacyRecoveryPresentation = refreshedPresentation
+        return true
+    }
+
+    private func legacyRecoveryPresentation(
+        race: Race,
+        detail: RaceDetailViewModel,
+        legacy: LocalPickRecord
+    ) -> LegacyRecoveryPresentation {
+        let context = legacyRecoveryAccountContext
+        let owner: PickOwnerScope = context.userID.map(PickOwnerScope.user) ?? .guest
         let destination = localPickStore.record(for: race.id, owner: owner)
         let currentSelection = destination?.selection
-            ?? serverSelection(detail.serverPick, userID: userID)
-        legacyRecoveryErrorMessage = nil
-        legacyRecoveryPresentation = LegacyRecoveryPresentation(
+            ?? serverSelection(detail.serverPick, userID: context.userID)
+        return LegacyRecoveryPresentation(
             raceID: race.id,
             privateScopeID: privateScopeID,
-            userID: userID,
-            isSignedIn: authManager.accessToken != nil,
-            requiresConnection: isAccountUnavailable,
+            userID: context.userID,
+            isSignedIn: context.isSignedIn,
+            requiresConnection: context.requiresConnection,
             legacyRevision: legacy.revision,
             destinationRevision: destination?.revision,
             serverPick: privatePickSnapshot(detail.serverPick),
@@ -689,7 +720,6 @@ struct RaceDeckView: View {
                 triplet($0, entrants: detail.entrants)
             }
         )
-        return true
     }
 
     private func resolvePickConflict(for race: Race) {
@@ -716,6 +746,9 @@ struct RaceDeckView: View {
         case .retry:
             legacyRecoveryErrorMessage = nil
             Task {
+                if presentation.requiresConnection {
+                    await authManager.retrySession(races: viewModel.races)
+                }
                 await detail.refresh(
                     token: authManager.accessToken,
                     userID: authManager.authenticatedUser?.id,
@@ -723,6 +756,10 @@ struct RaceDeckView: View {
                 )
             }
         case .use, .discard, .keepCurrent, .replace:
+            guard let owner = presentation.mutationOwner else {
+                legacyRecoveryErrorMessage = "Connect to check account picks, then retry."
+                return
+            }
             let recoveryAction: LegacyRecoveryAction = switch action {
             case .use: .use
             case .discard: .discard
@@ -732,7 +769,6 @@ struct RaceDeckView: View {
             }
             let token = authManager.accessToken
             let userID = authManager.authenticatedUser?.id
-            let owner: PickOwnerScope = userID.map(PickOwnerScope.user) ?? .guest
             let outcome = detail.resolveLegacyDevicePick(
                 action: recoveryAction,
                 expectedOwner: owner,
@@ -790,11 +826,6 @@ struct RaceDeckView: View {
                 updatedAt: $0.updatedAt
             )
         }
-    }
-
-    private var isAccountUnavailable: Bool {
-        if case .accountUnavailable = authManager.state { return true }
-        return false
     }
 
     private func triplet(
