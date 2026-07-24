@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 
 const route = await readFile(new URL("./route.ts", import.meta.url), "utf8")
+const entryGuard = await readFile(new URL("../entry-refresh-guard.ts", import.meta.url), "utf8")
 
 test("sync-entries only selects race statuses whose grids can still change", () => {
   assert.match(route, /status:\s*\{\s*in:\s*\[\s*'UPCOMING',\s*'LIVE'\s*\]/s)
@@ -10,25 +11,27 @@ test("sync-entries only selects race statuses whose grids can still change", () 
 })
 
 test("sync-entries skips partial provider entry sets before rewriting grids", () => {
-  assert.match(route, /const MIN_VALID_ENTRY_COUNT = 10/)
+  assert.match(route, /getRaceEntryRefreshSkipReason/)
+  assert.match(entryGuard, /export const MIN_VALID_ENTRY_COUNT = 10/)
+  assert.match(entryGuard, /nextCount < MIN_VALID_ENTRY_COUNT/)
+  assert.match(entryGuard, /`too-few-entries:\$\{nextCount\}`/)
+  assert.match(entryGuard, /existingCount > 0 && nextCount < existingCount/)
+  assert.match(entryGuard, /`entry-count-regression:\$\{existingCount\}->\$\{nextCount\}`/)
 
   const rebuildBlock = route.match(/for \(const \{ race, drivers \} of sessionResults\) \{[\s\S]*?\n  \}/)?.[0]
   assert.ok(rebuildBlock, "race entry rebuild loop should exist")
 
-  const tooFewIndex = rebuildBlock.indexOf("entries.length < MIN_VALID_ENTRY_COUNT")
-  const tooFewSkipIndex = rebuildBlock.indexOf("reason: `too-few-entries:${entries.length}`")
-  const existingCountIndex = rebuildBlock.indexOf("const existingCount = race._count.entries")
-  const regressionGuardIndex = rebuildBlock.indexOf("existingCount > 0 && entries.length < existingCount")
-  const regressionSkipIndex = rebuildBlock.indexOf("reason: `entry-count-regression:${existingCount}->${entries.length}`")
+  const guardIndex = rebuildBlock.indexOf("const skipReason = getRaceEntryRefreshSkipReason")
+  const existingCountIndex = rebuildBlock.indexOf("existingCount: race._count.entries")
+  const nextCountIndex = rebuildBlock.indexOf("nextCount: entries.length")
+  const skipIndex = rebuildBlock.indexOf("skipped.push({ raceId: race.id, reason: skipReason })")
   const deleteIndex = rebuildBlock.indexOf("db.raceEntry.deleteMany")
 
-  assert.notEqual(tooFewIndex, -1, "suspiciously small provider results should be guarded")
-  assert.notEqual(tooFewSkipIndex, -1, "too-few provider results should be reported as skipped")
+  assert.notEqual(guardIndex, -1, "partial provider results should be guarded")
   assert.notEqual(existingCountIndex, -1, "existing grid size should be considered")
-  assert.notEqual(regressionGuardIndex, -1, "provider results that shrink an existing grid should be guarded")
-  assert.notEqual(regressionSkipIndex, -1, "entry count regressions should be reported as skipped")
+  assert.notEqual(nextCountIndex, -1, "candidate grid size should be considered")
+  assert.notEqual(skipIndex, -1, "guarded provider results should be reported as skipped")
   assert.notEqual(deleteIndex, -1, "route should still rewrite valid grids")
 
-  assert.ok(tooFewIndex < deleteIndex, "minimum-count guard should run before deleting entries")
-  assert.ok(regressionGuardIndex < deleteIndex, "count-regression guard should run before deleting entries")
+  assert.ok(guardIndex < deleteIndex, "entry guard should run before deleting entries")
 })
