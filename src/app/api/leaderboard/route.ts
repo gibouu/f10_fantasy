@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server'
 import { auth } from '@/auth'
 import { mobileAuth } from '@/lib/auth/mobileAuth'
 import {
-  getGlobalLeaderboard,
+  getGlobalLeaderboardResult,
   getFriendsLeaderboard,
   getUserLeaderboardRank,
+  validateLeaderboardSort,
 } from '@/lib/services/leaderboard.service'
 import { getActiveSeason } from '@/lib/services/race.service'
 import { handleLeaderboardGet } from './get-handler'
@@ -14,8 +15,9 @@ export async function GET(request: NextRequest) {
     auth,
     mobileAuth,
     getActiveSeason,
-    getGlobalLeaderboard,
+    getGlobalLeaderboardResult,
     getFriendsLeaderboard,
     getUserLeaderboardRank,
+    validateLeaderboardSort,
   })
 }
