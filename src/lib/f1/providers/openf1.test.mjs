@@ -138,6 +138,54 @@ test("getFinalResults defers final classification when stints are empty", async 
   }
 })
 
+test("getFinalResults defers final classification when stints fetch fails", async () => {
+  const previousFetch = globalThis.fetch
+  const previousConsoleError = console.error
+  const errors = []
+  console.error = (...args) => errors.push(args)
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url)
+
+    if (requestUrl.endsWith("/position?session_key=345")) {
+      return jsonResponse([
+        {
+          session_key: 345,
+          driver_number: 1,
+          position: 1,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+        {
+          session_key: 345,
+          driver_number: 2,
+          position: 2,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+      ])
+    }
+
+    if (requestUrl.endsWith("/stints?session_key=345")) {
+      return new Response("upstream failed", {
+        status: 503,
+        statusText: "Service Unavailable",
+      })
+    }
+
+    return new Response("not found", { status: 404, statusText: "Not Found" })
+  }
+
+  try {
+    const provider = new OpenF1Provider()
+    const results = await provider.getFinalResults(345)
+
+    assert.deepEqual(results, [])
+    assert.equal(errors.length, 1)
+    assert.match(String(errors[0][0]), /deferring final classification/)
+  } finally {
+    globalThis.fetch = previousFetch
+    console.error = previousConsoleError
+  }
+})
+
 test("getLiveClassification returns null when OpenF1 has no position rows", async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async (url) => {

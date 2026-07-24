@@ -290,8 +290,12 @@ export class OpenF1Provider implements F1ProviderAdapter {
         }
       }
     } catch (err) {
-      console.error(`[openf1] Stint data unavailable for session ${sessionKey} — all drivers marked CLASSIFIED:`, err)
+      console.error(
+        `[openf1] Stint data unavailable for session ${sessionKey} — deferring final classification:`,
+        err,
+      )
       // Re-ingest after data settles via POST /api/cron/ingest-results { raceId }
+      return []
     }
 
     // 4. Compose final results
