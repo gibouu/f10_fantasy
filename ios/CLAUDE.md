@@ -2,7 +2,7 @@
 
 ## Product invariant
 
-The native app is intentionally simple: for each race, a player chooses P1, P10, and the first DNF, saves the three picks, and later sees the official score/ranking. UI work must not change that gameplay or the shared backend scoring rules.
+The native app is intentionally simple: for each race, a player chooses P1, P10, and one non-classified driver, saves the three picks, and later sees the official score/ranking. UI work must not change that gameplay or the shared backend scoring rules.
 
 ## Stack and project generation
 
