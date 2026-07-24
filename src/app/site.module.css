@@ -240,53 +240,6 @@
   object-fit: cover;
 }
 
-.scoringSection {
-  border-block: 1px solid var(--hairline);
-  background: var(--panel);
-}
-
-.scoringInner {
-  padding-block: clamp(2.25rem, 5vw, 3.75rem);
-}
-
-.scoreGrid {
-  margin: 0;
-  display: grid;
-  gap: 1.4rem;
-}
-
-.scoreItem {
-  display: grid;
-  grid-template-columns: 4.25rem 1fr;
-  gap: 1rem;
-  align-items: baseline;
-}
-
-.scoreItem dt {
-  color: var(--racing-red);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 1.85rem;
-  font-weight: 800;
-  letter-spacing: -0.06em;
-}
-
-.scoreItem dd {
-  margin: 0;
-  color: var(--ink);
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.bonusCopy {
-  margin: 2rem 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  text-align: center;
-}
-
 .siteFooter {
   margin-top: auto;
   background: var(--canvas);
@@ -478,29 +431,6 @@
     font-size: clamp(5rem, 9vw, 7.25rem);
   }
 
-  .scoreGrid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0;
-  }
-
-  .scoreItem {
-    min-height: 4rem;
-    padding-inline: clamp(1rem, 3vw, 2.5rem);
-    grid-template-columns: auto 1fr;
-  }
-
-  .scoreItem + .scoreItem {
-    border-left: 1px solid var(--hairline);
-  }
-
-  .scoreItem:first-child {
-    padding-left: 0;
-  }
-
-  .scoreItem:last-child {
-    padding-right: 0;
-  }
-
   .footerInner {
     grid-template-columns: auto 1fr;
     align-items: start;
@@ -524,8 +454,7 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .siteHeader,
-  .scoringSection {
+  .siteHeader {
     background: var(--canvas);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
