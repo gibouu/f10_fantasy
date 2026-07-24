@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { validateCronSecret } from "@/lib/api/cron-auth"
+import { revalidatePublicRaceCache } from "@/lib/api/public-race-cache"
 import { db } from "@/lib/db/client"
 import { lockPicksForRace } from "@/lib/services/lock.service"
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
 
   let lockedRaces = 0
   let totalPicksLocked = 0
+  const statusChangedRaceIds = new Set<string>()
 
   for (const race of racesToLock) {
     // Lock all unlocked pick sets for this race
@@ -64,10 +66,13 @@ export async function POST(req: NextRequest) {
         : undefined
 
     if (newStatus) {
-      await db.race.updateMany({
+      const result = await db.race.updateMany({
         where: { id: race.id, status: "UPCOMING" },
         data: { status: newStatus },
       })
+      if (result.count > 0) {
+        statusChangedRaceIds.add(race.id)
+      }
     }
 
     console.log(
@@ -75,6 +80,10 @@ export async function POST(req: NextRequest) {
     )
 
     lockedRaces++
+  }
+
+  if (statusChangedRaceIds.size > 0) {
+    revalidatePublicRaceCache(statusChangedRaceIds)
   }
 
   console.log(

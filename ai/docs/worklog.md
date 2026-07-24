@@ -40,6 +40,15 @@ Do NOT turn this into a giant diary.
 - should update architecture?: no — cache/invalidation details can land when #361 merges
 - should update decisions?: no
 
+### 2026-07-24 18:21 — Public race API cache headers
+- by: Codex
+- summary: Added shared CDN cache headers, cache tags, and Server-Timing to public race list/detail GETs; bypassed Auth.js middleware before public race GETs; added public race cache tag revalidation after schedule/status/entry/qualifying/result cron mutations.
+- files touched: `src/app/api/races`, `src/lib/api/public-race-cache.ts`, `src/middleware.ts`, `src/app/api/cron/*`, route source tests
+- verification: targeted race/cron source tests; `npm run test:routes`; `npx tsc --noEmit`; `npm run lint`; `npm run build`
+- open questions: Production CDN hit-rate/TTFB targets still need deployment telemetry; `/api/users/me` read consolidation was deferred.
+- should update architecture?: no
+- should update decisions?: no
+
 ### 2026-07-15 — Browser product UI retired behind the App Store landing
 - by: Codex
 - summary: Removed the retired browser route groups, component/provider/error-reporting tree, shadcn scaffold config, UI utility, and 12 browser-only direct packages. Preserved the complete API/Auth.js/scoring/cron/database surface, client-error intake/sanitizer, and driver/team asset contracts used by iOS.

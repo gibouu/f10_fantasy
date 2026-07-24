@@ -12,6 +12,13 @@ const { auth } = NextAuth(authConfig);
 // when `auth()` is used as a middleware wrapper.
 type NextAuthRequest = NextRequest & { auth: Session | null };
 
+function isPublicRaceApiGet(pathname: string, method: string): boolean {
+  return (
+    method === "GET" &&
+    (pathname === "/api/races" || pathname.startsWith("/api/races/"))
+  );
+}
+
 function isPublicApiRoute(pathname: string, method: string): boolean {
   if (pathname === "/api/client-errors") {
     return method === "POST";
@@ -36,7 +43,7 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
   );
 }
 
-export default auth((req: NextAuthRequest) => {
+const authMiddleware = auth((req: NextAuthRequest) => {
   const { nextUrl, auth: session } = req;
   const pathname = nextUrl.pathname;
 
@@ -79,6 +86,19 @@ export default auth((req: NextAuthRequest) => {
   // ── 4. Authenticated API request — allow the request ──────────────────
   return NextResponse.next();
 });
+
+export default function middleware(...args: Parameters<typeof authMiddleware>) {
+  const req = args[0] as NextRequest;
+  const pathname = req.nextUrl.pathname;
+
+  // Public race GETs are CDN-cacheable and must not invoke Auth.js, which may
+  // refresh session cookies even though these responses are completely public.
+  if (isPublicRaceApiGet(pathname, req.method)) {
+    return NextResponse.next();
+  }
+
+  return authMiddleware(...args);
+}
 
 export const config = {
   // Auth.js handles /api/auth/* directly through its route handler.

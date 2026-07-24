@@ -14,6 +14,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateCronSecret } from '@/lib/api/cron-auth'
+import { revalidatePublicRaceCache } from '@/lib/api/public-race-cache'
 import { db } from '@/lib/db/client'
 import { createF1Provider } from '@/lib/f1/adapter'
 import { getRaceEntryRefreshSkipReason } from '../entry-refresh-guard'
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
 
   // Rebuild RaceEntry rows for each refreshed race.
   let refreshed = 0
+  const refreshedRaceIds = new Set<string>()
   const skipped: Array<{ raceId: string; reason: string }> = []
 
   for (const { race, drivers } of sessionResults) {
@@ -174,6 +176,11 @@ export async function POST(req: NextRequest) {
     ])
 
     refreshed++
+    refreshedRaceIds.add(race.id)
+  }
+
+  if (refreshedRaceIds.size > 0) {
+    revalidatePublicRaceCache(refreshedRaceIds)
   }
 
   return NextResponse.json({ refreshed, skipped, total: upcomingRaces.length })
