@@ -48,5 +48,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Pick not found" }, { status: 404 })
   }
 
-  return NextResponse.json({ pick })
+  return NextResponse.json(
+    { pick },
+    { headers: { ETag: `"${pick.version}"` } },
+  )
 }

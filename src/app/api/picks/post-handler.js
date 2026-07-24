@@ -7,7 +7,32 @@ const PICK_SAVE_DOMAIN_ERRORS = [
   { pattern: /^Race .+ is cancelled/, status: 409 },
   { pattern: /^The following driver IDs are not registered entrants for this race:/, status: 400 },
   { pattern: /^A pick set already exists for this race/, status: 409 },
+  { pattern: /^Invalid pick base version$/, status: 400 },
 ]
+
+function normalizeIfMatch(value) {
+  if (!value) return undefined
+
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+
+  const quoted = trimmed.match(/^"(.+)"$/)
+  return quoted ? quoted[1] : trimmed
+}
+
+function versionHeaders(pick) {
+  if (!pick?.version) return undefined
+  return { ETag: `"${pick.version}"` }
+}
+
+function isPickConflictError(err) {
+  return Boolean(
+    err &&
+      typeof err === "object" &&
+      err.name === "PickConflictError" &&
+      err.currentPick,
+  )
+}
 
 export async function handlePickPost(
   req,
@@ -34,6 +59,10 @@ export async function handlePickPost(
   let input
   try {
     input = createPickSchema.parse(parsedBody.body)
+    const baseVersion = normalizeIfMatch(req.headers.get("if-match"))
+    if (baseVersion) {
+      input = { ...input, baseVersion }
+    }
   } catch (err) {
     if (isValidationError(err)) {
       return Response.json(
@@ -46,8 +75,15 @@ export async function handlePickPost(
 
   try {
     const pick = await createOrUpdatePick(session.user.id, input)
-    return Response.json({ pick })
+    return Response.json({ pick }, { headers: versionHeaders(pick) })
   } catch (err) {
+    if (isPickConflictError(err)) {
+      return Response.json(
+        { error: err.message, currentPick: err.currentPick },
+        { status: 409, headers: versionHeaders(err.currentPick) },
+      )
+    }
+
     return sanitizedErrorResponse(err, {
       domainErrors: PICK_SAVE_DOMAIN_ERRORS,
       fallbackMessage: "Failed to save pick",

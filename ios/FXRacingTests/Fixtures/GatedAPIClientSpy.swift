@@ -19,6 +19,7 @@ actor GatedAPIClientSpy: APIRequesting {
         let path: String
         let token: String?
         let query: [String: String]
+        let headers: [String: String]
         let bodyData: Data?
     }
 
@@ -62,6 +63,7 @@ actor GatedAPIClientSpy: APIRequesting {
                 path: endpoint.path,
                 token: token,
                 query: query,
+                headers: endpoint.headers,
                 bodyData: endpoint.bodyData
             )
         )

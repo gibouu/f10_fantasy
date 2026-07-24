@@ -31,6 +31,7 @@ Do NOT turn this into a giant diary.
 
 ## Entries
 
+<<<<<<< HEAD
 ### 2026-07-24 — Issue triage, study findings, and parallel fixes
 - by: Codex
 - summary: Filed study findings #375–#379. Opened/pushed fix PRs for #365 (DNF copy), #361 (race API cache), #362 (pick optimistic concurrency), #369 (landing strip + screenshot validator), #375/#377 (OpenF1 stints failure + season activation), #376 (sync-schedule entry guards). Release-polish umbrella #367 remains on draft PR #373 gated by simulator verification #368 and App Store tasks #370–#372.
@@ -38,6 +39,15 @@ Do NOT turn this into a giant diary.
 - verification: per-PR targeted Node suites; several PRs also ran tsc/lint/build as recorded in PR bodies.
 - open questions: #368 still needs Simulator verification; #378/#379 cleanup queued; #361 CDN TTFB thresholds need production measurement after deploy.
 - should update architecture?: no — cache/invalidation details can land when #361 merges
+=======
+### 2026-07-24 18:33 — Pick optimistic concurrency
+- by: Codex
+- summary: Added pick `version`/ETag responses, required base-version checks for existing pick edits inside `createOrUpdatePick`, and returned 409 conflicts with the current server pick. iOS SyncManager now sends `If-Match` from cached authoritative picks and treats 409 as a recoverable conflict.
+- files touched: `src/lib/services/pick.service.ts`, `src/app/api/picks/*`, `src/types/domain.ts`, `ios/FXRacing/Core/Networking`, `ios/FXRacing/Core/Sync/SyncManager.swift`, focused tests, shared architecture docs
+- verification: focused pick route/service/iOS source tests; `npm run test:ios`; `npm run test:services`; `npm run test:routes`; `npx tsc --noEmit`; `npm run lint`; `npm run build`
+- open questions: none
+- should update architecture?: yes — updated
+>>>>>>> 789a6e5 (Add pick optimistic concurrency)
 - should update decisions?: no
 
 ### 2026-07-15 — Browser product UI retired behind the App Store landing

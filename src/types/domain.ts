@@ -116,6 +116,8 @@ export type PickSetData = {
   dnfSeatKey: string | null
   createdAt: Date
   updatedAt: Date
+  /** Stable optimistic-concurrency token derived from updatedAt. */
+  version: string
   /** Set when the pick set is locked; null means still editable */
   lockedAt: Date | null
   /**

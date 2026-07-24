@@ -32,8 +32,32 @@ export class PickLockedError extends Error {
   }
 }
 
+export class PickConflictError extends Error {
+  readonly currentPick: PickSetData
+
+  constructor(currentPick: PickSetData) {
+    super('Pick has changed since it was loaded; refresh and try again')
+    this.name = 'PickConflictError'
+    this.currentPick = currentPick
+  }
+}
+
 function cancelledRacePickMessage(raceId: string): string {
   return `Race ${raceId} is cancelled — picks can no longer be submitted`
+}
+
+export function pickVersion(updatedAt: Date): string {
+  return updatedAt.toISOString()
+}
+
+function parseBasePickVersion(baseVersion: string | undefined): Date | null {
+  if (!baseVersion) return null
+
+  const parsed = new Date(baseVersion)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error('Invalid pick base version')
+  }
+  return parsed
 }
 
 // ─────────────────────────────────────────────
@@ -46,6 +70,7 @@ export const CreatePickSchema = z
     tenthPlaceDriverId: z.string().min(1),
     winnerDriverId: z.string().min(1),
     dnfDriverId: z.string().min(1),
+    baseVersion: z.string().min(1).optional(),
   })
   .refine(
     (data) => {
@@ -94,6 +119,7 @@ function mapPickSetToData(
     dnfSeatKey: ps.dnfSeatKey,
     createdAt: ps.createdAt,
     updatedAt: ps.updatedAt,
+    version: pickVersion(ps.updatedAt),
     lockedAt: ps.lockedAt,
     lockedSubmittedBeforeQualifying: ps.lockedSubmittedBeforeQualifying ?? null,
   }
@@ -187,6 +213,7 @@ export async function createOrUpdatePick(
 ): Promise<PickSetData> {
   // 1. Validate input
   const validated = CreatePickSchema.parse(input)
+  const baseUpdatedAt = parseBasePickVersion(validated.baseVersion)
 
   return db.$transaction(async (tx) => {
     // 2. Load and lock race. This serializes race status changes with both
@@ -244,14 +271,35 @@ export async function createOrUpdatePick(
         seatLookup.driverIdToSeatKey.get(validated.dnfDriverId) ?? null,
     }
 
+    const existingPickSet = await tx.pickSet.findUnique({
+      where: { userId_raceId: { userId, raceId: validated.raceId } },
+    })
+
+    if (existingPickSet) {
+      if (isPickSetLocked(existingPickSet.lockedAt)) {
+        throw new PickLockedError(
+          'This pick set has been locked and can no longer be edited',
+        )
+      }
+
+      if (
+        !baseUpdatedAt ||
+        existingPickSet.updatedAt.getTime() !== baseUpdatedAt.getTime()
+      ) {
+        throw new PickConflictError(mapPickSetToData(existingPickSet))
+      }
+    }
+
     // 5. Atomic guarded update — re-asserts both invariants at the DB level.
     // Two concurrent submits at lockCutoff − Δ both pass the JS check above,
-    // but only the request whose write commits while lockCutoffUtc > now(),
-    // status is not CANCELLED, and lockedAt IS NULL succeeds.
+    // but only the request whose base version still matches and whose write
+    // commits while lockCutoffUtc > now(), status is not CANCELLED, and
+    // lockedAt IS NULL succeeds.
     const updated = await tx.pickSet.updateMany({
       where: {
         userId,
         raceId: validated.raceId,
+        ...(baseUpdatedAt ? { updatedAt: baseUpdatedAt } : {}),
         lockedAt: null,
         race: {
           lockCutoffUtc: { gt: new Date() },
