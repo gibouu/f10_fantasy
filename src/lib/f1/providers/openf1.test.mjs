@@ -98,7 +98,6 @@ test("getFinalResults distinguishes DNS drivers from DNF retirements", async () 
     globalThis.fetch = previousFetch
   }
 })
-
 test("getFinalResults defers final classification when stints are empty", async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async (url) => {
@@ -137,7 +136,6 @@ test("getFinalResults defers final classification when stints are empty", async 
     globalThis.fetch = previousFetch
   }
 })
-
 test("getFinalResults defers final classification when stints fetch fails", async () => {
   const previousFetch = globalThis.fetch
   const previousConsoleError = console.error
@@ -183,53 +181,5 @@ test("getFinalResults defers final classification when stints fetch fails", asyn
   } finally {
     globalThis.fetch = previousFetch
     console.error = previousConsoleError
-  }
-})
-
-test("getLiveClassification returns null when OpenF1 has no position rows", async () => {
-  const previousFetch = globalThis.fetch
-  globalThis.fetch = async (url) => {
-    const requestUrl = String(url)
-
-    if (requestUrl.endsWith("/position?session_key=456")) {
-      return jsonResponse([])
-    }
-
-    return new Response("not found", { status: 404, statusText: "Not Found" })
-  }
-
-  try {
-    const provider = new OpenF1Provider()
-    const classification = await provider.getLiveClassification(456)
-
-    assert.equal(classification, null)
-  } finally {
-    globalThis.fetch = previousFetch
-  }
-})
-
-test("getLiveClassification propagates OpenF1 provider failures", async () => {
-  const previousFetch = globalThis.fetch
-  globalThis.fetch = async (url) => {
-    const requestUrl = String(url)
-
-    if (requestUrl.endsWith("/position?session_key=789")) {
-      return new Response("upstream failed", {
-        status: 500,
-        statusText: "Internal Server Error",
-      })
-    }
-
-    return new Response("not found", { status: 404, statusText: "Not Found" })
-  }
-
-  try {
-    const provider = new OpenF1Provider()
-    await assert.rejects(
-      provider.getLiveClassification(789),
-      /OpenF1 HTTP 500 Internal Server Error/,
-    )
-  } finally {
-    globalThis.fetch = previousFetch
   }
 })

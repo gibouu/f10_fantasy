@@ -10,10 +10,9 @@ const getRacesForSeasonBody = source.match(
   /export async function getRacesForSeason[\s\S]*?const races = await db\.race\.findMany\(\{([\s\S]*?)\n  \}\)/,
 )?.[1]
 const getRaceEntrantsStart = source.indexOf("export async function getRaceEntrants")
-const getRaceResultsStart = source.indexOf("export async function getRaceResults")
 const getRaceEntrantsBody =
-  getRaceEntrantsStart >= 0 && getRaceResultsStart > getRaceEntrantsStart
-    ? source.slice(getRaceEntrantsStart, getRaceResultsStart)
+  getRaceEntrantsStart >= 0
+    ? source.slice(getRaceEntrantsStart)
     : null
 
 assert.ok(getRaceByIdBody, "expected to find getRaceById findUnique query")

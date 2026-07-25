@@ -53,7 +53,7 @@ Do not log temporary debugging notes here.
 - Reason: Type safety across the RSC boundary; prevents accidental serialization of Prisma objects.
 - Tradeoffs: More types to maintain; mapping boilerplate between layers.
 - Affected areas: Any new data shape introduced — must decide which layer it lives in.
-- Follow-up: Use `Serialized*` variants for Date fields crossing the boundary.
+- Follow-up: Serialize Date fields as ISO strings before they cross API/native or RSC/client boundaries.
 
 ### 2026-04-15 — Cron jobs via AWS Lambda, not Vercel Crons
 - Status: accepted

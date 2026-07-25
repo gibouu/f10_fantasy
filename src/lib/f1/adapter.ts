@@ -10,7 +10,6 @@ import type {
   NormalizedMeeting,
   NormalizedSession,
   NormalizedDriver,
-  NormalizedLiveClassification,
   NormalizedFinalResult,
 } from './types'
 
@@ -35,14 +34,6 @@ export interface F1ProviderAdapter {
    * Return the list of drivers who participated in a specific session.
    */
   getDriversForSession(sessionKey: number): Promise<NormalizedDriver[]>
-
-  /**
-   * Return a snapshot of the current live race order.
-   * Returns null when the session hasn't started or no position data exists.
-   */
-  getLiveClassification(
-    sessionKey: number,
-  ): Promise<NormalizedLiveClassification | null>
 
   /**
    * Return the definitive final results for a completed session.

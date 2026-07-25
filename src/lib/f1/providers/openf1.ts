@@ -11,7 +11,6 @@ import type {
   NormalizedMeeting,
   NormalizedSession,
   NormalizedDriver,
-  NormalizedLiveClassification,
   NormalizedFinalResult,
 } from '../types'
 
@@ -195,39 +194,6 @@ export class OpenF1Provider implements F1ProviderAdapter {
       teamColor: normalizeHexColor(d.team_colour),
       photoUrl: d.headshot_url ?? null,
     }))
-  }
-
-  async getLiveClassification(
-    sessionKey: number,
-  ): Promise<NormalizedLiveClassification | null> {
-    const raw = await openF1Fetch<OpenF1Position>(
-      `/position?session_key=${sessionKey}`,
-    )
-
-    if (raw.length === 0) return null
-
-    // Reduce to the latest position entry per driver
-    const latestByDriver = new Map<number, OpenF1Position>()
-    for (const entry of raw) {
-      const existing = latestByDriver.get(entry.driver_number)
-      if (!existing || entry.date > existing.date) {
-        latestByDriver.set(entry.driver_number, entry)
-      }
-    }
-
-    // capturedAt = the most recent timestamp across all drivers
-    const timestamps = Array.from(latestByDriver.values()).map((e) => e.date)
-    const latestTimestamp = timestamps.sort().at(-1)!
-
-    const positions = Array.from(latestByDriver.values())
-      .map((e) => ({ driverNumber: e.driver_number, position: e.position }))
-      .sort((a, b) => a.position - b.position)
-
-    return {
-      sessionKey,
-      capturedAt: new Date(latestTimestamp),
-      positions,
-    }
   }
 
   async getFinalResults(sessionKey: number): Promise<NormalizedFinalResult[]> {

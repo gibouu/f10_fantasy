@@ -186,33 +186,3 @@ export type FriendRequestData = {
   status: FriendRequestStatus
   createdAt: Date
 }
-
-// ─────────────────────────────────────────────
-// Serialized variants (dates as ISO strings)
-// Used when passing server-loaded data to client components via props.
-// Next.js cannot serialize Date instances across the RSC/client boundary.
-// ─────────────────────────────────────────────
-
-export type SerializedRaceSummary = Omit<
-  RaceSummary,
-  'scheduledStartUtc' | 'lockCutoffUtc' | 'qualifyingStartUtc'
-> & {
-  scheduledStartUtc: string
-  lockCutoffUtc: string
-  qualifyingStartUtc: string | null
-}
-
-export type SerializedScoreBreakdownData = Omit<ScoreBreakdownData, 'computedAt'> & {
-  computedAt: string
-}
-
-export type SerializedPickSetData = Omit<PickSetData, 'createdAt' | 'updatedAt' | 'lockedAt'> & {
-  createdAt: string
-  updatedAt: string
-  lockedAt: string | null
-}
-
-export type SerializedPickSetWithScore = SerializedPickSetData & {
-  scoreBreakdown: SerializedScoreBreakdownData | null
-  race: SerializedRaceSummary
-}

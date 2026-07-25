@@ -36,10 +36,6 @@ struct LegacyLocalPickV1: Codable, Sendable {
     }
 }
 
-/// Temporary source compatibility for SyncManager and RaceDetailViewModel.
-/// Task 5/6 replace their ownerless entry points with record IDs and revisions.
-typealias LocalPick = LegacyLocalPickV1
-
 @MainActor
 protocol LocalPickPersisting: AnyObject {
     func data(forKey key: String) -> Data?
@@ -467,96 +463,18 @@ final class LocalPickStore {
         return true
     }
 
-    // MARK: - Guest-only compatibility
-
-    /// Ownerless compatibility views intentionally expose guest records only.
-    var picks: [String: LocalPick] {
-        Dictionary(
-            uniqueKeysWithValues: records.values.compactMap { record in
-                guard record.id.owner == .guest else { return nil }
-                return (record.id.raceID, legacyPick(from: record))
-            }
-        )
-    }
-
-    func pick(for raceId: String) -> LocalPick? {
-        guard let record = record(for: raceId, owner: .guest) else {
-            return nil
-        }
-        return legacyPick(from: record)
-    }
-
-    func unsyncedPicks() -> [LocalPick] {
-        records.values
-            .filter { $0.id.owner == .guest && $0.syncState == .queued }
-            .sorted { $0.revision < $1.revision }
-            .map(legacyPick(from:))
-    }
-
-    @discardableResult
-    func save(_ pick: LocalPick, race: Race) -> Bool {
-        let selection = PickSelection(
-            winnerDriverID: pick.winnerId,
-            tenthPlaceDriverID: pick.p10Id,
-            dnfDriverID: pick.dnfId
-        )
-        switch save(
-            selection: selection,
-            race: race,
-            owner: .guest,
-            now: clock.now()
-        ) {
-        case .saved, .unchanged:
-            return true
-        case .locked, .invalidOwner, .persistenceFailed:
-            return false
-        }
-    }
-
-    @discardableResult
-    func markSynced(raceId: String, revision: UInt64?) -> Bool {
-        guard let revision else { return false }
-        let id = LocalPickRecordID(owner: .guest, raceID: raceId)
-        return transition(id: id, revision: revision, to: .confirmed)
-    }
-
-    @discardableResult
-    func markMigrationExpired(raceId: String, revision: UInt64?) -> Bool {
-        guard let revision else { return false }
-        let id = LocalPickRecordID(owner: .guest, raceID: raceId)
-        return transition(id: id, revision: revision, to: .expired)
-    }
-
     func clearExpiredMigrationNotice() {
         expiredMigrationNoticeCount = 0
     }
 
     @discardableResult
-    func remove(raceId: String) -> Bool {
-        let id = LocalPickRecordID(owner: .guest, raceID: raceId)
+    func remove(id: LocalPickRecordID) -> Bool {
         guard let removed = records.removeValue(forKey: id) else { return false }
         guard persistV2() else {
             records[id] = removed
             return false
         }
         return true
-    }
-
-    private func legacyPick(from record: LocalPickRecord) -> LocalPick {
-        let isConfirmed = record.syncState == .confirmed
-        let migrationStatus: LocalPickMigrationStatus? = record.syncState == .expired
-            ? .expired
-            : nil
-        return LocalPick(
-            raceId: record.id.raceID,
-            winnerId: record.selection.winnerDriverID,
-            p10Id: record.selection.tenthPlaceDriverID,
-            dnfId: record.selection.dnfDriverID,
-            savedAt: record.savedAt,
-            synced: isConfirmed,
-            migrationStatus: migrationStatus,
-            revision: record.revision
-        )
     }
 
     // MARK: - Persistence
