@@ -128,6 +128,7 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 - `GET /api/picks?raceId=<id>` — fetch authenticated user's pick; response includes `pick.version` (same value as `updatedAt.toISOString()`) and an `ETag`
 - `POST /api/picks` — submit pick (auth required); existing-row edits require `If-Match: "<pick.version>"` or body `baseVersion`, stale/missing versions return HTTP 409 with `{ currentPick }`
 - `GET /api/races` — public race list
+- Public race GETs (`/api/races`, `/api/races/[id]`) bypass Auth.js middleware, set shared Cache-Control (`s-maxage` + `stale-while-revalidate`), emit Server-Timing, and are invalidated via cache tags after schedule/status/entry/qualifying/result mutations.
 - `GET /api/races/[id]` — public race detail, including qualifying results and optional entrant season-form fields
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
