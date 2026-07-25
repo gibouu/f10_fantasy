@@ -340,7 +340,7 @@ struct RaceDeckView: View {
             TutorialCard(
                 icon: "hand.tap.fill",
                 title: "Make three picks",
-                message: "Choose P1, P10, and the first DNF. The picker moves through all three without closing."
+                message: "Choose P1, P10, and one driver who won't be classified. The picker moves through all three without closing."
             ) {
                 if reduceMotion {
                     tutorialStore.hasSeenPickTutorial = true
