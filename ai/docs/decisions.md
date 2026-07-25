@@ -19,6 +19,16 @@ Do not log temporary debugging notes here.
 
 ## Entries
 
+
+### 2026-07-25 — Public race API CDN caching and Auth.js bypass
+- Status: accepted
+- Context: Production `/api/races` warm-origin TTFB stayed ~1s and responses set avoidable Auth.js cookies despite being public.
+- Decision: Bypass Auth.js middleware for public race GETs; set status-aware shared Cache-Control with stale-while-revalidate; tag and revalidate after schedule/status/entry/qualifying/result mutations; expose Server-Timing. Keep private user/pick responses `private, no-store`.
+- Reason: First-install and origin latency dominate native hydration; CDN caching is safe for public schedule/detail with short live TTLs.
+- Tradeoffs: Live status can lag by cache TTL plus client 60s poll; invalidation must stay hooked to every mutating cron.
+- Affected areas: `src/middleware.ts`, `src/app/api/races/*`, cron routes that call `revalidateTag`.
+- Follow-up: Measure production CDN-hit TTFB p95 ≤ 250 ms and cache hit rate ≥ 90% outside live windows (#361).
+
 ### 2026-07-15 — iOS-first product with a static web surface
 - Status: accepted
 - Context: Gameplay is delivered by the native iOS app; maintaining a second browser product added client bundles, runtime work, dependencies, and duplicated UX without being part of the desired product direction.
