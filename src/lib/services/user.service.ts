@@ -193,32 +193,6 @@ export async function changeUsername(
 }
 
 /**
- * Look up a user profile by their public username (case-insensitive).
- * Returns null if not found.
- */
-export async function getUserByUsername(
-  username: string,
-): Promise<{ id: string; publicUsername: string | null; avatarUrl: string | null } | null> {
-  const user = await db.user.findFirst({
-    where: {
-      publicUsername: {
-        equals: username,
-        mode: 'insensitive',
-      },
-    },
-    select: { id: true, publicUsername: true, image: true },
-  })
-
-  if (!user) return null
-
-  return {
-    id: user.id,
-    publicUsername: user.publicUsername,
-    avatarUrl: user.image,
-  }
-}
-
-/**
  * Set or clear a user's favourite team slug (used as their leaderboard icon).
  * Pass null to remove the team icon.
  */
@@ -233,17 +207,6 @@ export async function setFavoriteTeam(
     where: { id: userId },
     data: { favoriteTeamSlug: slug },
   })
-}
-
-/**
- * Returns whether the tutorial has been dismissed for the given user.
- */
-export async function hasDismissedTutorial(userId: string): Promise<boolean> {
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { tutorialDismissedAt: true },
-  })
-  return user?.tutorialDismissedAt != null
 }
 
 /**

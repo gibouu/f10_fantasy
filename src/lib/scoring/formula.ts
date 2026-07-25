@@ -189,49 +189,6 @@ export function computeRaceScore(
   }
 }
 
-// ─────────────────────────────────────────────
-// UI helpers
-// ─────────────────────────────────────────────
-
-/**
- * Returns an array of human-readable explanation strings describing how
- * each component of the score was earned. Suitable for tooltip / detail views.
- */
-export function getScoreExplanation(
-  score: ScoreOutput,
-  raceType: 'MAIN' | 'SPRINT',
-): string[] {
-  const lines: string[] = []
-  const caps = getScoringCaps(raceType)
-
-  // 10th place explanation
-  if (score.tenthPlaceScore === caps.p10) {
-    lines.push(`Perfect 10th place pick! +${score.tenthPlaceScore} pts`)
-  } else if (score.tenthPlaceScore > 0) {
-    lines.push(`10th place pick scored +${score.tenthPlaceScore} pts`)
-  } else {
-    lines.push('10th place pick scored 0 pts (too far off or driver did not finish)')
-  }
-
-  // Winner bonus explanation
-  if (score.winnerBonus === caps.winner) {
-    lines.push(`Correct winner pick! +${score.winnerBonus} pts`)
-  } else {
-    lines.push('Winner pick incorrect — +0 pts')
-  }
-
-  // DNF bonus explanation
-  if (score.dnfBonus === caps.dnf) {
-    lines.push(`Correct DNF pick! +${score.dnfBonus} pts`)
-  } else {
-    lines.push('DNF pick incorrect — +0 pts')
-  }
-
-  lines.push(`Total: ${score.totalScore} / ${caps.total} pts`)
-
-  return lines
-}
-
 export function getScoringCaps(raceType: 'MAIN' | 'SPRINT'): RaceScoringCaps {
   return raceType === 'MAIN'
     ? {

@@ -6,10 +6,35 @@ struct Pick: Codable, Sendable {
     let tenthPlaceDriverId: String
     let winnerDriverId: String
     let dnfDriverId: String
+    let version: String?
     let lockedAt: Date?
     let scoreBreakdown: ScoreBreakdown?
     var updatedAt: Date? = nil
     var lockedSubmittedBeforeQualifying: Bool? = nil
+
+    init(
+        id: String,
+        raceId: String,
+        tenthPlaceDriverId: String,
+        winnerDriverId: String,
+        dnfDriverId: String,
+        version: String? = nil,
+        lockedAt: Date?,
+        scoreBreakdown: ScoreBreakdown?,
+        updatedAt: Date? = nil,
+        lockedSubmittedBeforeQualifying: Bool? = nil
+    ) {
+        self.id = id
+        self.raceId = raceId
+        self.tenthPlaceDriverId = tenthPlaceDriverId
+        self.winnerDriverId = winnerDriverId
+        self.dnfDriverId = dnfDriverId
+        self.version = version
+        self.lockedAt = lockedAt
+        self.scoreBreakdown = scoreBreakdown
+        self.updatedAt = updatedAt
+        self.lockedSubmittedBeforeQualifying = lockedSubmittedBeforeQualifying
+    }
 }
 
 struct ScoreBreakdown: Codable, Sendable {

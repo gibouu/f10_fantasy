@@ -4,9 +4,10 @@ export async function handleLeaderboardGet(
     auth,
     mobileAuth,
     getActiveSeason,
-    getGlobalLeaderboard,
+    getGlobalLeaderboardResult,
     getFriendsLeaderboard,
     getUserLeaderboardRank,
+    validateLeaderboardSort,
   },
 ) {
   const { searchParams } = request.nextUrl
@@ -31,13 +32,19 @@ export async function handleLeaderboardGet(
     return Response.json({ rows: [], userRank: null, userRow: null })
   }
 
-  const rows =
+  if (!(await validateLeaderboardSort(seasonId, sort))) {
+    return Response.json({ error: "Invalid race id" }, { status: 400 })
+  }
+
+  const leaderboard =
     scope === "friends"
-      ? await getFriendsLeaderboard(userId, seasonId, sort)
-      : await getGlobalLeaderboard(seasonId, sort, 20)
+      ? {
+          rows: await getFriendsLeaderboard(userId, seasonId, sort),
+          userRank: userId ? await getUserLeaderboardRank(userId, seasonId, sort) : null,
+        }
+      : await getGlobalLeaderboardResult(seasonId, sort, 20, userId)
 
-  const userRank = userId ? await getUserLeaderboardRank(userId, seasonId, sort) : null
-  const userRow = userId ? (rows.find((row) => row.userId === userId) ?? null) : null
+  const userRow = userId ? (leaderboard.rows.find((row) => row.userId === userId) ?? null) : null
 
-  return Response.json({ rows, userRank, userRow })
+  return Response.json({ rows: leaderboard.rows, userRank: leaderboard.userRank, userRow })
 }

@@ -50,7 +50,7 @@ export default function RootPage() {
               <img
                 className={styles.deviceImage}
                 src="/landing/fx-racing-race-deck-v1.jpg"
-                alt="FX Racing race deck showing winner, P10, and non-finisher pick rows"
+                alt="FX Racing race deck showing P1, P10, and DNF pick rows"
                 width="736"
                 height="1600"
                 sizes="(min-width: 768px) 272px, 46vw"
@@ -74,32 +74,6 @@ export default function RootPage() {
                 decoding="async"
               />
             </figure>
-          </div>
-        </section>
-
-        <section
-          className={styles.scoringSection}
-          aria-label="How to play"
-          data-review-id="landing-rules"
-        >
-          <div className={`${styles.shell} ${styles.scoringInner}`}>
-            <dl className={styles.scoreGrid}>
-              <div className={styles.scoreItem}>
-                <dt>P1</dt>
-                <dd>winner</dd>
-              </div>
-              <div className={styles.scoreItem}>
-                <dt>P10</dt>
-                <dd>midfield finisher</dd>
-              </div>
-              <div className={styles.scoreItem}>
-                <dt>DNF</dt>
-                <dd>non-finisher</dd>
-              </div>
-            </dl>
-            <p className={styles.bonusCopy}>
-              Make all three calls before qualifying for bonus points.
-            </p>
           </div>
         </section>
       </main>

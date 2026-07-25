@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/.artifacts/app-store/
 /artifacts/ios-performance/
 
 # next.js

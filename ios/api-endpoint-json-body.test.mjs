@@ -36,3 +36,11 @@ test("JSON-body endpoints use the shared helper", () => {
     assert.doesNotMatch(block, /let body = try\? JSONEncoder\(\)\.encode/)
   }
 })
+
+test("submitPick carries the optimistic concurrency version as If-Match", () => {
+  const block = source.match(/static func submitPick[\s\S]*?private static func jsonBody/)?.[0]
+  assert.ok(block, "submitPick endpoint factory should exist")
+  assert.match(block, /baseVersion:\s*String\?\s*=\s*nil/)
+  assert.match(block, /"If-Match"/)
+  assert.match(block, /headers:\s*headers/)
+})

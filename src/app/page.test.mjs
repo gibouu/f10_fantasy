@@ -28,7 +28,7 @@ test("landing stays static and presents the three-call game", () => {
   assert.match(source, /PICK THE GRID/)
   assert.match(source, /P1\. P10\. DNF\./)
   assert.match(source, /One race\. Three calls\. Global rankings\./)
-  assert.match(source, /non-finisher/)
+  assert.match(source, /Make all three picks before qualifying/)
   assert.doesNotMatch(source, /first retirement/i)
   assert.equal((source.match(/<h1\b/g) ?? []).length, 1)
   assert.match(source, /href=["']\/privacy["']/)
@@ -41,6 +41,14 @@ test("landing owns its canonical and social metadata", () => {
   assert.match(page, /openGraph:\s*{[\s\S]*?url:\s*["']\/["']/)
   assert.match(page, /siteName:\s*["']FX Racing["']/)
   assert.match(page, /twitter:\s*{\s*card:\s*["']summary_large_image["']/)
+})
+
+test("landing omits the repeated scoring strip", () => {
+  assert.doesNotMatch(page, /data-review-id=["']landing-rules["']/)
+  assert.doesNotMatch(page, /aria-label=["']How to play["']/)
+  assert.doesNotMatch(page, /midfield finisher/)
+  assert.doesNotMatch(page, /non-finisher/)
+  assert.doesNotMatch(page, /scoreGrid|bonusCopy|scoringSection/)
 })
 
 test("landing uses two local, dimensioned, lightweight screenshots", async () => {

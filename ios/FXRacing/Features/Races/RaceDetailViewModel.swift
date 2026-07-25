@@ -1660,7 +1660,7 @@ final class RaceDetailViewModel {
         switch slot {
         case .winner: "Race winner"
         case .p10: "Finishes tenth"
-        case .dnf: "First retirement"
+        case .dnf: "Non-classified driver"
         }
     }
 

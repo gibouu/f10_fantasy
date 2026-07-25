@@ -3,6 +3,12 @@ import { getQualifyingResults } from '@/lib/services/qualifying.service'
 import { getDriverSeasonStats } from '@/lib/services/driver-season-stats'
 import { db } from '@/lib/db/client'
 import { getResultScoreGuide } from '@/lib/scoring/formula'
+import {
+  publicRaceHeaders,
+  raceDetailCacheControl,
+  raceNotFoundCacheControl,
+  serverTiming,
+} from '@/lib/api/public-race-cache'
 import { createRaceDetailGetHandler } from './get-handler'
 
 const findRaceResults = (raceId: string) =>
@@ -25,4 +31,8 @@ export const GET = createRaceDetailGetHandler({
   findRaceResults,
   getQualifyingResults,
   getResultScoreGuide,
+  publicRaceHeaders,
+  raceDetailCacheControl,
+  raceNotFoundCacheControl,
+  serverTiming,
 })

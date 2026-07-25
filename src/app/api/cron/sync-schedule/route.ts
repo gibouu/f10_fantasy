@@ -9,9 +9,11 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { validateCronSecret } from "@/lib/api/cron-auth"
+import { revalidatePublicRaceCache } from "@/lib/api/public-race-cache"
 import { db } from "@/lib/db/client"
 import { createF1Provider } from "@/lib/f1/adapter"
 import { fetchDriversForSessions } from "./driver-fetch"
+import { getRaceEntryRefreshSkipReason } from "../entry-refresh-guard"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cron/sync-schedule
@@ -28,15 +30,28 @@ export async function POST(req: NextRequest) {
   // ── 1. Ensure there is an active Season record for the current year ────────
   let season = await db.season.findFirst({
     where: { year },
-    select: { id: true, year: true },
+    select: { id: true, year: true, isActive: true },
   })
 
   if (!season) {
     await db.season.updateMany({ where: { isActive: true }, data: { isActive: false } })
     season = await db.season.create({
       data: { year, isActive: true },
-      select: { id: true, year: true },
+      select: { id: true, year: true, isActive: true },
     })
+  } else if (!season.isActive) {
+    const [, activatedSeason] = await db.$transaction([
+      db.season.updateMany({
+        where: { isActive: true, id: { not: season.id } },
+        data: { isActive: false },
+      }),
+      db.season.update({
+        where: { id: season.id },
+        data: { isActive: true },
+        select: { id: true, year: true, isActive: true },
+      }),
+    ])
+    season = activatedSeason
   }
 
   // ── 2. Fetch sessions + meetings in parallel ───────────────────────────────
@@ -119,6 +134,8 @@ export async function POST(req: NextRequest) {
   const allQualifyingSessions = sessions.filter((s) => s.type === "Qualifying")
 
   const raceIdBySessionKey = new Map<number, string>()
+  const entryCountByRaceId = new Map<string, number>()
+  const mutatedRaceIds = new Set<string>()
   let synced = 0
   let hadRaceUpsertFailure = false
 
@@ -222,7 +239,7 @@ export async function POST(req: NextRequest) {
           openf1MeetingKey: session.meetingKey,
           type: raceType as "MAIN" | "SPRINT",
         },
-        select: { id: true, status: true },
+        select: { id: true, status: true, _count: { select: { entries: true } } },
       })
 
       if (!existing) {
@@ -237,18 +254,21 @@ export async function POST(req: NextRequest) {
               lte: new Date(start + windowMs),
             },
           },
-          select: { id: true, status: true },
+          select: { id: true, status: true, _count: { select: { entries: true } } },
         })
       }
 
       let raceId: string
+      let existingEntryCount = 0
       if (existing) {
         raceId = existing.id
+        existingEntryCount = existing._count.entries
         if (existing.status !== "COMPLETED") {
           await db.race.update({
             where: { id: existing.id },
             data: { ...updatePayload, openf1SessionKey: session.sessionKey },
           })
+          mutatedRaceIds.add(raceId)
         }
       } else {
         const created = await db.race.create({
@@ -256,8 +276,10 @@ export async function POST(req: NextRequest) {
           select: { id: true },
         })
         raceId = created.id
+        mutatedRaceIds.add(raceId)
       }
       raceIdBySessionKey.set(session.sessionKey, raceId)
+      entryCountByRaceId.set(raceId, existingEntryCount)
       synced++
     } catch (err) {
       hadRaceUpsertFailure = true
@@ -318,6 +340,7 @@ export async function POST(req: NextRequest) {
       })
       reconciled = result.count
       for (const o of orphans) {
+        mutatedRaceIds.add(o.id)
         console.log(
           `[f10:cron:sync-schedule] reconcile CANCELLED R${o.round} ${o.type} "${o.name}" (id=${o.id}) — no longer in OpenF1`,
         )
@@ -331,6 +354,7 @@ export async function POST(req: NextRequest) {
 
   // Skip the remaining steps if no driver data was fetched
   if (sessionDrivers.every((sd) => sd.drivers.length === 0)) {
+    revalidatePublicRaceCache(mutatedRaceIds)
     return NextResponse.json({ synced, reconciled, year, driversSkipped: true })
   }
 
@@ -425,26 +449,47 @@ export async function POST(req: NextRequest) {
       .map((s) => s.sessionKey),
   )
   const raceEntries: { raceId: string; driverId: string }[] = []
+  const entryRefreshSkipped: Array<{ raceId: string; reason: string }> = []
 
   for (const { session, drivers } of sessionDrivers) {
     if (!raceSessions.has(session.sessionKey)) continue
     const raceId = raceIdBySessionKey.get(session.sessionKey)
     if (!raceId) continue
-    for (const driver of drivers) {
-      const driverId = driverIdByNumber.get(driver.driverNumber)
-      if (!driverId) continue
-      raceEntries.push({ raceId, driverId })
+
+    const entries = drivers
+      .map((driver) => ({
+        raceId,
+        driverId: driverIdByNumber.get(driver.driverNumber),
+      }))
+      .filter((entry): entry is { raceId: string; driverId: string } => entry.driverId !== undefined)
+
+    const skipReason = getRaceEntryRefreshSkipReason({
+      existingCount: entryCountByRaceId.get(raceId) ?? 0,
+      nextCount: entries.length,
+    })
+    if (skipReason) {
+      entryRefreshSkipped.push({ raceId, reason: skipReason })
+      continue
     }
+
+    raceEntries.push(...entries)
   }
 
   const refreshedRaceIds = Array.from(new Set(raceEntries.map((entry) => entry.raceId)))
+  for (const raceId of refreshedRaceIds) {
+    mutatedRaceIds.add(raceId)
+  }
 
-  await db.$transaction([
-    db.raceEntry.deleteMany({
-      where: { raceId: { in: refreshedRaceIds } },
-    }),
-    db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
-  ])
+  if (raceEntries.length > 0) {
+    await db.$transaction([
+      db.raceEntry.deleteMany({
+        where: { raceId: { in: refreshedRaceIds } },
+      }),
+      db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
+    ])
+  }
 
-  return NextResponse.json({ synced, reconciled, year })
+  revalidatePublicRaceCache(mutatedRaceIds)
+
+  return NextResponse.json({ synced, reconciled, year, entryRefreshSkipped })
 }

@@ -117,6 +117,16 @@ export type DriverSeasonForm = {
   results: DriverSeasonResult[]
 }
 
+/**
+ * Wire form of {@link DriverSeasonResult}: `Date` cannot cross the API
+ * boundary, so `scheduledStartUtc` is serialized as an ISO string and the
+ * driver identity is dropped (results are already nested under their driver).
+ */
+export type SerializedDriverSeasonResult = Omit<
+  DriverSeasonResult,
+  'driverId' | 'scheduledStartUtc'
+> & { scheduledStartUtc: string }
+
 // ─────────────────────────────────────────────
 // Picks
 // ─────────────────────────────────────────────
@@ -133,6 +143,8 @@ export type PickSetData = {
   dnfSeatKey: string | null
   createdAt: Date
   updatedAt: Date
+  /** Stable optimistic-concurrency token derived from updatedAt. */
+  version: string
   /** Set when the pick set is locked; null means still editable */
   lockedAt: Date | null
   /**
@@ -202,39 +214,4 @@ export type FriendRequestData = {
   addresseeTeamSlug?: string | null
   status: FriendRequestStatus
   createdAt: Date
-}
-
-// ─────────────────────────────────────────────
-// Serialized variants (dates as ISO strings)
-// Used when passing server-loaded data to client components via props.
-// Next.js cannot serialize Date instances across the RSC/client boundary.
-// ─────────────────────────────────────────────
-
-export type SerializedRaceSummary = Omit<
-  RaceSummary,
-  'scheduledStartUtc' | 'lockCutoffUtc' | 'qualifyingStartUtc'
-> & {
-  scheduledStartUtc: string
-  lockCutoffUtc: string
-  qualifyingStartUtc: string | null
-}
-
-export type SerializedScoreBreakdownData = Omit<ScoreBreakdownData, 'computedAt'> & {
-  computedAt: string
-}
-
-export type SerializedDriverSeasonResult = Omit<
-  DriverSeasonResult,
-  'driverId' | 'scheduledStartUtc'
-> & { scheduledStartUtc: string }
-
-export type SerializedPickSetData = Omit<PickSetData, 'createdAt' | 'updatedAt' | 'lockedAt'> & {
-  createdAt: string
-  updatedAt: string
-  lockedAt: string | null
-}
-
-export type SerializedPickSetWithScore = SerializedPickSetData & {
-  scoreBreakdown: SerializedScoreBreakdownData | null
-  race: SerializedRaceSummary
 }

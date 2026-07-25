@@ -748,7 +748,6 @@ npm run test:ios
 npm run test:utils
 npm run test:scoring
 npm run test:scripts:static
-npx tsx scripts/test-mobile-provider-email.ts
 npx tsc --noEmit
 npm run lint
 npm run build

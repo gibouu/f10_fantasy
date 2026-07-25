@@ -98,7 +98,6 @@ test("getFinalResults distinguishes DNS drivers from DNF retirements", async () 
     globalThis.fetch = previousFetch
   }
 })
-
 test("getFinalResults defers final classification when stints are empty", async () => {
   const previousFetch = globalThis.fetch
   globalThis.fetch = async (url) => {
@@ -137,38 +136,35 @@ test("getFinalResults defers final classification when stints are empty", async 
     globalThis.fetch = previousFetch
   }
 })
-
-test("getLiveClassification returns null when OpenF1 has no position rows", async () => {
+test("getFinalResults defers final classification when stints fetch fails", async () => {
   const previousFetch = globalThis.fetch
+  const previousConsoleError = console.error
+  const errors = []
+  console.error = (...args) => errors.push(args)
   globalThis.fetch = async (url) => {
     const requestUrl = String(url)
 
-    if (requestUrl.endsWith("/position?session_key=456")) {
-      return jsonResponse([])
+    if (requestUrl.endsWith("/position?session_key=345")) {
+      return jsonResponse([
+        {
+          session_key: 345,
+          driver_number: 1,
+          position: 1,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+        {
+          session_key: 345,
+          driver_number: 2,
+          position: 2,
+          date: "2026-06-21T15:00:00.000Z",
+        },
+      ])
     }
 
-    return new Response("not found", { status: 404, statusText: "Not Found" })
-  }
-
-  try {
-    const provider = new OpenF1Provider()
-    const classification = await provider.getLiveClassification(456)
-
-    assert.equal(classification, null)
-  } finally {
-    globalThis.fetch = previousFetch
-  }
-})
-
-test("getLiveClassification propagates OpenF1 provider failures", async () => {
-  const previousFetch = globalThis.fetch
-  globalThis.fetch = async (url) => {
-    const requestUrl = String(url)
-
-    if (requestUrl.endsWith("/position?session_key=789")) {
+    if (requestUrl.endsWith("/stints?session_key=345")) {
       return new Response("upstream failed", {
-        status: 500,
-        statusText: "Internal Server Error",
+        status: 503,
+        statusText: "Service Unavailable",
       })
     }
 
@@ -177,11 +173,13 @@ test("getLiveClassification propagates OpenF1 provider failures", async () => {
 
   try {
     const provider = new OpenF1Provider()
-    await assert.rejects(
-      provider.getLiveClassification(789),
-      /OpenF1 HTTP 500 Internal Server Error/,
-    )
+    const results = await provider.getFinalResults(345)
+
+    assert.deepEqual(results, [])
+    assert.equal(errors.length, 1)
+    assert.match(String(errors[0][0]), /deferring final classification/)
   } finally {
     globalThis.fetch = previousFetch
+    console.error = previousConsoleError
   }
 })

@@ -296,7 +296,7 @@ final class LocalPickStoreTests: XCTestCase {
             store.transition(id: saved.id, revision: saved.revision, to: .confirmed)
         )
         XCTAssertEqual(store.record(id: saved.id), saved)
-        XCTAssertFalse(store.remove(raceId: saved.id.raceID))
+        XCTAssertFalse(store.remove(id: saved.id))
         XCTAssertEqual(store.record(id: saved.id), saved)
         XCTAssertEqual(persistence.data(forKey: "localPicks_v2"), durableBytes)
 
@@ -782,44 +782,6 @@ final class LocalPickStoreTests: XCTestCase {
         )
     }
 
-    func testCompatibilityCallbacksRequireCapturedGuestRevision() throws {
-        let context = makeDefaults()
-        defer { context.cleanUp() }
-        let store = LocalPickStore(defaults: context.defaults, clock: TestClock.fixed)
-        let initial = try saveRecord(
-            in: store,
-            race: RaceFixtures.liveSpa,
-            owner: .guest
-        )
-        let captured = try XCTUnwrap(store.unsyncedPicks().first)
-        let changedSelection = PickSelection(
-            winnerDriverID: "piastri",
-            tenthPlaceDriverID: "leclerc",
-            dnfDriverID: "norris"
-        )
-        let changedResult = store.save(
-            selection: changedSelection,
-            race: RaceFixtures.liveSpa,
-            owner: .guest,
-            now: RaceFixtures.now.addingTimeInterval(1)
-        )
-        guard case .saved(let changed) = changedResult else {
-            return XCTFail("Expected a newer guest revision")
-        }
-
-        XCTAssertEqual(captured.revision, initial.revision)
-        XCTAssertFalse(
-            store.markSynced(raceId: "spa", revision: captured.revision)
-        )
-        XCTAssertFalse(
-            store.markMigrationExpired(raceId: "spa", revision: captured.revision)
-        )
-        XCTAssertEqual(store.record(id: changed.id), changed)
-        XCTAssertTrue(
-            store.markSynced(raceId: "spa", revision: changed.revision)
-        )
-    }
-
     func testTerminalStatesRequireExplicitSaveToCreateNewRevision() throws {
         let context = makeDefaults()
         defer { context.cleanUp() }
@@ -1017,68 +979,6 @@ final class LocalPickStoreTests: XCTestCase {
 
         XCTAssertEqual(retried.revision, initial.revision + 1)
         XCTAssertEqual(retried.syncState, .queued)
-    }
-
-    func testLegacyRaceOnlyWrappersOperateOnGuestRecordOnly() throws {
-        let context = makeDefaults()
-        defer { context.cleanUp() }
-        let store = LocalPickStore(defaults: context.defaults, clock: TestClock.fixed)
-        let account = try saveRecord(
-            in: store,
-            race: RaceFixtures.liveSpa,
-            owner: .user("a")
-        )
-        let legacy = LocalPick(
-            raceId: "spa",
-            winnerId: "leclerc",
-            p10Id: "norris",
-            dnfId: "piastri",
-            savedAt: RaceFixtures.now,
-            synced: false,
-            migrationStatus: nil
-        )
-
-        XCTAssertNil(store.pick(for: "spa"))
-        XCTAssertTrue(store.unsyncedPicks().isEmpty)
-        XCTAssertFalse(store.markSynced(raceId: "spa", revision: nil))
-        XCTAssertFalse(store.markMigrationExpired(raceId: "spa", revision: nil))
-        XCTAssertFalse(store.remove(raceId: "spa"))
-        XCTAssertEqual(store.record(for: "spa", owner: .user("a")), account)
-
-        XCTAssertTrue(store.save(legacy, race: RaceFixtures.liveSpa))
-        XCTAssertEqual(store.pick(for: "spa")?.winnerId, "leclerc")
-        XCTAssertEqual(store.unsyncedPicks().map(\.raceId), ["spa"])
-
-        let firstGuestRevision = store.pick(for: "spa")?.revision
-        XCTAssertTrue(
-            store.markSynced(raceId: "spa", revision: firstGuestRevision)
-        )
-        XCTAssertTrue(store.pick(for: "spa")?.synced == true)
-        XCTAssertEqual(store.record(for: "spa", owner: .user("a")), account)
-
-        let revised = LocalPick(
-            raceId: "spa",
-            winnerId: "norris",
-            p10Id: "piastri",
-            dnfId: "leclerc",
-            savedAt: RaceFixtures.now.addingTimeInterval(1),
-            synced: false,
-            migrationStatus: nil
-        )
-        XCTAssertTrue(store.save(revised, race: RaceFixtures.liveSpa))
-        let revisedGuestRevision = store.pick(for: "spa")?.revision
-        XCTAssertTrue(
-            store.markMigrationExpired(
-                raceId: "spa",
-                revision: revisedGuestRevision
-            )
-        )
-        XCTAssertEqual(store.pick(for: "spa")?.migrationStatus, .expired)
-        XCTAssertEqual(store.record(for: "spa", owner: .user("a")), account)
-
-        XCTAssertTrue(store.remove(raceId: "spa"))
-        XCTAssertNil(store.pick(for: "spa"))
-        XCTAssertEqual(store.record(for: "spa", owner: .user("a")), account)
     }
 
     func testAuthoritativePicksArePersistedAndStrictlyAccountScoped() throws {

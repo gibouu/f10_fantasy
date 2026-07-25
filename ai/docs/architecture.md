@@ -76,7 +76,7 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 
 | Path | Purpose |
 |---|---|
-| `src/lib/services/race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRaceResults`, `getRacesForSeason`, `getActiveSeason` |
+| `src/lib/services/race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRacesForSeason`, `getActiveSeason` |
 | `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick`; profile history hides `CANCELLED` races |
 | `src/lib/services/ingestion.service.ts` | `ingestResultsForRace` → fetches OpenF1 → upserts `RaceResult` |
 | `src/lib/services/qualifying.service.ts` | `ingestQualifyingForRace`, `getQualifyingResults`, partial-row qualifying backfill |
@@ -125,8 +125,10 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 
 ## API Surface
 
-- `POST /api/picks` — submit pick (auth required)
+- `GET /api/picks?raceId=<id>` — fetch authenticated user's pick; response includes `pick.version` (same value as `updatedAt.toISOString()`) and an `ETag`
+- `POST /api/picks` — submit pick (auth required); existing-row edits require `If-Match: "<pick.version>"` or body `baseVersion`, stale/missing versions return HTTP 409 with `{ currentPick }`
 - `GET /api/races` — public race list
+- Public race GETs (`/api/races`, `/api/races/[id]`) bypass Auth.js middleware, set shared Cache-Control (`s-maxage` + `stale-while-revalidate`), emit Server-Timing, and are invalidated via cache tags after schedule/status/entry/qualifying/result mutations.
 - `GET /api/races/[id]` — public race detail, including qualifying results and optional entrant season-form fields
 - `GET /api/users/[userId]` — public user profile + picks
 - `GET /api/friends` — friend list (auth required)
@@ -144,8 +146,9 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 ## Key Constraints
 
 - **Three parallel type systems** — Domain types (`src/types/domain.ts`), Prisma types (DB-only, never leak to client), F1 types (`src/lib/f1/types.ts`). Keep them separate.
-- **Serialization pattern** — `Date` fields cannot cross JSON or RSC/client boundaries. API/native-facing shapes use `Serialized*` variants with dates as ISO strings.
+- **Serialization pattern** — `Date` fields cannot cross JSON or RSC/client boundaries. API/native-facing responses serialize dates as ISO strings.
 - **PickSet** unique on `[userId, raceId]` — one pick set per user per race
+- **Pick optimistic concurrency** — API pick responses expose `version = updatedAt.toISOString()`. Cross-device edits must send the loaded version via `If-Match` or `baseVersion`; `pick.service.ts` compares it inside the write transaction before updating.
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT
 - **Race ordering is chronological** — service lists/current-race queries sort by `scheduledStartUtc`, not round number. Round labels may be manually renumbered after calendar reconciliation; cancelled rows may be parked at high round values to avoid unique-key collisions.
 - **Two lock levels** — `race.lockCutoffUtc` (race-wide) + `pickSet.lockedAt` (individual)

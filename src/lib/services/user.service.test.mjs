@@ -8,7 +8,7 @@ function changeUsernameSource() {
   const start = source.indexOf("export async function changeUsername")
   assert.notEqual(start, -1)
 
-  const end = source.indexOf("/**\n * Look up a user profile", start)
+  const end = source.indexOf("export async function setFavoriteTeam", start)
   assert.notEqual(end, -1)
 
   return source.slice(start, end)

@@ -14,10 +14,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateCronSecret } from '@/lib/api/cron-auth'
+import { revalidatePublicRaceCache } from '@/lib/api/public-race-cache'
 import { db } from '@/lib/db/client'
 import { createF1Provider } from '@/lib/f1/adapter'
-
-const MIN_VALID_ENTRY_COUNT = 10
+import { getRaceEntryRefreshSkipReason } from '../entry-refresh-guard'
 
 export async function POST(req: NextRequest) {
   if (!validateCronSecret(req)) {
@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
 
   // Rebuild RaceEntry rows for each refreshed race.
   let refreshed = 0
+  const refreshedRaceIds = new Set<string>()
   const skipped: Array<{ raceId: string; reason: string }> = []
 
   for (const { race, drivers } of sessionResults) {
@@ -160,16 +161,12 @@ export async function POST(req: NextRequest) {
       .map((d) => ({ raceId: race.id, driverId: driverIdByNumber.get(d.driverNumber) }))
       .filter((e): e is { raceId: string; driverId: string } => e.driverId !== undefined)
 
-    const existingCount = race._count.entries
-    if (entries.length < MIN_VALID_ENTRY_COUNT) {
-      skipped.push({ raceId: race.id, reason: `too-few-entries:${entries.length}` })
-      continue
-    }
-    if (existingCount > 0 && entries.length < existingCount) {
-      skipped.push({
-        raceId: race.id,
-        reason: `entry-count-regression:${existingCount}->${entries.length}`,
-      })
+    const skipReason = getRaceEntryRefreshSkipReason({
+      existingCount: race._count.entries,
+      nextCount: entries.length,
+    })
+    if (skipReason) {
+      skipped.push({ raceId: race.id, reason: skipReason })
       continue
     }
 
@@ -179,6 +176,11 @@ export async function POST(req: NextRequest) {
     ])
 
     refreshed++
+    refreshedRaceIds.add(race.id)
+  }
+
+  if (refreshedRaceIds.size > 0) {
+    revalidatePublicRaceCache(refreshedRaceIds)
   }
 
   return NextResponse.json({ refreshed, skipped, total: upcomingRaces.length })

@@ -96,6 +96,14 @@ test("Midnight Grid keeps the approved palette, shell, and badge breakpoint", ()
   )
 })
 
+test("landing scoring strip selectors stay retired", () => {
+  assert.doesNotMatch(styles, /scoringSection/)
+  assert.doesNotMatch(styles, /scoringInner/)
+  assert.doesNotMatch(styles, /scoreGrid/)
+  assert.doesNotMatch(styles, /scoreItem/)
+  assert.doesNotMatch(styles, /bonusCopy/)
+})
+
 test("screenshot overlap stays centered with straight-on panels", () => {
   const raceDeckFrame = styles.match(/\.raceDeckFrame\s*{([\s\S]*?)}/)?.[1] ?? ""
   const driverPickerFrame = styles.match(/\.driverPickerFrame\s*{([\s\S]*?)}/)?.[1] ?? ""
@@ -109,14 +117,13 @@ test("screenshot overlap stays centered with straight-on panels", () => {
 test("Midnight Grid keeps the approved typography weights", () => {
   assert.match(styles, /\.sitePage\s*{[^}]*font-weight:\s*450/)
 
-  for (const selector of ["brand", "heroTitle", "scoreItem dt", "legalArticle h1"]) {
+  for (const selector of ["brand", "heroTitle", "legalArticle h1"]) {
     const pattern = new RegExp(`\\.${selector.replace(" ", "\\s+")}\\s*{[^}]*font-weight:\\s*800`)
     assert.match(styles, pattern, `${selector} must use display weight 800`)
   }
 
   assert.match(styles, /\.eyebrow,\s*\.legalEyebrow\s*{[^}]*font-weight:\s*700/)
   assert.match(styles, /\.appStoreText\s*{[^}]*font-weight:\s*700/)
-  assert.match(styles, /\.scoreItem dd\s*{[^}]*font-weight:\s*700/)
   assert.match(styles, /\.legalNavigation a,\s*\.legalLink\s*{[^}]*font-weight:\s*700/)
   assert.match(styles, /\.legalSection h2\s*{[^}]*font-weight:\s*700/)
   assert.match(styles, /\.supportAddress\s*{[^}]*font-weight:\s*700/)

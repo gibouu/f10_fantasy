@@ -31,14 +31,6 @@ export function isPickSetLocked(lockedAt: Date | null): boolean {
   return lockedAt !== null
 }
 
-/**
- * Returns the number of milliseconds until the race's lock cutoff.
- * Negative values mean the cutoff has already passed.
- */
-export function msUntilLock(race: Pick<Race, 'lockCutoffUtc'>): number {
-  return race.lockCutoffUtc.getTime() - Date.now()
-}
-
 // ─────────────────────────────────────────────
 // DB operations
 // ─────────────────────────────────────────────
@@ -87,40 +79,4 @@ export async function lockPicksForRace(raceId: string): Promise<number> {
   `
 
   return Number(count)
-}
-
-/**
- * Returns true if the user can still create or edit a pick for the given race.
- *
- * Checks two conditions:
- *   1. The race's lockCutoffUtc has not passed.
- *   2. If the user already has a pick set, it must not have lockedAt set.
- */
-export async function canEditPicks(
-  userId: string,
-  raceId: string,
-): Promise<boolean> {
-  const race = await db.race.findUnique({
-    where: { id: raceId },
-    select: { lockCutoffUtc: true },
-  })
-
-  if (!race) return false
-
-  // Race-level lock — applies to all users regardless of their pick set state
-  if (isRaceLocked(race)) return false
-
-  // Check if the user's specific pick set has been locked
-  const existingPick = await db.pickSet.findUnique({
-    where: {
-      userId_raceId: { userId, raceId },
-    },
-    select: { lockedAt: true },
-  })
-
-  // No existing pick → user can still create one
-  if (!existingPick) return true
-
-  // Pick exists — return false if it was explicitly locked
-  return !isPickSetLocked(existingPick.lockedAt)
 }

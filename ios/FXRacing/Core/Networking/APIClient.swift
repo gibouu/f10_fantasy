@@ -82,6 +82,9 @@ struct APIClient: Sendable {
         if let token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        for (field, value) in endpoint.headers {
+            req.setValue(value, forHTTPHeaderField: field)
+        }
         if let body = endpoint.bodyData {
             req.httpBody = body
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")

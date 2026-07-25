@@ -3,6 +3,20 @@ import test from "node:test"
 
 import { createRaceDetailGetHandler } from "./get-handler.js"
 
+// The real helpers live in `@/lib/api/public-race-cache`, which pulls in
+// `next/cache`. Stub them so this stays a dependency-free unit test; the
+// route wiring itself is asserted in `../route-source.test.mjs`.
+const cacheDeps = {
+  publicRaceHeaders: ({ cacheControl, raceId, serverTiming }) => ({
+    "Cache-Control": cacheControl,
+    "Cache-Tag": raceId ? `public-races, public-race:${raceId}` : "public-races",
+    "Server-Timing": serverTiming,
+  }),
+  raceDetailCacheControl: (status) => `public, detail-${status}`,
+  raceNotFoundCacheControl: () => "public, not-found",
+  serverTiming: (entries) => entries.map(({ name }) => name).join(", "),
+}
+
 const race = {
   id: "belgium",
   seasonId: "season-2026",
@@ -45,6 +59,7 @@ test("GET returns the race, entrant form history, scored results, and qualifying
     scoreGuide: [],
   }
   const getHandler = createRaceDetailGetHandler({
+    ...cacheDeps,
     getRaceById: async (raceId) => {
       calls.race.push(raceId)
       return race
@@ -159,6 +174,7 @@ test("GET returns the race, entrant form history, scored results, and qualifying
 test("GET returns 404 before loading dependent race detail data", async () => {
   const called = []
   const getHandler = createRaceDetailGetHandler({
+    ...cacheDeps,
     getRaceById: async () => null,
     getRaceEntrants: async () => called.push("entrants"),
     getDriverSeasonStats: async () => called.push("season"),
@@ -226,6 +242,7 @@ test("GET keeps a worst-case 22 by 24 driver-history response within the payload
     ]),
   )
   const getHandler = createRaceDetailGetHandler({
+    ...cacheDeps,
     getRaceById: async () => ({
       ...race,
       name: longestFixtureStrings.raceName,
@@ -257,6 +274,7 @@ test("GET keeps a worst-case 22 by 24 driver-history response within the payload
 test("GET propagates qualifying lookup failures", async () => {
   const qualifyingFailure = new Error("qualifying lookup failed")
   const getHandler = createRaceDetailGetHandler({
+    ...cacheDeps,
     getRaceById: async () => race,
     getRaceEntrants: async () => [entrant],
     getDriverSeasonStats: async () => new Map(),

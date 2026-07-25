@@ -16,7 +16,6 @@ struct Race: Codable, Sendable, Identifiable {
     /// API responses may omit it; nil → no bonus available.
     let qualifyingStartUtc: Date?
 
-    var isLocked: Bool { Date() >= lockCutoffUtc }
     var isSprint: Bool { type == .sprint }
     var flagEmoji: String { Race.flag(for: country) }
 
@@ -24,20 +23,6 @@ struct Race: Codable, Sendable, Identifiable {
     /// shared-round weekend (e.g. R9 British Sprint + R9 British GP) is
     /// visually distinguishable on race cards.
     var roundLabel: String { "R\(round)\(isSprint ? "S" : "")" }
-
-    /// True while qualifying is still in the future and a new pick would
-    /// qualify for the early-bird 2x bonus.
-    var earlyBirdAvailable: Bool {
-        guard let qualifyingStartUtc else { return false }
-        return Date() < qualifyingStartUtc
-    }
-
-    /// Maximum scores for each slot, used to colour-code score badges.
-    var scoreCaps: ScoreCaps {
-        isSprint
-            ? ScoreCaps(p10: 8, winner: 2, dnf: 1)
-            : ScoreCaps(p10: 25, winner: 5, dnf: 3)
-    }
 
     private static func flag(for country: String) -> String {
         let map: [String: String] = [
@@ -52,12 +37,6 @@ struct Race: Codable, Sendable, Identifiable {
         ]
         return map[country] ?? "🏎️"
     }
-}
-
-struct ScoreCaps: Sendable {
-    let p10: Int
-    let winner: Int
-    let dnf: Int
 }
 
 struct Season: Codable, Sendable, Identifiable {
