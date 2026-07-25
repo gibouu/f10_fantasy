@@ -15,14 +15,32 @@
 
 import { jwtVerify } from 'jose'
 import { db } from '@/lib/db/client'
+import type { Prisma } from '@prisma/client'
 import type { Session } from 'next-auth'
+
+type MobileAuthOptions = {
+  /**
+   * Optional fields to hydrate from the same user read used for revocation.
+   * Routes must still fall back to their normal DB read if this is absent.
+   */
+  userSelect?: Prisma.UserSelect
+}
+
+type MobileAuthDatabaseUser = { sessionValidAfter: Date | null } & Record<string, unknown>
+
+export type MobileAuthSession = Session & {
+  databaseUser?: MobileAuthDatabaseUser
+}
 
 /** Derive a stable signing key from AUTH_SECRET for mobile JWTs. */
 export function mobileSigningKey(): Uint8Array {
   return Buffer.from(process.env.AUTH_SECRET!, 'utf-8')
 }
 
-export async function mobileAuth(req: Request): Promise<Session | null> {
+export async function mobileAuth(
+  req: Request,
+  options: MobileAuthOptions = {},
+): Promise<MobileAuthSession | null> {
   const authHeader = req.headers.get('authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
 
@@ -54,28 +72,31 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
   // ~hundreds of ms before sessionValidAfter once iat is rounded down.
   // Compare in whole seconds so a brand-new account is never rejected by
   // its own freshly-issued token.
+  let databaseUser: MobileAuthDatabaseUser | null = null
   try {
     const user = await db.user.findUnique({
       where: { id: userId },
-      select: { sessionValidAfter: true },
+      select: { ...(options.userSelect ?? {}), sessionValidAfter: true },
     })
-    if (!user) {
+    const userWithRevocation = user as MobileAuthDatabaseUser | null
+    if (!userWithRevocation) {
       return null
     }
 
     if (
-      user.sessionValidAfter &&
+      userWithRevocation.sessionValidAfter &&
       sessionIssuedAtMs !== null &&
       sessionIssuedAtMs <
-        Math.floor(user.sessionValidAfter.getTime() / 1000) * 1000
+        Math.floor(userWithRevocation.sessionValidAfter.getTime() / 1000) * 1000
     ) {
       return null // Token has been revoked via POST /api/auth/revoke-session
     }
+    databaseUser = userWithRevocation
   } catch {
     // DB unavailable — skip revocation check, proceed with token claims
   }
 
-  return {
+  const session: MobileAuthSession = {
     user: {
       id: userId,
       name: (payload.name as string | null) ?? null,
@@ -86,5 +107,11 @@ export async function mobileAuth(req: Request): Promise<Session | null> {
       sessionIssuedAtMs,
     },
     expires: new Date(payload.exp * 1000).toISOString(),
-  } as Session
+  } as MobileAuthSession
+
+  if (databaseUser && options.userSelect) {
+    session.databaseUser = databaseUser
+  }
+
+  return session
 }
