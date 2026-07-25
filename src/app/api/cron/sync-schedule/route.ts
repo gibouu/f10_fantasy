@@ -12,6 +12,7 @@ import { validateCronSecret } from "@/lib/api/cron-auth"
 import { db } from "@/lib/db/client"
 import { createF1Provider } from "@/lib/f1/adapter"
 import { fetchDriversForSessions } from "./driver-fetch"
+import { getRaceEntryRefreshSkipReason } from "../entry-refresh-guard"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/cron/sync-schedule
@@ -132,6 +133,7 @@ export async function POST(req: NextRequest) {
   const allQualifyingSessions = sessions.filter((s) => s.type === "Qualifying")
 
   const raceIdBySessionKey = new Map<number, string>()
+  const entryCountByRaceId = new Map<string, number>()
   let synced = 0
   let hadRaceUpsertFailure = false
 
@@ -235,7 +237,7 @@ export async function POST(req: NextRequest) {
           openf1MeetingKey: session.meetingKey,
           type: raceType as "MAIN" | "SPRINT",
         },
-        select: { id: true, status: true },
+        select: { id: true, status: true, _count: { select: { entries: true } } },
       })
 
       if (!existing) {
@@ -250,13 +252,15 @@ export async function POST(req: NextRequest) {
               lte: new Date(start + windowMs),
             },
           },
-          select: { id: true, status: true },
+          select: { id: true, status: true, _count: { select: { entries: true } } },
         })
       }
 
       let raceId: string
+      let existingEntryCount = 0
       if (existing) {
         raceId = existing.id
+        existingEntryCount = existing._count.entries
         if (existing.status !== "COMPLETED") {
           await db.race.update({
             where: { id: existing.id },
@@ -271,6 +275,7 @@ export async function POST(req: NextRequest) {
         raceId = created.id
       }
       raceIdBySessionKey.set(session.sessionKey, raceId)
+      entryCountByRaceId.set(raceId, existingEntryCount)
       synced++
     } catch (err) {
       hadRaceUpsertFailure = true
@@ -438,26 +443,42 @@ export async function POST(req: NextRequest) {
       .map((s) => s.sessionKey),
   )
   const raceEntries: { raceId: string; driverId: string }[] = []
+  const entryRefreshSkipped: Array<{ raceId: string; reason: string }> = []
 
   for (const { session, drivers } of sessionDrivers) {
     if (!raceSessions.has(session.sessionKey)) continue
     const raceId = raceIdBySessionKey.get(session.sessionKey)
     if (!raceId) continue
-    for (const driver of drivers) {
-      const driverId = driverIdByNumber.get(driver.driverNumber)
-      if (!driverId) continue
-      raceEntries.push({ raceId, driverId })
+
+    const entries = drivers
+      .map((driver) => ({
+        raceId,
+        driverId: driverIdByNumber.get(driver.driverNumber),
+      }))
+      .filter((entry): entry is { raceId: string; driverId: string } => entry.driverId !== undefined)
+
+    const skipReason = getRaceEntryRefreshSkipReason({
+      existingCount: entryCountByRaceId.get(raceId) ?? 0,
+      nextCount: entries.length,
+    })
+    if (skipReason) {
+      entryRefreshSkipped.push({ raceId, reason: skipReason })
+      continue
     }
+
+    raceEntries.push(...entries)
   }
 
   const refreshedRaceIds = Array.from(new Set(raceEntries.map((entry) => entry.raceId)))
 
-  await db.$transaction([
-    db.raceEntry.deleteMany({
-      where: { raceId: { in: refreshedRaceIds } },
-    }),
-    db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
-  ])
+  if (raceEntries.length > 0) {
+    await db.$transaction([
+      db.raceEntry.deleteMany({
+        where: { raceId: { in: refreshedRaceIds } },
+      }),
+      db.raceEntry.createMany({ data: raceEntries, skipDuplicates: true }),
+    ])
+  }
 
-  return NextResponse.json({ synced, reconciled, year })
+  return NextResponse.json({ synced, reconciled, year, entryRefreshSkipped })
 }
