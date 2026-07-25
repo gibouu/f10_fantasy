@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 
-import { handleUsersMeGet } from "./get-handler.js"
+import { handleUsersMeGet, USERS_ME_PROFILE_SELECT } from "./get-handler.js"
 
 function request() {
   return new Request("http://localhost/api/users/me")
@@ -59,10 +59,14 @@ test("GET /api/users/me returns 401 without cookie or bearer auth", async () => 
 
 test("GET /api/users/me falls back to bearer auth and returns 404 for a missing user", async () => {
   const findCalls = []
+  const mobileAuthCalls = []
   const response = await handleUsersMeGet(
     request(),
     dependencies({
-      mobileAuth: async () => ({ user: { id: "mobile-user" } }),
+      mobileAuth: async (_request, options) => {
+        mobileAuthCalls.push(options)
+        return { user: { id: "mobile-user" } }
+      },
       db: {
         user: {
           findUnique: async (query) => {
@@ -75,8 +79,65 @@ test("GET /api/users/me falls back to bearer auth and returns 404 for a missing 
   )
 
   assert.equal(response.status, 404)
+  assert.deepEqual(mobileAuthCalls, [{ userSelect: USERS_ME_PROFILE_SELECT }])
   assert.equal(findCalls[0].where.id, "mobile-user")
   assert.deepEqual(await response.json(), { error: "User not found" })
+})
+
+test("GET /api/users/me reuses mobile auth profile from the revocation read", async () => {
+  const dbCalls = []
+  const mobileAuthCalls = []
+  const response = await handleUsersMeGet(
+    request(),
+    dependencies({
+      mobileAuth: async (_request, options) => {
+        mobileAuthCalls.push(options)
+        return {
+          user: { id: "mobile-user" },
+          databaseUser: user({ id: "mobile-user", publicUsername: "mobile" }),
+        }
+      },
+      db: {
+        user: {
+          findUnique: async (query) => {
+            dbCalls.push(query)
+            return null
+          },
+        },
+      },
+    }),
+  )
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(mobileAuthCalls, [{ userSelect: USERS_ME_PROFILE_SELECT }])
+  assert.deepEqual(dbCalls, [])
+  assert.equal((await response.json()).publicUsername, "mobile")
+})
+
+test("GET /api/users/me ignores a mismatched hydrated mobile auth profile", async () => {
+  const findCalls = []
+  const response = await handleUsersMeGet(
+    request(),
+    dependencies({
+      mobileAuth: async () => ({
+        user: { id: "mobile-user" },
+        databaseUser: user({ id: "other-user", publicUsername: "other" }),
+      }),
+      db: {
+        user: {
+          findUnique: async (query) => {
+            findCalls.push(query)
+            return user({ id: "mobile-user", publicUsername: "mobile" })
+          },
+        },
+      },
+    }),
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(findCalls.length, 1)
+  assert.equal(findCalls[0].where.id, "mobile-user")
+  assert.equal((await response.json()).publicUsername, "mobile")
 })
 
 test("GET /api/users/me serializes nullable and populated profile dates", async () => {

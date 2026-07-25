@@ -144,3 +144,73 @@ test("mobileAuth accepts valid exp-bearing mobile tokens", async () => {
     assert.equal(session?.expires, new Date(exp * 1000).toISOString())
   })
 })
+
+test("mobileAuth can hydrate route-selected user fields during revocation lookup", async () => {
+  await withAuthSecret(async () => {
+    let query
+    const createdAt = new Date("2026-06-01T12:00:00.000Z")
+    mockDb.user.findUnique = async (receivedQuery) => {
+      query = receivedQuery
+      return {
+        id: "user-1",
+        publicUsername: "driverone",
+        createdAt,
+        sessionValidAfter: null,
+      }
+    }
+
+    const exp = Math.floor(Date.now() / 1000) + 60 * 60
+    const token = await new SignJWT({ id: "user-1" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime(exp)
+      .sign(signingKey())
+
+    const session = await mobileAuth(bearerRequest(token), {
+      userSelect: { id: true, publicUsername: true, createdAt: true },
+    })
+
+    assert.deepEqual(query, {
+      where: { id: "user-1" },
+      select: {
+        id: true,
+        publicUsername: true,
+        createdAt: true,
+        sessionValidAfter: true,
+      },
+    })
+    assert.equal(session?.databaseUser?.id, "user-1")
+    assert.equal(session?.databaseUser?.publicUsername, "driverone")
+    assert.equal(session?.databaseUser?.createdAt, createdAt)
+  })
+})
+
+test("mobileAuth still rejects hydrated tokens older than the revocation cutoff", async () => {
+  await withAuthSecret(async () => {
+    let query
+    const issuedAt = Math.floor(Date.now() / 1000) - 120
+    mockDb.user.findUnique = async (receivedQuery) => {
+      query = receivedQuery
+      return {
+        id: "user-1",
+        sessionValidAfter: new Date((issuedAt + 60) * 1000),
+      }
+    }
+
+    const token = await new SignJWT({ id: "user-1" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + 60 * 60)
+      .sign(signingKey())
+
+    const session = await mobileAuth(bearerRequest(token), {
+      userSelect: { id: true },
+    })
+
+    assert.deepEqual(query, {
+      where: { id: "user-1" },
+      select: { id: true, sessionValidAfter: true },
+    })
+    assert.equal(session, null)
+  })
+})

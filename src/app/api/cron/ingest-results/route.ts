@@ -17,6 +17,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateCronSecret } from '@/lib/api/cron-auth'
+import { revalidatePublicRaceCache } from '@/lib/api/public-race-cache'
 import { db } from '@/lib/db/client'
 import { ingestResultsForRace, findRacesNeedingIngestion } from '@/lib/services/ingestion.service'
 import { computeAndStoreScoresForRace } from '@/lib/services/scoring.service'
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
     qualified: number
     error?: string
   }> = []
+  const mutatedRaceIds = new Set<string>()
 
   for (const raceId of targetRaceIds) {
     const raceStartedAt = Date.now()
@@ -172,6 +174,9 @@ export async function POST(req: NextRequest) {
         scored: outcome.scored,
         qualified: outcome.qualified,
       })
+      if (outcome.ingested > 0 || outcome.scored > 0 || outcome.qualified > 0) {
+        mutatedRaceIds.add(raceId)
+      }
       console.log(
         `[f10:cron:ingest] OK raceId=${raceId} ingested=${outcome.ingested} scored=${outcome.scored} qualified=${outcome.qualified} (${Date.now() - raceStartedAt}ms)`,
       )
@@ -187,6 +192,10 @@ export async function POST(req: NextRequest) {
   console.log(
     `[f10:cron:ingest] done in ${Date.now() - startedAt}ms processed=${results.length} errors=${results.filter((r) => r.error).length}`,
   )
+
+  if (mutatedRaceIds.size > 0) {
+    revalidatePublicRaceCache(mutatedRaceIds)
+  }
 
   return NextResponse.json({ processed: results })
 }
