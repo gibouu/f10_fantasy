@@ -14,47 +14,55 @@ function dependencies(overrides = {}) {
     auth: async () => ({ user: { id: "user-1" } }),
     mobileAuth: async () => null,
     getActiveSeason: async () => ({ id: "season-1" }),
-    getGlobalLeaderboard: async () => [],
+    getGlobalLeaderboardResult: async () => ({ rows: [], userRank: null }),
     getFriendsLeaderboard: async () => [],
     getUserLeaderboardRank: async () => null,
+    validateLeaderboardSort: async () => true,
     ...overrides,
   }
 }
 
-test("GET uses the requested race sort when computing userRank", async () => {
-  const rankCalls = []
+test("GET returns global rows and userRank from the combined leaderboard result", async () => {
+  const globalCalls = []
   const response = await handleLeaderboardGet(
     request("http://localhost/api/leaderboard?sort=race-1&seasonId=season-1"),
     dependencies({
-      getGlobalLeaderboard: async (_seasonId, sort) => [
-        { userId: "user-1", rank: sort === "race-1" ? 3 : 9 },
-      ],
-      getUserLeaderboardRank: async (userId, seasonId, sort) => {
-        rankCalls.push({ userId, seasonId, sort })
-        return sort === "race-1" ? 3 : 9
+      getGlobalLeaderboardResult: async (seasonId, sort, limit, userId) => {
+        globalCalls.push({ seasonId, sort, limit, userId })
+        return {
+          rows: [{ userId: "user-1", rank: sort === "race-1" ? 3 : 9 }],
+          userRank: sort === "race-1" ? 3 : 9,
+        }
+      },
+      getUserLeaderboardRank: async () => {
+        throw new Error("global requests should not recompute user rank")
       },
     }),
   )
 
   assert.equal(response.status, 200)
-  assert.deepEqual(rankCalls, [{ userId: "user-1", seasonId: "season-1", sort: "race-1" }])
+  assert.deepEqual(globalCalls, [
+    { seasonId: "season-1", sort: "race-1", limit: 20, userId: "user-1" },
+  ])
   assert.equal((await response.json()).userRank, 3)
 })
 
-test("GET keeps season as the default userRank sort", async () => {
-  const rankCalls = []
+test("GET keeps season as the default leaderboard sort", async () => {
+  const globalCalls = []
   const response = await handleLeaderboardGet(
     request("http://localhost/api/leaderboard?seasonId=season-1"),
     dependencies({
-      getUserLeaderboardRank: async (userId, seasonId, sort) => {
-        rankCalls.push({ userId, seasonId, sort })
-        return 2
+      getGlobalLeaderboardResult: async (seasonId, sort, limit, userId) => {
+        globalCalls.push({ seasonId, sort, limit, userId })
+        return { rows: [], userRank: 2 }
       },
     }),
   )
 
   assert.equal(response.status, 200)
-  assert.deepEqual(rankCalls, [{ userId: "user-1", seasonId: "season-1", sort: "season" }])
+  assert.deepEqual(globalCalls, [
+    { seasonId: "season-1", sort: "season", limit: 20, userId: "user-1" },
+  ])
   assert.equal((await response.json()).userRank, 2)
 })
 
@@ -66,9 +74,9 @@ test("GET allows unauthenticated global leaderboard reads", async () => {
     dependencies({
       auth: async () => null,
       mobileAuth: async () => null,
-      getGlobalLeaderboard: async (seasonId, sort, limit) => {
-        globalCalls.push({ seasonId, sort, limit })
-        return [{ userId: "user-2", rank: 1 }]
+      getGlobalLeaderboardResult: async (seasonId, sort, limit, userId) => {
+        globalCalls.push({ seasonId, sort, limit, userId })
+        return { rows: [{ userId: "user-2", rank: 1 }], userRank: null }
       },
       getUserLeaderboardRank: async (...args) => {
         rankCalls.push(args)
@@ -78,7 +86,9 @@ test("GET allows unauthenticated global leaderboard reads", async () => {
   )
 
   assert.equal(response.status, 200)
-  assert.deepEqual(globalCalls, [{ seasonId: "season-1", sort: "season", limit: 20 }])
+  assert.deepEqual(globalCalls, [
+    { seasonId: "season-1", sort: "season", limit: 20, userId: null },
+  ])
   assert.deepEqual(rankCalls, [])
   assert.deepEqual(await response.json(), {
     rows: [{ userId: "user-2", rank: 1 }],
@@ -104,4 +114,31 @@ test("GET requires authentication for friends leaderboard reads", async () => {
   assert.equal(response.status, 401)
   assert.deepEqual(friendsCalls, [])
   assert.deepEqual(await response.json(), { error: "Unauthorized" })
+})
+
+test("GET rejects invalid race sort values before loading leaderboard rows", async () => {
+  const calls = []
+  const response = await handleLeaderboardGet(
+    request("http://localhost/api/leaderboard?sort=not-a-race&seasonId=season-1"),
+    dependencies({
+      validateLeaderboardSort: async (seasonId, sort) => {
+        calls.push({ fn: "validateLeaderboardSort", seasonId, sort })
+        return false
+      },
+      getGlobalLeaderboardResult: async () => {
+        calls.push({ fn: "getGlobalLeaderboardResult" })
+        return { rows: [], userRank: null }
+      },
+      getUserLeaderboardRank: async () => {
+        calls.push({ fn: "getUserLeaderboardRank" })
+        return null
+      },
+    }),
+  )
+
+  assert.equal(response.status, 400)
+  assert.deepEqual(calls, [
+    { fn: "validateLeaderboardSort", seasonId: "season-1", sort: "not-a-race" },
+  ])
+  assert.deepEqual(await response.json(), { error: "Invalid race id" })
 })

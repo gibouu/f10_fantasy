@@ -38,9 +38,6 @@ type AggregatedRow = {
 
 /**
  * Aggregate scores for a set of user IDs in a given season.
- * If `lastRaceOnly` is true, only the most recently completed race is counted.
- */
-/**
  * filter: 'season' = all completed races, any other string = specific raceId
  */
 async function aggregateScores(
@@ -55,12 +52,6 @@ async function aggregateScores(
     filter === 'season'
       ? { seasonId, status: 'COMPLETED' as const }
       : { seasonId, status: 'COMPLETED' as const, id: filter }
-
-  // If filtering to a specific race, verify it exists
-  if (filter !== 'season') {
-    const exists = await db.race.findFirst({ where: raceWhere, select: { id: true } })
-    if (!exists) return await buildZeroedRows(userIds)
-  }
 
   // Load all pick sets with score breakdowns and race type info for the target users
   const pickSets = await db.pickSet.findMany({
@@ -138,27 +129,39 @@ async function aggregateScores(
   return Array.from(aggregated.values())
 }
 
-/** Build zeroed rows for users when there are no completed races */
-async function buildZeroedRows(userIds: string[]): Promise<AggregatedRow[]> {
-  const users = await db.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, publicUsername: true, image: true, favoriteTeamSlug: true },
+function raceWhereForSort(seasonId: string, sort: string) {
+  return sort === 'season'
+    ? { seasonId, status: 'COMPLETED' as const }
+    : { seasonId, status: 'COMPLETED' as const, id: sort }
+}
+
+async function getScoredUserIdsForSort(
+  seasonId: string,
+  sort: string,
+  userIds?: string[],
+): Promise<string[]> {
+  const pickSets = await db.pickSet.findMany({
+    where: {
+      ...(userIds ? { userId: { in: userIds } } : {}),
+      race: raceWhereForSort(seasonId, sort),
+      scoreBreakdown: { isNot: null },
+    },
+    select: { userId: true },
+    distinct: ['userId'],
   })
 
-  return users.map((u) => {
-    const team = u.favoriteTeamSlug ? TEAMS[u.favoriteTeamSlug as TeamSlug] : null
-    return {
-      userId: u.id,
-      publicUsername: u.publicUsername,
-      avatarUrl: u.image,
-      teamLogoUrl: team?.logoUrl ?? null,
-      teamColor: team?.color ?? null,
-      totalScore: 0,
-      exactTenthHits: 0,
-      winnerHits: 0,
-      dnfHits: 0,
-    }
-  })
+  return pickSets.map((r) => r.userId)
+}
+
+async function getRankedGlobalLeaderboard(
+  seasonId: string,
+  sort: string,
+): Promise<LeaderboardRow[]> {
+  const userIds = await getScoredUserIdsForSort(seasonId, sort)
+  if (userIds.length === 0) return []
+
+  const rows = await aggregateScores(userIds, seasonId, sort)
+  return rankRows(rows)
 }
 
 // ─────────────────────────────────────────────
@@ -178,21 +181,25 @@ export async function getGlobalLeaderboard(
   sort: string,
   limit = 20,
 ): Promise<LeaderboardRow[]> {
-  // Find all users who have submitted at least one scored pick in this season
-  const userIdsRaw = await db.pickSet.findMany({
-    where: {
-      race: { seasonId },
-      scoreBreakdown: { isNot: null },
-    },
-    select: { userId: true },
-    distinct: ['userId'],
-  })
+  const rows = await getRankedGlobalLeaderboard(seasonId, sort)
+  return rows.slice(0, limit)
+}
 
-  const userIds = userIdsRaw.map((r) => r.userId)
-  if (userIds.length === 0) return []
+export async function getGlobalLeaderboardResult(
+  seasonId: string,
+  sort: string,
+  limit = 20,
+  userId: string | null = null,
+): Promise<{ rows: LeaderboardRow[]; userRank: number | null }> {
+  const rankedRows = await getRankedGlobalLeaderboard(seasonId, sort)
+  const userRank = userId
+    ? (rankedRows.find((row) => row.userId === userId)?.rank ?? null)
+    : null
 
-  const rows = await aggregateScores(userIds, seasonId, sort)
-  return rankRows(rows).slice(0, limit)
+  return {
+    rows: rankedRows.slice(0, limit),
+    userRank,
+  }
 }
 
 /**
@@ -218,9 +225,22 @@ export async function getFriendsLeaderboard(
 
   // Include the requesting user themselves
   const allIds = Array.from(new Set([userId, ...friendIds]))
+  const leaderboardUserIds =
+    sort === 'season' ? allIds : await getScoredUserIdsForSort(seasonId, sort, allIds)
 
-  const rows = await aggregateScores(allIds, seasonId, sort)
+  const rows = await aggregateScores(leaderboardUserIds, seasonId, sort)
   return rankRows(rows)
+}
+
+export async function validateLeaderboardSort(seasonId: string, sort: string): Promise<boolean> {
+  if (sort === 'season') return true
+
+  const race = await db.race.findFirst({
+    where: { id: sort, seasonId },
+    select: { id: true },
+  })
+
+  return Boolean(race)
 }
 
 /**
@@ -232,7 +252,7 @@ export async function getUserLeaderboardRank(
   seasonId: string,
   sort: string,
 ): Promise<number | null> {
-  const leaderboard = await getGlobalLeaderboard(seasonId, sort, 10_000)
+  const leaderboard = await getRankedGlobalLeaderboard(seasonId, sort)
   const entry = leaderboard.find((row) => row.userId === userId)
   return entry?.rank ?? null
 }
