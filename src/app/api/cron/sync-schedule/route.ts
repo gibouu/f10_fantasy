@@ -28,15 +28,28 @@ export async function POST(req: NextRequest) {
   // ── 1. Ensure there is an active Season record for the current year ────────
   let season = await db.season.findFirst({
     where: { year },
-    select: { id: true, year: true },
+    select: { id: true, year: true, isActive: true },
   })
 
   if (!season) {
     await db.season.updateMany({ where: { isActive: true }, data: { isActive: false } })
     season = await db.season.create({
       data: { year, isActive: true },
-      select: { id: true, year: true },
+      select: { id: true, year: true, isActive: true },
     })
+  } else if (!season.isActive) {
+    const [, activatedSeason] = await db.$transaction([
+      db.season.updateMany({
+        where: { isActive: true, id: { not: season.id } },
+        data: { isActive: false },
+      }),
+      db.season.update({
+        where: { id: season.id },
+        data: { isActive: true },
+        select: { id: true, year: true, isActive: true },
+      }),
+    ])
+    season = activatedSeason
   }
 
   // ── 2. Fetch sessions + meetings in parallel ───────────────────────────────
