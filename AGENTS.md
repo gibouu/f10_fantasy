@@ -308,4 +308,4 @@ Key behavioral constraints not derivable from reading code:
 - **Three type systems must stay separate** — Domain types, Prisma types, F1 types — never mix layers
 - **Completed races are immutable** — `sync-schedule` and `sync-entries` must never touch them
 - **Guest access** — all read-only pages must handle `userId = null` gracefully; never crash or throw on missing auth
-- **Serialization** — `Date` fields cannot cross the RSC/client boundary; use `Serialized*` variants
+- **Serialization** — `Date` fields cannot cross the RSC/client boundary; serialize dates as ISO strings at API/native boundaries

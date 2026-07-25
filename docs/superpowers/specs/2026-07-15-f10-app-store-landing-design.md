@@ -155,7 +155,7 @@ The hero must remain visually centered. Screenshot overlap cannot pull the full 
   - driver picker sheet or rankings, whichever is cleanest in the final build.
 - Reuse `f10-final-upcoming-review.jpg` only if it still matches the final iOS build.
 - Capture a fresh second screen rather than shipping the current placeholder-portrait picker image.
-- Pre-encode the final assets; `next/image` cannot be relied upon to transcode because the project currently sets `images.unoptimized: true`.
+- Pre-encode the final assets; the landing uses local `<img>` assets rather than relying on `next/image` transcoding.
 - Give every image explicit dimensions and responsive `sizes`.
 - Load only the LCP image eagerly; lazy-load the second screenshot.
 - Keep both screenshot transfers at or below 400 KB combined.

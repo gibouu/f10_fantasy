@@ -76,7 +76,7 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 
 | Path | Purpose |
 |---|---|
-| `src/lib/services/race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRaceResults`, `getRacesForSeason`, `getActiveSeason` |
+| `src/lib/services/race.service.ts` | `getRaceById`, `getRaceEntrants`, `getRacesForSeason`, `getActiveSeason` |
 | `src/lib/services/pick.service.ts` | `getPickForRace`, `getPickedRaceIds`, `getPicksForSeason`, `createOrUpdatePick`; profile history hides `CANCELLED` races |
 | `src/lib/services/ingestion.service.ts` | `ingestResultsForRace` → fetches OpenF1 → upserts `RaceResult` |
 | `src/lib/services/qualifying.service.ts` | `ingestQualifyingForRace`, `getQualifyingResults`, partial-row qualifying backfill |
@@ -145,7 +145,7 @@ The retired `/races`, `/leaderboard`, `/picks`, `/profile`, `/signin`, and `/onb
 ## Key Constraints
 
 - **Three parallel type systems** — Domain types (`src/types/domain.ts`), Prisma types (DB-only, never leak to client), F1 types (`src/lib/f1/types.ts`). Keep them separate.
-- **Serialization pattern** — `Date` fields cannot cross JSON or RSC/client boundaries. API/native-facing shapes use `Serialized*` variants with dates as ISO strings.
+- **Serialization pattern** — `Date` fields cannot cross JSON or RSC/client boundaries. API/native-facing responses serialize dates as ISO strings.
 - **PickSet** unique on `[userId, raceId]` — one pick set per user per race
 - **Pick optimistic concurrency** — API pick responses expose `version = updatedAt.toISOString()`. Cross-device edits must send the loaded version via `If-Match` or `baseVersion`; `pick.service.ts` compares it inside the write transaction before updating.
 - **Race** unique on `[seasonId, round, type]` — separates MAIN and SPRINT

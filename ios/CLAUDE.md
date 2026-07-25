@@ -106,7 +106,7 @@ reviewRequired → queued → syncing(revision, mode) → confirmed
 
 ## Locking
 
-- `Race.isLocked` derives from server `lockCutoffUtc` and the local clock for immediate UI feedback.
+- Lock state derives from server `lockCutoffUtc` and the local clock for immediate UI feedback.
 - The UI disables editing, `LocalPickStore` refuses new locked drafts, and the backend remains authoritative through 423 responses.
 - A picker that becomes locked while open closes and announces the change for VoiceOver.
 

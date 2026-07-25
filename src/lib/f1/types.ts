@@ -56,25 +56,6 @@ export type NormalizedDriver = {
 }
 
 // ─────────────────────────────────────────────
-// Live position data
-// ─────────────────────────────────────────────
-
-export type NormalizedPosition = {
-  driverNumber: number
-  position: number
-  date: Date
-}
-
-export type NormalizedLiveClassification = {
-  sessionKey: number
-  capturedAt: Date
-  positions: Array<{
-    driverNumber: number
-    position: number
-  }>
-}
-
-// ─────────────────────────────────────────────
 // Final race results
 // ─────────────────────────────────────────────
 

@@ -698,7 +698,7 @@ final class SyncManager {
               accountRecord.revision > currentGuest.revision
         else { return false }
 
-        _ = localPickStore.remove(raceId: guestRecord.id.raceID)
+        _ = localPickStore.remove(id: guestRecord.id)
         return true
     }
 

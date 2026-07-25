@@ -7,8 +7,7 @@
  */
 
 import { db } from '@/lib/db/client'
-import type { RaceSummary, DriverSummary, RaceResultRecord } from '@/types/domain'
-import { ResultStatus } from '@/types/domain'
+import type { RaceSummary, DriverSummary } from '@/types/domain'
 import { resolveTeam, DRIVER_PHOTOS } from '@/lib/f1/teams'
 import { buildSeatLookup } from '@/lib/f1/seats'
 import { mapRaceToSummary } from './race-summary.mapper'
@@ -63,47 +62,6 @@ export async function getRacesForSeason(
   })
 
   return races.map(mapRaceToSummary)
-}
-
-/**
- * Return the "current" race for a season using the following priority:
- *   1. LIVE race (if one exists)
- *   2. Next UPCOMING race (soonest scheduledStartUtc)
- *   3. Most recently COMPLETED race (latest scheduledStartUtc, as fallback
- *      when the season is over)
- *
- * Ordering by scheduledStartUtc rather than `round` because round numbers
- * can be out of chronological order on rows inserted after the season started
- * (see `scripts/reconcile-2026-calendar.ts`). Date is always authoritative.
- *
- * Returns null if the season has no races at all.
- */
-export async function getCurrentRace(
-  seasonId: string,
-): Promise<RaceSummary | null> {
-  // Check for a live race first
-  const live = await db.race.findFirst({
-    where: { seasonId, status: 'LIVE' },
-    orderBy: { scheduledStartUtc: 'asc' },
-  })
-
-  if (live) return mapRaceToSummary(live)
-
-  // Next upcoming race
-  const upcoming = await db.race.findFirst({
-    where: { seasonId, status: 'UPCOMING' },
-    orderBy: { scheduledStartUtc: 'asc' },
-  })
-
-  if (upcoming) return mapRaceToSummary(upcoming)
-
-  // Fallback: most recently completed
-  const completed = await db.race.findFirst({
-    where: { seasonId, status: 'COMPLETED' },
-    orderBy: { scheduledStartUtc: 'desc' },
-  })
-
-  return completed ? mapRaceToSummary(completed) : null
 }
 
 /**
@@ -206,46 +164,4 @@ export async function getRaceEntrants(
     ...entrant,
     seatKey: seatLookup.driverIdToSeatKey.get(entrant.id) ?? null,
   }))
-}
-
-/**
- * Return the final results for a race, annotated with the race summary.
- *
- * Returns an array (normally a single element) because the type signature
- * allows for future multi-session expansion. Each element bundles the
- * RaceSummary with its associated result records.
- */
-export async function getRaceResults(
-  raceId: string,
-): Promise<Array<RaceSummary & { results: RaceResultRecord[] }>> {
-  const race = await db.race.findUnique({
-    where: { id: raceId },
-    include: {
-      results: {
-        orderBy: [
-          // Classified finishers first by position, then non-classified
-          { position: 'asc' },
-        ],
-        select: {
-          driverId: true,
-          position: true,
-          status: true,
-          fastestLap: true,
-        },
-      },
-    },
-  })
-
-  if (!race) return []
-
-  const raceSummary = mapRaceToSummary(race)
-
-  const results: RaceResultRecord[] = race.results.map((r) => ({
-    driverId: r.driverId,
-    position: r.position,
-    status: r.status as ResultStatus,
-    fastestLap: r.fastestLap,
-  }))
-
-  return [{ ...raceSummary, results }]
 }
