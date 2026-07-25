@@ -50,3 +50,41 @@ test("createOrUpdatePick reasserts cancelled race guards for update and create w
   assert.doesNotMatch(createOrUpdatePickBody, /createPickSetIfRaceWritable/)
   assert.match(createOrUpdatePickBody, /if \(race\.status === ['"]CANCELLED['"]\)[\s\S]*?tx\.pickSet\.create/)
 })
+
+test("createOrUpdatePick exposes and validates a base version for optimistic concurrency", () => {
+  assert.match(source, /export function pickVersion\(updatedAt: Date\): string \{\s*return updatedAt\.toISOString\(\)/)
+  assert.match(
+    source,
+    /baseVersion:\s*z\.string\(\)\.min\(1\)\.optional\(\)/,
+  )
+  assert.match(source, /export class PickConflictError extends Error/)
+  assert.match(source, /this\.currentPick = currentPick/)
+  assert.match(createOrUpdatePickBody, /const baseUpdatedAt = parseBasePickVersion\(validated\.baseVersion\)/)
+})
+
+test("createOrUpdatePick compares base version inside the pick transaction before updating", () => {
+  const transactionStart = createOrUpdatePickBody.indexOf("return db.$transaction")
+  const existingLookup = createOrUpdatePickBody.indexOf("const existingPickSet = await tx.pickSet.findUnique")
+  const conflictThrow = createOrUpdatePickBody.indexOf("throw new PickConflictError(mapPickSetToData(existingPickSet))")
+  const updateWrite = createOrUpdatePickBody.indexOf("tx.pickSet.updateMany")
+
+  assert.ok(transactionStart >= 0)
+  assert.ok(existingLookup > transactionStart)
+  assert.ok(conflictThrow > existingLookup)
+  assert.ok(conflictThrow < updateWrite)
+  assert.match(
+    createOrUpdatePickBody,
+    /existingPickSet\.updatedAt\.getTime\(\) !== baseUpdatedAt\.getTime\(\)/,
+  )
+})
+
+test("createOrUpdatePick keeps simultaneous edits guarded by the submitted version", () => {
+  assert.match(
+    createOrUpdatePickBody,
+    /\.\.\.\(baseUpdatedAt \? \{ updatedAt: baseUpdatedAt \} : \{\}\)/,
+  )
+  assert.match(
+    createOrUpdatePickBody,
+    /only the request whose base version still matches[\s\S]*?lockedAt IS NULL succeeds/,
+  )
+})

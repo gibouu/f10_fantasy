@@ -128,7 +128,7 @@ final class APIClientTests: XCTestCase {
         let session = URLSession(
             configuration: StubURLProtocol.configuration(
                 status: 200,
-                body: #"{"pick":{"id":"pick","raceId":"race","tenthPlaceDriverId":"p10","winnerDriverId":"winner","dnfDriverId":"dnf","lockedAt":null,"scoreBreakdown":null}}"#
+                body: #"{"pick":{"id":"pick","raceId":"race","tenthPlaceDriverId":"p10","winnerDriverId":"winner","dnfDriverId":"dnf","version":"2026-07-24T18:33:00.000Z","lockedAt":null,"scoreBreakdown":null}}"#
             )
         )
         let client = APIClient(
@@ -143,6 +143,7 @@ final class APIClientTests: XCTestCase {
 
         XCTAssertEqual(payload.pick.id, "pick")
         XCTAssertEqual(payload.pick.raceId, "race")
+        XCTAssertEqual(payload.pick.version, "2026-07-24T18:33:00.000Z")
     }
 }
 

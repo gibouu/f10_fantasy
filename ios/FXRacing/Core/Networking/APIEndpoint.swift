@@ -5,17 +5,20 @@ struct APIEndpoint: Sendable {
     let path: String
     let queryItems: [URLQueryItem]
     let bodyData: Data?
+    let headers: [String: String]
 
     init(
         method: String,
         path: String,
         queryItems: [URLQueryItem] = [],
-        bodyData: Data? = nil
+        bodyData: Data? = nil,
+        headers: [String: String] = [:]
     ) {
         self.method = method
         self.path = path
         self.queryItems = queryItems
         self.bodyData = bodyData
+        self.headers = headers
     }
 }
 
@@ -71,7 +74,14 @@ extension APIEndpoint {
         )
     }
 
-    static func submitPick(raceId: String, tenthPlaceDriverId: String, winnerDriverId: String, dnfDriverId: String) -> APIEndpoint {
+    static func submitPick(
+        raceId: String,
+        tenthPlaceDriverId: String,
+        winnerDriverId: String,
+        dnfDriverId: String,
+        baseVersion: String? = nil
+    ) -> APIEndpoint {
+        let headers = baseVersion.map { ["If-Match": "\"\($0)\""] } ?? [:]
         APIEndpoint(
             method: "POST",
             path: "/api/picks",
@@ -80,7 +90,8 @@ extension APIEndpoint {
                 "tenthPlaceDriverId": tenthPlaceDriverId,
                 "winnerDriverId": winnerDriverId,
                 "dnfDriverId": dnfDriverId,
-            ])
+            ]),
+            headers: headers
         )
     }
 

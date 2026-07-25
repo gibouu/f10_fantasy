@@ -63,6 +63,46 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertEqual(context.store.record(id: record.id)?.syncState, .confirmed)
     }
 
+    func testExplicitSaveSendsAuthoritativePickVersionAsIfMatch() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let record = try saveRecord(in: context.store, owner: .user("user-a"))
+        let baseVersion = "2026-07-24T18:33:00.000Z"
+        XCTAssertTrue(
+            context.store.preserveAuthoritative(
+                pick(
+                    raceID: record.id.raceID,
+                    selection: PickSelection(
+                        winnerDriverID: "piastri",
+                        tenthPlaceDriverID: "leclerc",
+                        dnfDriverID: "norris"
+                    ),
+                    id: "server-baseline",
+                    version: baseVersion
+                ),
+                for: .user("user-a")
+            )
+        )
+        let api = GatedAPIClientSpy(
+            responses: ["POST /api/picks": [.json(PickResponse(pick: pick(for: record)))]]
+        )
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        guard case .saved = await manager.submitExplicit(
+            id: record.id,
+            revision: record.revision,
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: context.store
+        ) else {
+            return XCTFail("Expected save")
+        }
+
+        let request = try XCTUnwrap(await api.recordedRequests().first)
+        XCTAssertEqual(request.headers["If-Match"], "\"\(baseVersion)\"")
+        XCTAssertNil(try body(from: request)["baseVersion"])
+    }
+
     func testExplicitSaveRejectsWrongOwnerGuestAndTerminalWithoutRequests() async throws {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -1075,6 +1115,50 @@ final class SyncManagerTests: XCTestCase {
         XCTAssertEqual(methods, ["POST", "GET"])
     }
 
+    func testDirect409ReconcilesAuthorityAndMarksConflict() async throws {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let record = try saveRecord(in: context.store, owner: .user("user-a"))
+        let authoritative = pick(
+            raceID: record.id.raceID,
+            selection: PickSelection(
+                winnerDriverID: "piastri",
+                tenthPlaceDriverID: "leclerc",
+                dnfDriverID: "norris"
+            ),
+            id: "conflicting-server-pick",
+            version: "2026-07-24T18:34:00.000Z"
+        )
+        let api = GatedAPIClientSpy(responses: [
+            "POST /api/picks": [.failure(.serverError(409, "Pick changed"))],
+            "GET /api/picks": [.json(PickResponse(pick: authoritative))],
+        ])
+        let manager = SyncManager(api: api, clock: TestClock.fixed)
+
+        let result = await manager.submitExplicit(
+            id: record.id,
+            revision: record.revision,
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: context.store
+        )
+
+        guard case .conflict(let pick) = result else {
+            return XCTFail("Expected conflict")
+        }
+        XCTAssertEqual(pick?.id, authoritative.id)
+        XCTAssertEqual(context.store.record(id: record.id)?.syncState, .conflict(.serverWins))
+        XCTAssertEqual(
+            context.store.authoritativePick(
+                for: record.id.raceID,
+                owner: .user("user-a")
+            )?.id,
+            authoritative.id
+        )
+        let methods = await api.recordedRequests().map(\.method)
+        XCTAssertEqual(methods, ["POST", "GET"])
+    }
+
     func testKnownLockedRaceExpiresWithoutRequest() async throws {
         let context = makeContext()
         defer { context.cleanUp() }
@@ -1179,7 +1263,8 @@ final class SyncManagerTests: XCTestCase {
     private func pick(
         raceID: String,
         selection: PickSelection,
-        id: String
+        id: String,
+        version: String? = nil
     ) -> Pick {
         Pick(
             id: id,
@@ -1187,6 +1272,7 @@ final class SyncManagerTests: XCTestCase {
             tenthPlaceDriverId: selection.tenthPlaceDriverID,
             winnerDriverId: selection.winnerDriverID,
             dnfDriverId: selection.dnfDriverID,
+            version: version,
             lockedAt: nil,
             scoreBreakdown: nil
         )

@@ -428,12 +428,17 @@ final class SyncManager {
 
             do {
                 guard isCurrent(sessionLease) else { return .queued }
+                let baseVersion = localPickStore.authoritativePick(
+                    for: id.raceID,
+                    owner: .user(currentUserID)
+                )?.version
                 let response: PickResponse = try await api.request(
                     .submitPick(
                         raceId: id.raceID,
                         tenthPlaceDriverId: record.selection.tenthPlaceDriverID,
                         winnerDriverId: record.selection.winnerDriverID,
-                        dnfDriverId: record.selection.dnfDriverID
+                        dnfDriverId: record.selection.dnfDriverID,
+                        baseVersion: baseVersion
                     ),
                     token: token
                 )
@@ -476,6 +481,45 @@ final class SyncManager {
                 )
                 reportUnauthorized(rejectedToken: token)
                 return .unauthorized
+            } catch APIError.serverError(let code, _) where code == 409 {
+                guard isCurrent(sessionLease) else { return .queued }
+                if shouldFollowNewerExplicitRevision(
+                    id: id,
+                    capturedRevision: revision,
+                    localPickStore: localPickStore
+                ) {
+                    continue
+                }
+                let authoritativeResult = await fetchAuthoritativePick(
+                    raceID: id.raceID,
+                    currentUserID: currentUserID,
+                    token: token,
+                    localPickStore: localPickStore,
+                    sessionLease: sessionLease
+                )
+                guard isCurrent(sessionLease) else { return .queued }
+                let authoritativePick: Pick?
+                switch authoritativeResult {
+                case .resolved(let pick):
+                    authoritativePick = pick
+                case .unauthorized:
+                    queueCapturedRevision(
+                        id: id,
+                        revision: revision,
+                        localPickStore: localPickStore,
+                        sessionLease: sessionLease
+                    )
+                    reportUnauthorized(rejectedToken: token)
+                    return .unauthorized
+                }
+                return terminalResult(
+                    .conflict(.serverWins),
+                    id: id,
+                    revision: revision,
+                    localPickStore: localPickStore,
+                    success: .conflict(authoritativePick),
+                    sessionLease: sessionLease
+                )
             } catch APIError.serverError(let code, _) where code == 423 {
                 guard isCurrent(sessionLease) else { return .queued }
                 if shouldFollowNewerExplicitRevision(
