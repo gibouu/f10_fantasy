@@ -2,7 +2,7 @@
 
 > Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-Last updated: 2026-07-19T18:08:02Z
+Last updated: 2026-07-26
 
 ## Project purpose
 
@@ -174,20 +174,38 @@ Known simulator device:
   - Status: open, release gate.
   - Matters because accessibility layout cannot be called fully verified until native UI/manual checks pass.
 - #369 — Task 7 static landing cleanup and screenshot validator.
-  - Status: open.
-  - This is the only explicitly separable non-simulator slice if #368 remains blocked.
+  - Status: CLOSED 2026-07-25 by PR #382. Do not treat as remaining work.
 - #370 — Task 8 full verification and visual feedback loop.
-  - Status: open, depends on #368.
+  - Status: open. The non-simulator half passes on this branch (see
+    "Verification performed" below). Simulator/performance slices remain.
 - #372 — Task 9 release identifiers, screenshots, and landing assets.
-  - Status: open, depends on #368/#370 and owner/App Store access.
+  - Status: open. Version/build and the App Store screenshot set are DONE
+    (below). Remaining: landing `-v2` images and the per-release handoff doc,
+    plus the App Store Connect side, which only the owner can do.
 - #371 — Task 10 PR merge, deployment, upload, and App Store submission.
-  - Status: open, final release step; do last.
+  - Status: open, final release step; do last. Owner-only from archive onward.
 - #365 — align iOS DNF tutorial copy with scoring behavior.
-  - Status: pre-existing open issue, not part of this handoff branch unless explicitly scoped.
+  - Status: CLOSED. Landed on `main`. Note the fix originally lived in
+    `RacePickPanel.swift`, which this branch deletes; the copy now lives in
+    `RaceDetailViewModel.slotDescription` and is guarded by
+    `ios/dnf-tutorial-copy.test.mjs`.
 - #362 — optimistic concurrency for cross-device pick edits.
-  - Status: pre-existing open issue, separate from current branch.
+  - Status: CLOSED. Landed on `main` via PR #385 and merged into this branch.
 - #361 — public race API / production TTFB optimization.
-  - Status: pre-existing open issue, separate from current branch.
+  - Status: open but code-complete on `main` (PRs #381, #389). What remains is
+    production measurement, not code. Known caveat: these are plain dynamic
+    route handlers with no `unstable_cache`/`'use cache'` entries, so
+    `revalidatePublicRaceCache()` has nothing registered to purge — public race
+    caching is effectively TTL-only today and the tagged-invalidation criterion
+    is unproven.
+- #377 — activate current-year season when sync-schedule finds it inactive.
+  - Status: CLOSED 2026-07-26. Was already fixed on `main` by PR #384.
+- #390 — guests could not read the global leaderboard.
+  - Status: fixed on `fix/390-guest-leaderboard` (PR #391), branched off `main`
+    rather than this branch so the production fix does not wait on the release.
+  - `/api/leaderboard` was missing from `isPublicApiRoute()`, so guest GETs were
+    redirected to `/signin` and the app decoded HTML as JSON. Found by running
+    the Release build against production during screenshot capture.
 
 ## Operational knowledge
 
@@ -220,23 +238,52 @@ Safe recovery guidance:
 - Vercel/GitHub CI must pass before PR merge.
 - Supabase/database access must use the documented CLI entrypoint only.
 
+## Verification performed on 2026-07-26 (owner's Mac, Xcode 26.6)
+
+CoreSimulator is healthy on this machine — the #368 host blocker was specific
+to the earlier cloud box, not to the code. From this branch after merging
+`origin/main`:
+
+- `npx tsc --noEmit`, `npm run lint`, `npm run build` — clean.
+- All ten `npm run test:*` suites — 327 tests, 0 failures.
+- `xcodebuild` Release build for iOS Simulator — BUILD SUCCEEDED.
+- `MainShellUITests/testAccessibilitySizeRaceCardKeepsCriticalContentVisibleAndOrdered`
+  — passed on iPhone 17 Pro Max.
+- Release build installed and driven against production; App Store screenshots
+  captured and `npm run validate:app-store-screenshots` passes.
+
+Two defects the `origin/main` merge surfaced, both fixed here:
+
+- `APIEndpoint.submitPick` was missing an explicit `return`, so **the iOS app
+  did not compile on `main`**. CI never runs `xcodebuild`, so nothing caught it.
+- The #365 DNF copy fix lived in a file this branch deletes; reapplied at the
+  copy's new home.
+
+## Simulator devices
+
+The owner keeps exactly one simulator, **iPhone 17 Pro Max**, whose native
+1320x2868 is exactly the 6.9-inch App Store size. iPhone 17 Pro and a
+temporary iPhone 16 Plus were deleted on 2026-07-26 at the owner's request to
+reclaim disk. Do not assume any other device exists; older plan documents that
+name "iPhone 17 Pro" are historical.
+
 ## Recommended continuation order
 
-1. Read #374, this file, `AGENTS.md`, the implementation plan, SDD progress, and #368–#372.
+1. Read #374, this file, `AGENTS.md`, the implementation plan, and #368–#372.
 2. Confirm branch/HEAD and PR #373 checks.
-3. Complete #368 if CoreSimulator is usable.
-4. If simulator remains blocked and owner approves non-simulator work, complete #369 only.
-5. Complete #370 after #368.
-6. Complete #372 after #370 and owner/App Store/screenshot prerequisites.
-7. Complete #371 last.
-8. Keep PR #373 draft until required verification and CI pass.
-9. Update this file and related GitHub issues after every material state change.
+3. Merge PR #391 (#390 guest leaderboard) — it is a live production bug and is
+   independent of this release branch.
+4. Remaining for #372: landing `-v2` images and the per-release handoff doc.
+5. Complete #371 last; everything from the archive onward is owner-only.
+6. Update this file and related GitHub issues after every material state change.
 
 ## Explicit prohibitions until separately authorized
 
-- Do not merge PR #373.
-- Do not mark PR #373 ready for review.
-- Do not submit to App Store.
+- ~~Do not merge PR #373.~~ Superseded 2026-07-26: the owner authorized
+  opening and merging PRs for this work ("fix them and pr and merge if
+  necessary"). Still require green CI and a self-reviewed diff first.
+- ~~Do not mark PR #373 ready for review.~~ Superseded by the same instruction.
+- Do not submit to App Store — the owner does the App Store Connect side.
 - Do not upload screenshots or builds.
 - Do not change signing identities, certificates, or provisioning profiles.
 - Do not accept Apple legal agreements for the owner.
