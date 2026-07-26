@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for the FX Racing App Store build.
+
+  Contains no secrets: the team ID is already declared in ios/project.yml and
+  the generated pbxproj, so this file is checked in to keep archive/export
+  reproducible. See docs/release/app-store-release.md for the full sequence.
+
+  destination is "export", which writes a signed .ipa locally and never talks
+  to App Store Connect. Uploading is a separate, deliberate step — do it from
+  Xcode Organizer or Transporter, or flip this to "upload" if you want
+  xcodebuild to push the build itself (that needs an Apple ID + 2FA).
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+
+    <key>destination</key>
+    <string>export</string>
+
+    <key>teamID</key>
+    <string>U6Z87CS4W3</string>
+
+    <!-- Version and build come from ios/project.yml; never let Xcode bump them. -->
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+
+    <key>signingStyle</key>
+    <string>automatic</string>
+
+    <!-- Symbols give readable App Store Connect crash reports. -->
+    <key>uploadSymbols</key>
+    <true/>
+
+    <key>stripSwiftSymbols</key>
+    <true/>
+
+    <!-- App thinning is decided by the store, not the export. -->
+    <key>thinning</key>
+    <string>&lt;none&gt;</string>
+</dict>
+</plist>

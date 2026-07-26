@@ -79,7 +79,11 @@ test("documents the required App Store screenshot filenames", () => {
 
   assert.match(summary, /01-race-deck-1320x2868\.\{png,jpg,jpeg\}/)
   assert.match(summary, /02-driver-picker-1320x2868\.\{png,jpg,jpeg\}/)
-  assert.match(summary, /03-rankings-1290x2796\.\{png,jpg,jpeg\}/)
+  assert.match(summary, /03-rankings-1320x2868\.\{png,jpg,jpeg\}/)
+
+  // 6.9-inch is the only size App Store Connect requires; smaller sizes are
+  // optional, so the whole set can come from a single simulator.
+  assert.doesNotMatch(summary, /1290x2796/)
 })
 
 test("accepts complete required PNG and JPEG screenshot sets", async () => {
@@ -139,7 +143,7 @@ test("rejects duplicate canonical IDs within the same size set", async () => {
 test("rejects missing required filenames and incomplete optional sets", async () => {
   await withTempDir(async (directory) => {
     await writeCompleteRequiredSet(directory)
-    await rm(join(directory, "03-rankings-1290x2796.png"))
+    await rm(join(directory, "03-rankings-1320x2868.png"))
     await writeFile(join(directory, "01-race-deck-1284x2778.png"), makePng({
       height: 2778,
       width: 1284,
@@ -149,8 +153,8 @@ test("rejects missing required filenames and incomplete optional sets", async ()
     const errors = result.errors.join("\n")
 
     assert.equal(result.ok, false)
-    assert.match(errors, /missing required filename 03-rankings-1290x2796\.\{png,jpg,jpeg\}/)
-    assert.match(errors, /1290x2796: incomplete screenshot set; missing 03-rankings/)
+    assert.match(errors, /missing required filename 03-rankings-1320x2868\.\{png,jpg,jpeg\}/)
+    assert.match(errors, /1320x2868: incomplete screenshot set; missing 03-rankings/)
     assert.match(
       errors,
       /1284x2778: incomplete screenshot set; missing 02-driver-picker, 03-rankings/,
