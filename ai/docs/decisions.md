@@ -20,6 +20,15 @@ Do not log temporary debugging notes here.
 ## Entries
 
 
+### 2026-07-26 — Public race caching is TTL-only; tags are for manual purge
+- Status: accepted
+- Context: #361 shipped CDN caching plus what looked like targeted invalidation: responses carried a `Cache-Tag` header and the four race-mutating crons called `revalidatePublicRaceCache()`, which called `revalidateTag()`. Both halves were inert. `revalidateTag()` only purges the Next.js Data Cache, and `git grep` finds no `unstable_cache` / `'use cache'` / `cacheTag` anywhere in `src/` — these are plain dynamic route handlers whose caching is purely the CDN honouring `s-maxage`, so there was no registered entry to purge. Separately, Vercel reads `Vercel-Cache-Tag`; a bare `Cache-Tag` is the Cloudflare/Fastly convention and is ignored. The code therefore read as if invalidation worked when nothing could purge anything (#392).
+- Decision: Make public race caching explicitly TTL-only. Removed `revalidatePublicRaceCache()` and its four cron call sites, and the `next/cache` import. Renamed the response header to `Vercel-Cache-Tag` so the tags are genuinely purgeable on demand via `vercel cache invalidate --tag public-race:<raceId>` or `POST /v1/edge-cache/invalidate-by-tags`. Crons now log `staleTags=` naming exactly which tags a run invalidated, so an operator can purge deliberately.
+- Reason: Prefer a small honest mechanism over a larger one that only appears to work. Automatic purge would need a Vercel API token in the cron environment, and the TTLs already bound staleness tightly: a status transition is bounded by the *previous* status's TTL, so a race going LIVE → COMPLETED is visible within ~15s, and the list within ~60s.
+- Tradeoffs: No automatic purge. If a mutation must be visible sooner than its TTL, someone runs the documented purge command. If that proves too manual, the follow-up is to wire the edge-cache invalidate API into `revalidatePublicRaceCache()` with a scoped token — the tags are now correct, so only the trigger would be missing.
+- Affected areas: `src/lib/api/public-race-cache.ts`, the four cron routes under `src/app/api/cron/`, `src/app/api/races/route-source.test.mjs`.
+- Follow-up: Revisit if #361's production hit-rate measurement shows staleness complaints rather than cache misses.
+
 ### 2026-07-25 — Public race API CDN caching and Auth.js bypass
 - Status: accepted
 - Context: Production `/api/races` warm-origin TTFB stayed ~1s and responses set avoidable Auth.js cookies despite being public.

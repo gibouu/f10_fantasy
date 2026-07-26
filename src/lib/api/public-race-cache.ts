@@ -1,4 +1,3 @@
-import { revalidateTag } from "next/cache"
 import type { RaceSummary } from "@/types/domain"
 
 export const PUBLIC_RACES_TAG = "public-races"
@@ -33,6 +32,20 @@ export function publicRaceCacheTagHeader(raceId?: string): string {
   return raceId ? `${PUBLIC_RACES_TAG}, ${publicRaceTag(raceId)}` : PUBLIC_RACES_TAG
 }
 
+/**
+ * Tags whose cached responses a cron run has just made stale, for logging.
+ *
+ * Public race caching is TTL-only (see `raceDetailCacheControl`), so nothing
+ * purges automatically. Logging the tags means an operator reading cron output
+ * knows exactly what to pass to `vercel cache invalidate --tag` if they need
+ * the change visible before the TTL expires.
+ */
+export function stalePublicRaceCacheTags(raceIds: Iterable<string>): string {
+  const ids = Array.from(new Set(raceIds))
+  if (ids.length === 0) return ""
+  return [PUBLIC_RACES_TAG, ...ids.map(publicRaceTag)].join(",")
+}
+
 export function serverTiming(
   entries: Array<{ name: string; durationMs?: number; description?: string }>,
 ): string {
@@ -59,14 +72,12 @@ export function publicRaceHeaders({
 }): HeadersInit {
   return {
     "Cache-Control": cacheControl,
-    "Cache-Tag": publicRaceCacheTagHeader(raceId),
+    // Vercel reads `Vercel-Cache-Tag`; a bare `Cache-Tag` is the Cloudflare/
+    // Fastly convention and is ignored here. Tagging makes these responses
+    // purgeable on demand:
+    //   vercel cache invalidate --tag public-race:<raceId>
+    // or POST /v1/edge-cache/invalidate-by-tags.
+    "Vercel-Cache-Tag": publicRaceCacheTagHeader(raceId),
     "Server-Timing": timing,
-  }
-}
-
-export function revalidatePublicRaceCache(raceIds: Iterable<string> = []): void {
-  revalidateTag(PUBLIC_RACES_TAG)
-  for (const raceId of Array.from(new Set(raceIds))) {
-    revalidateTag(publicRaceTag(raceId))
   }
 }

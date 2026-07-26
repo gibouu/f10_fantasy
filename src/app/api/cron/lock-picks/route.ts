@@ -9,9 +9,9 @@
  */
 
 import { NextResponse } from "next/server"
+import { stalePublicRaceCacheTags } from "@/lib/api/public-race-cache"
 import type { NextRequest } from "next/server"
 import { validateCronSecret } from "@/lib/api/cron-auth"
-import { revalidatePublicRaceCache } from "@/lib/api/public-race-cache"
 import { db } from "@/lib/db/client"
 import { lockPicksForRace } from "@/lib/services/lock.service"
 
@@ -82,12 +82,9 @@ export async function POST(req: NextRequest) {
     lockedRaces++
   }
 
-  if (statusChangedRaceIds.size > 0) {
-    revalidatePublicRaceCache(statusChangedRaceIds)
-  }
 
   console.log(
-    `[f10:cron:lock] done in ${Date.now() - startedAt}ms lockedRaces=${lockedRaces} totalPicksLocked=${totalPicksLocked}`,
+    `[f10:cron:lock] done in ${Date.now() - startedAt}ms lockedRaces=${lockedRaces} totalPicksLocked=${totalPicksLocked} staleTags=${stalePublicRaceCacheTags(statusChangedRaceIds)}`,
   )
 
   return NextResponse.json({ lockedRaces, totalPicksLocked })
