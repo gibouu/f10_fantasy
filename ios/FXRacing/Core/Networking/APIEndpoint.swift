@@ -82,7 +82,7 @@ extension APIEndpoint {
         baseVersion: String? = nil
     ) -> APIEndpoint {
         let headers = baseVersion.map { ["If-Match": "\"\($0)\""] } ?? [:]
-        APIEndpoint(
+        return APIEndpoint(
             method: "POST",
             path: "/api/picks",
             bodyData: jsonBody([
