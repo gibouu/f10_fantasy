@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["lhr1"],
   "functions": {
     "src/app/api/cron/**": {
       "maxDuration": 60

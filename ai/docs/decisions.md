@@ -20,6 +20,15 @@ Do not log temporary debugging notes here.
 ## Entries
 
 
+### 2026-07-26 — Vercel Functions run in lhr1, co-located with the database
+- Status: accepted
+- Context: #398. A cache miss on the public race APIs cost 1.5-1.9s. `Server-Timing` split the phases and showed a single primary-key `findUnique` taking **393 ms** (`db.race;dur=393.0`) with four concurrent related queries at 941 ms — two orders of magnitude above a warm indexed lookup, and not a request waterfall since the route already parallelises. The cause was geography: `x-vercel-id` showed functions executing in `iad1` (Washington DC) while the Supabase project is in **eu-west-2 (London)**. Every query crossed the Atlantic, and a TLS + auth handshake is several round trips on top.
+- Decision: pin `"regions": ["lhr1"]` in `vercel.json`. lhr1 is Vercel's London region, the same side of the ocean as the database.
+- Reason: co-locating compute with the database removes the transatlantic hop from every query. Requests make several DB round trips each, so the saving multiplies; the cost is one extra user-to-function hop, paid once.
+- Tradeoffs: users far from London see slightly higher latency on origin requests. This is heavily outweighed because the public race APIs are CDN-cached with a measured 97.5-100% hit rate — most requests are served from the edge nearest the user and never reach lhr1 at all. Only cache misses and authenticated routes pay the hop. The alternative, moving the database to us-east-1, is a data migration with downtime and was not justified.
+- Affected areas: `vercel.json`, guarded by `scripts/vercel-region.test.mjs`.
+- Follow-up: re-measure origin p95 after deploy; #361's target was ≤750 ms.
+
 ### 2026-07-26 — Public race caching is TTL-only; tags are for manual purge
 - Status: accepted
 - Context: #361 shipped CDN caching plus what looked like targeted invalidation: responses carried a `Cache-Tag` header and the four race-mutating crons called `revalidatePublicRaceCache()`, which called `revalidateTag()`. Both halves were inert. `revalidateTag()` only purges the Next.js Data Cache, and `git grep` finds no `unstable_cache` / `'use cache'` / `cacheTag` anywhere in `src/` — these are plain dynamic route handlers whose caching is purely the CDN honouring `s-maxage`, so there was no registered entry to purge. Separately, Vercel reads `Vercel-Cache-Tag`; a bare `Cache-Tag` is the Cloudflare/Fastly convention and is ignored. The code therefore read as if invalidation worked when nothing could purge anything (#392).
