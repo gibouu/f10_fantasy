@@ -30,8 +30,8 @@ final class UpcomingCardLayoutMetricsTests: XCTestCase {
             )
             XCTAssertGreaterThanOrEqual(
                 height,
-                412,
-                "Card height should preserve the current visual floor at \(size)"
+                458,
+                "Card height should preserve the measured visual floor (rail must not clip) at \(size)"
             )
             previousHeight = height
         }
@@ -54,7 +54,7 @@ final class UpcomingCardLayoutMetricsTests: XCTestCase {
     func testNormalSizeCardGeometryRemainsTask6Stable() {
         XCTAssertEqual(
             UpcomingCardLayoutMetrics.cardHeight(for: .large),
-            412,
+            458,
             accuracy: 0.001
         )
     }
