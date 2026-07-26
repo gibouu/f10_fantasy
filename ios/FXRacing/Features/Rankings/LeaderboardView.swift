@@ -252,14 +252,22 @@ struct LeaderboardView: View {
             Section {
                 ForEach(vm.rows) { row in
                     let isCurrent = row.userId == currentUserId
-                    Button {
-                        selectedPlayer = SelectedPlayer(id: row.userId)
-                    } label: {
-                        LeaderboardRowView(row: row, isCurrentUser: isCurrent)
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .accessibilityIdentifier("ranking-row-\(row.userId)")
+                    // A `Button` with `.buttonStyle(.plain)` wrapping this
+                    // custom label did not deliver taps inside the List — the
+                    // action never ran, so the profile sheet never opened.
+                    // (Plain-text buttons elsewhere in the same List work, and
+                    // the sheet itself works, so it was specific to this
+                    // combination.) A tap gesture on the row content is
+                    // reliable; the button trait keeps the row exposed as a
+                    // button to VoiceOver and UI tests.
+                    LeaderboardRowView(row: row, isCurrentUser: isCurrent)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectedPlayer = SelectedPlayer(id: row.userId)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityIdentifier("ranking-row-\(row.userId)")
                 }
             }
 
