@@ -87,7 +87,36 @@ Either flip `destination` to `upload` in `ios/ExportOptions.plist` and re-run
 step 4, or upload `FXRacing.ipa` from Xcode Organizer or Transporter. Wait for
 App Store Connect to finish processing before the build becomes selectable.
 
-## 6. Screenshots
+## 6. The simulator, and why other projects leak into it
+
+Every Xcode project on the machine shares one simulator device set
+(`~/Library/Developer/CoreSimulator/Devices`). A simulator is a shared
+computer, not a per-project sandbox:
+
+- Any app ever installed on a device stays installed until the device is erased.
+- A build with a generic destination (`platform=iOS Simulator` with no device,
+  or `booted`) installs onto whichever simulator happens to be running — so a
+  concurrent build in another project lands on this project's device and can
+  come to the foreground mid-session.
+- If `Simulator.app`'s saved `CurrentDeviceUDID` points at a device that was
+  deleted, Xcode recreates a stock device (e.g. a fresh "iPhone 17 Pro") to
+  satisfy it. That is where phantom duplicate devices come from.
+
+Use `scripts/ios-sim` rather than raw `simctl`:
+
+```bash
+scripts/ios-sim doctor   # foreign apps, stale Simulator.app pointer, device list
+scripts/ios-sim fresh    # erase + boot + install + launch — true first-run state
+scripts/ios-sim run      # install + launch, keep existing data
+scripts/ios-sim udid     # for xcodebuild -destination "id=$(scripts/ios-sim udid)"
+```
+
+It pins one dedicated device named **`FX Racing 17 Pro Max`**. The name is
+deliberately non-stock so another project's `-destination 'name=iPhone 17 Pro'`
+cannot match it. Always target `id=<udid>`; never `booted` and never a bare
+platform destination.
+
+## 7. Screenshots
 
 Generate them with the simulator and validate before uploading:
 
@@ -118,7 +147,7 @@ python3 -c 'from PIL import Image; import sys
   .artifacts/app-store/*.png
 ```
 
-## 7. Store metadata — owner only
+## 8. Store metadata — owner only
 
 Select the processed build, upload the screenshots in filename order, and
 confirm support/privacy URLs, age rating, export compliance
