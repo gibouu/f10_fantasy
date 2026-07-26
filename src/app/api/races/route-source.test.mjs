@@ -99,15 +99,40 @@ test("middleware bypasses Auth.js before public race GETs can set cookies", () =
   )
 })
 
-test("race-data cron mutations revalidate public race cache tags", () => {
+test("public race responses are tagged with the header Vercel actually reads", () => {
+  // A bare `Cache-Tag` is the Cloudflare/Fastly convention and is ignored by
+  // Vercel, so tagging with it did nothing. `Vercel-Cache-Tag` is what makes
+  // `vercel cache invalidate --tag` and the edge-cache API able to purge these.
+  assert.match(cacheSource, /"Vercel-Cache-Tag": publicRaceCacheTagHeader\(raceId\)/)
+  assert.doesNotMatch(cacheSource, /"Cache-Tag":/)
+})
+
+test("public race caching claims no invalidation it cannot perform", () => {
+  // revalidateTag() only purges the Next.js Data Cache. These are plain dynamic
+  // route handlers whose caching is the CDN honouring s-maxage, and nothing
+  // registers a Data Cache entry — so the old revalidateTag calls were no-ops.
+  assert.doesNotMatch(cacheSource, /revalidateTag/)
+  assert.doesNotMatch(cacheSource, /from "next\/cache"/)
+
   for (const source of [
     syncScheduleSource,
     syncEntriesSource,
     ingestResultsSource,
     lockPicksSource,
   ]) {
-    assert.match(source, /revalidatePublicRaceCache/)
+    assert.doesNotMatch(source, /revalidatePublicRaceCache/)
   }
-  assert.match(cacheSource, /revalidateTag\(PUBLIC_RACES_TAG\)/)
-  assert.match(cacheSource, /revalidateTag\(publicRaceTag\(raceId\)\)/)
+})
+
+test("race-data crons log the cache tags their mutations made stale", () => {
+  // Purging is manual, so the cron output has to name what to purge.
+  for (const source of [
+    syncScheduleSource,
+    syncEntriesSource,
+    ingestResultsSource,
+    lockPicksSource,
+  ]) {
+    assert.match(source, /staleTags=\$\{stalePublicRaceCacheTags\(/)
+  }
+  assert.match(cacheSource, /export function stalePublicRaceCacheTags/)
 })

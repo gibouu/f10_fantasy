@@ -15,9 +15,9 @@
  */
 
 import { NextResponse } from 'next/server'
+import { stalePublicRaceCacheTags } from "@/lib/api/public-race-cache"
 import type { NextRequest } from 'next/server'
 import { validateCronSecret } from '@/lib/api/cron-auth'
-import { revalidatePublicRaceCache } from '@/lib/api/public-race-cache'
 import { db } from '@/lib/db/client'
 import { ingestResultsForRace, findRacesNeedingIngestion } from '@/lib/services/ingestion.service'
 import { computeAndStoreScoresForRace } from '@/lib/services/scoring.service'
@@ -190,12 +190,9 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(
-    `[f10:cron:ingest] done in ${Date.now() - startedAt}ms processed=${results.length} errors=${results.filter((r) => r.error).length}`,
+    `[f10:cron:ingest] done in ${Date.now() - startedAt}ms processed=${results.length} errors=${results.filter((r) => r.error).length} staleTags=${stalePublicRaceCacheTags(mutatedRaceIds)}`,
   )
 
-  if (mutatedRaceIds.size > 0) {
-    revalidatePublicRaceCache(mutatedRaceIds)
-  }
 
   return NextResponse.json({ processed: results })
 }

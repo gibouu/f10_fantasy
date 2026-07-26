@@ -7,9 +7,9 @@
  */
 
 import { NextResponse } from "next/server"
+import { stalePublicRaceCacheTags } from "@/lib/api/public-race-cache"
 import type { NextRequest } from "next/server"
 import { validateCronSecret } from "@/lib/api/cron-auth"
-import { revalidatePublicRaceCache } from "@/lib/api/public-race-cache"
 import { db } from "@/lib/db/client"
 import { createF1Provider } from "@/lib/f1/adapter"
 import { fetchDriversForSessions } from "./driver-fetch"
@@ -354,7 +354,6 @@ export async function POST(req: NextRequest) {
 
   // Skip the remaining steps if no driver data was fetched
   if (sessionDrivers.every((sd) => sd.drivers.length === 0)) {
-    revalidatePublicRaceCache(mutatedRaceIds)
     return NextResponse.json({ synced, reconciled, year, driversSkipped: true })
   }
 
@@ -489,7 +488,9 @@ export async function POST(req: NextRequest) {
     ])
   }
 
-  revalidatePublicRaceCache(mutatedRaceIds)
+  console.log(
+    `[f10:cron:schedule] done synced=${synced} reconciled=${reconciled} year=${year} staleTags=${stalePublicRaceCacheTags(mutatedRaceIds)}`,
+  )
 
   return NextResponse.json({ synced, reconciled, year, entryRefreshSkipped })
 }
