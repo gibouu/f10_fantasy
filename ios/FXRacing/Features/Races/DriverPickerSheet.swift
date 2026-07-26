@@ -13,6 +13,7 @@ struct DriverPickerSheet: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding private var state: DriverPickerState
     @AccessibilityFocusState private var focusTarget: PickerFocusTarget?
     @State private var alertMessage: String?
@@ -60,12 +61,37 @@ struct DriverPickerSheet: View {
             }
     }
 
+    /// The picker advances P1 -> P10 -> DNF without closing. Previously the
+    /// only thing marking that were two grey words differing by one character
+    /// ("P1" vs "P10"), which players missed. The slot now carries the same
+    /// colour the card already uses for it, so the change reads at a glance
+    /// rather than needing to be read.
+    private var slotHeading: some View {
+        HStack(spacing: 8) {
+            Text("Choose a driver for")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(state.activeSlot.label)
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(state.activeSlot.tint)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(state.activeSlot.tint.opacity(0.16), in: Capsule())
+                .id(state.activeSlot)
+                .transition(.scale.combined(with: .opacity))
+
+            Spacer(minLength: 0)
+        }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state.activeSlot)
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                Text("Choose a driver for \(state.activeSlot.label)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                slotHeading
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Choose a driver for \(state.activeSlot.label)")
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($focusTarget, equals: .slotHeading)
 

@@ -56,6 +56,7 @@
 		787538A847C0C72104EA9282 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38466ACFC9DCC1DC84C22141 /* Haptics.swift */; };
 		787D8958572B1E7531E02439 /* APIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C808C928ABC015907CF35F4 /* APIClientSpy.swift */; };
 		7A5E88D88DD6027EDA886DF5 /* UpcomingCardLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5724B58A10FDEFA8BF517F /* UpcomingCardLayoutMetrics.swift */; };
+		7C9C634DE820C8E64A49450C /* PickSlot+Tint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF458F96D30B8A036CA76173 /* PickSlot+Tint.swift */; };
 		7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */; };
 		7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */; };
 		7D51D8FC98611EA655B899C3 /* RaceDeckViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */; };
@@ -255,6 +256,7 @@
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryActionTests.swift; sourceTree = "<group>"; };
+		DF458F96D30B8A036CA76173 /* PickSlot+Tint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PickSlot+Tint.swift"; sourceTree = "<group>"; };
 		DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusResolverTests.swift; sourceTree = "<group>"; };
 		E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickRecord.swift; sourceTree = "<group>"; };
 		E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDeckViewModelTests.swift; sourceTree = "<group>"; };
@@ -283,6 +285,7 @@
 				0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */,
 				68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */,
 				975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */,
+				DF458F96D30B8A036CA76173 /* PickSlot+Tint.swift */,
 				3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */,
 				4469E358F5D2657310E7A1E9 /* RaceContextView.swift */,
 				0DDD234C2CF79BC4C0824234 /* RaceDeckView.swift */,
@@ -910,6 +913,7 @@
 				C29CC74AAF88D1F8A544BD24 /* PerformanceFixtures.swift in Sources */,
 				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
 				75F72ED5C89C765B556F996E /* PickCommitFeedback.swift in Sources */,
+				7C9C634DE820C8E64A49450C /* PickSlot+Tint.swift in Sources */,
 				AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */,
 				13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */,
 				7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */,

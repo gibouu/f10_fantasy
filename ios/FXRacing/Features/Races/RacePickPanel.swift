@@ -214,7 +214,7 @@ struct RacePickPanel: View {
     private func slotLabel(_ slot: PickSlot, fixedWidth: Bool) -> some View {
         Text(slot.label)
             .font(.system(size: 11, weight: .black, design: .monospaced))
-            .foregroundStyle(slotColor(slot))
+            .foregroundStyle(slot.tint)
             .frame(width: fixedWidth ? 36 : nil, alignment: .leading)
     }
 
@@ -259,13 +259,6 @@ struct RacePickPanel: View {
         return "Opens the driver picker"
     }
 
-    private func slotColor(_ slot: PickSlot) -> Color {
-        switch slot {
-        case .winner: FXTheme.Colors.accent
-        case .p10: FXTheme.Colors.gold
-        case .dnf: FXTheme.Colors.danger
-        }
-    }
 }
 
 struct RacePickPanelPlaceholder: View {
