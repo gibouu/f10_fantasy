@@ -81,7 +81,21 @@ test("local-save performance starts immediately before final selection", () => {
   )?.[0] ?? "";
   assert.match(diagnostic, /let start = ContinuousClock\.now\s*finalDriver\.tap\(\)/);
   assert.match(performanceUITestSource, /prepareTwoPicks/);
-  assert.doesNotMatch(performanceUITestSource, /save-picks-|Save picks|Picks saved/);
+  // Picks autosave, so the harness must never drive an explicit save control.
+  // "Picks saved" is allowed: it is one of the status-rail titles the harness
+  // waits on to observe that the autosave landed, not a button it taps.
+  assert.doesNotMatch(performanceUITestSource, /save-picks-|Save picks|savePicksButton/);
+});
+
+test("the local-save harness waits on the status rail, not a fixed string", () => {
+  // The rail collapses its children, so its text is the element label rather
+  // than a static text, and the title varies with auth and sync state.
+  assert.match(performanceUITestSource, /element\("race-pick-status", in: app\)/);
+  assert.match(performanceUITestSource, /savedStatusTitles\.contains\(rail\.label\)/);
+  assert.doesNotMatch(
+    performanceUITestSource,
+    /staticTexts\["Saved on this iPhone"\]/,
+  );
 });
 
 test("pick rows stay visibly unavailable until driver data is ready", () => {

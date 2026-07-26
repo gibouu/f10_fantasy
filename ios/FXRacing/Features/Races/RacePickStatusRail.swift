@@ -203,6 +203,10 @@ struct RacePickStatusRail: View {
         .accessibilityLabel(status.title)
         .accessibilityValue(accessibilityValue)
         .accessibilityHint(accessibilityHint)
+        // `children: .ignore` collapses the rail into a single element, so the
+        // inner Text views are not exposed as static texts. UI tests need a
+        // stable hook to read the pick state from.
+        .accessibilityIdentifier("race-pick-status")
     }
 
     private var content: some View {
