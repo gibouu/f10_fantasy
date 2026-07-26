@@ -28,6 +28,13 @@ function isPublicApiRoute(pathname: string, method: string): boolean {
     return method === "GET";
   }
 
+  // Global rankings are guest-readable. The handler resolves its own session
+  // and returns a JSON 401 for the friends scope, so it must not be redirected
+  // to /signin — a native client would decode that HTML page as JSON.
+  if (pathname === "/api/leaderboard") {
+    return method === "GET";
+  }
+
   if (pathname === "/api/users/suggest-usernames") {
     return method === "GET";
   }
