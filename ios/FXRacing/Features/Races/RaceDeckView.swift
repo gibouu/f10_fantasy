@@ -294,15 +294,11 @@ struct RaceDeckView: View {
                 if let race = selectedRace,
                    let detail = scopedSelectedDetail,
                    detail.race.id == race.id {
-                    RaceContextView(
-                        section: section,
-                        race: race,
-                        detail: detail
-                    )
-                    .padding(.horizontal, 18)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-
                     #if FX_PERF_HARNESS
+                    // Must sit *above* RaceContextView. This is a LazyVStack,
+                    // so anything below the tall season-form table is not
+                    // instantiated and the marker never reaches the
+                    // accessibility tree for the harness to find.
                     if !detail.entrants.isEmpty {
                         Color.clear
                             .frame(width: 1, height: 1)
@@ -312,6 +308,14 @@ struct RaceDeckView: View {
                             .allowsHitTesting(false)
                     }
                     #endif
+
+                    RaceContextView(
+                        section: section,
+                        race: race,
+                        detail: detail
+                    )
+                    .padding(.horizontal, 18)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
             .padding(.vertical, 4)

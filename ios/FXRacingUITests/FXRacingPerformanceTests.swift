@@ -266,7 +266,7 @@ final class FXRacingPerformanceTests: XCTestCase {
             let finalDriver = try self.prepareTwoPicks(in: app)
             let start = ContinuousClock.now
             finalDriver.tap()
-            guard app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 10) else {
+            guard self.waitUntilSaved(in: app) else {
                 throw HarnessFailure.notReady("Saved state")
             }
             return self.seconds(start.duration(to: .now))
@@ -299,7 +299,7 @@ final class FXRacingPerformanceTests: XCTestCase {
                 app.terminate()
                 return
             }
-            XCTAssertTrue(app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 10))
+            XCTAssertTrue(waitUntilSaved(in: app))
             app.terminate()
         }
     }
@@ -447,6 +447,27 @@ final class FXRacingPerformanceTests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.01))
         } while ContinuousClock.now < deadline
         return condition()
+    }
+
+    /// Titles the pick status rail shows once a pick is persisted locally.
+    /// Which one appears depends on auth and sync state — "Picks saved" when
+    /// signed in and settled, "Saved on this iPhone" for a guest or while a
+    /// sync is still pending. Both mean the local write completed, which is
+    /// what these scenarios measure.
+    private static let savedStatusTitles: Set<String> = [
+        "Picks saved",
+        "Saved on this iPhone",
+    ]
+
+    /// The rail applies `accessibilityElement(children: .ignore)`, so its text
+    /// is the element's label rather than a static text. Match by identifier
+    /// and read the label.
+    @MainActor
+    private func waitUntilSaved(in app: XCUIApplication) -> Bool {
+        let rail = element("race-pick-status", in: app)
+        return waitUntil {
+            rail.exists && Self.savedStatusTitles.contains(rail.label)
+        }
     }
 
     @MainActor
