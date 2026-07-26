@@ -10,8 +10,10 @@ const deckSource = await readFile(
   new URL("./FXRacing/Features/Races/RaceDeckView.swift", import.meta.url),
   "utf8",
 );
-const pickPanelSource = await readFile(
-  new URL("./FXRacing/Features/Races/RacePickPanel.swift", import.meta.url),
+// Slot descriptions moved from RacePickPanel into the detail view model when
+// the pick buttons were replaced by the status rail.
+const slotDescriptionSource = await readFile(
+  new URL("./FXRacing/Features/Races/RaceDetailViewModel.swift", import.meta.url),
   "utf8",
 );
 
@@ -35,7 +37,7 @@ test("DNF tutorial copy describes any non-classified driver", () => {
     deckSource,
     /Choose P1, P10, and one driver who won't be classified\./,
   );
-  assert.match(pickPanelSource, /case \.dnf: "Non-classified driver"/);
+  assert.match(slotDescriptionSource, /case \.dnf: "Non-classified driver"/);
 });
 
 test("iOS product UI source no longer says first DNF or first retirement", async () => {

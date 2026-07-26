@@ -71,6 +71,48 @@ final class MainShellUITests: XCTestCase {
     }
 
     @MainActor
+    func testAccessibilitySizeRaceCardKeepsCriticalContentVisibleAndOrdered() {
+        let app = launch(
+            .gameplay,
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXXL",
+            ]
+        )
+
+        let card = element(in: app, identifier: "race-card-spa")
+        XCTAssertTrue(card.waitForExistence(timeout: 2))
+
+        let schedule = app.buttons["schedule-spa"]
+        let title = app.staticTexts["Belgian Grand Prix"]
+        let circuit = app.staticTexts["Circuit de Spa-Francorchamps"]
+        let heading = app.staticTexts["Your picks"]
+        let winner = app.buttons["pick-slot-spa-winner"]
+        let p10 = app.buttons["pick-slot-spa-p10"]
+        let dnf = app.buttons["pick-slot-spa-dnf"]
+        let status = app.staticTexts["Choose 3 more"]
+
+        for element in [schedule, title, circuit, heading, winner, p10, dnf, status] {
+            XCTAssertTrue(element.waitForExistence(timeout: 2), "\(element) should exist")
+            XCTAssertFalse(element.frame.isEmpty, "\(element) should have a visible frame")
+            XCTAssertTrue(
+                card.frame.insetBy(dx: -1, dy: -1).contains(element.frame),
+                "\(element) should be fully visible inside the race card"
+            )
+        }
+
+        XCTAssertEqual(schedule.label, "Schedule")
+        XCTAssertFalse(schedule.label.contains("\n"))
+
+        assertFrame(title.frame, isBefore: circuit.frame, "Race title should be above circuit")
+        assertFrame(circuit.frame, isBefore: heading.frame, "Circuit should be above picks")
+        assertFrame(heading.frame, isBefore: winner.frame, "Picks heading should be above winner row")
+        assertFrame(winner.frame, isBefore: p10.frame, "Winner row should be above P10 row")
+        assertFrame(p10.frame, isBefore: dnf.frame, "P10 row should be above DNF row")
+        assertFrame(dnf.frame, isBefore: status.frame, "DNF row should be above save status")
+    }
+
+    @MainActor
     func testEmptyDraftProgressesP1P10DNFAndSaves() {
         let app = launch(.gameplay)
 
@@ -83,27 +125,44 @@ final class MainShellUITests: XCTestCase {
         XCTAssertTrue(waitUntilHittable(p10Slot))
         p10Slot.tap()
 
-        let leclerc = app.buttons["driver-leclerc"]
-        revealHittable(leclerc, in: app)
-        XCTAssertTrue(leclerc.isHittable)
-        leclerc.tap()
+        firstAvailableDriver(in: app).tap()
         XCTAssertTrue(app.navigationBars["Pick P10"].waitForExistence(timeout: 2))
-        let hamilton = app.buttons["driver-hamilton"]
-        revealHittable(hamilton, in: app)
-        XCTAssertTrue(hamilton.isHittable)
-        hamilton.tap()
+        firstAvailableDriver(in: app).tap()
         XCTAssertTrue(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
-        let norris = app.buttons["driver-norris"]
-        revealHittable(norris, in: app)
-        XCTAssertTrue(norris.isHittable)
-        norris.tap()
-        app.buttons["Done"].tap()
+        firstAvailableDriver(in: app).tap()
 
-        let save = app.buttons["save-picks-spa"]
-        XCTAssertTrue(save.waitForExistence(timeout: 1))
-        XCTAssertTrue(save.isEnabled)
-        save.tap()
-        XCTAssertTrue(app.buttons["Picks saved"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.navigationBars["Pick DNF"].waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            app.staticTexts["Saved on this iPhone"].waitForExistence(timeout: 2)
+                || app.staticTexts["Picks saved"].exists
+        )
+        XCTAssertFalse(app.buttons["save-picks-spa"].exists)
+    }
+
+    @MainActor
+    func testLegacyRecoveryPresentsOnceAcrossSectionSwitchAndNotNowPreservesIt() {
+        let app = launch(.gameplay, extraArguments: ["--legacy-recovery"])
+
+        XCTAssertTrue(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.staticTexts["P1"].exists)
+        XCTAssertTrue(app.staticTexts["P10"].exists)
+        XCTAssertTrue(app.staticTexts["DNF"].exists)
+        app.buttons["Not now"].tap()
+        XCTAssertFalse(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 1)
+        )
+
+        app.buttons["Past"].tap()
+        app.buttons["Upcoming"].tap()
+
+        XCTAssertFalse(
+            app.navigationBars["Picks found on this iPhone"]
+                .waitForExistence(timeout: 1)
+        )
     }
 
     @MainActor
@@ -119,7 +178,7 @@ final class MainShellUITests: XCTestCase {
         let antonelliForm = element(in: app, identifier: "season-form-row-antonelli")
         XCTAssertTrue(antonelliForm.exists)
         XCTAssertTrue(antonelliForm.label.contains("average finish"))
-        XCTAssertTrue(antonelliForm.label.contains("DNF"))
+        XCTAssertTrue(antonelliForm.label.contains("non-classified results"))
 
         let p10Slot = app.buttons["pick-slot-spa-p10"]
         reveal(p10Slot, bySwipingDown: deck)
@@ -133,6 +192,27 @@ final class MainShellUITests: XCTestCase {
         let sainz = app.buttons["driver-sainz"]
         revealHittable(sainz, in: app)
         XCTAssertTrue(sainz.isHittable)
+    }
+
+    @MainActor
+    func testSeasonFormOpensDriverHistory() {
+        let app = launch(.gameplay)
+        let deck = element(in: app, identifier: "race-deck")
+        let antonelliForm = app.buttons["season-form-row-antonelli"]
+
+        reveal(antonelliForm, bySwipingUp: deck)
+        XCTAssertTrue(waitUntilHittable(antonelliForm))
+        antonelliForm.tap()
+
+        let sheet = element(in: app, identifier: "driver-form-sheet-antonelli")
+        XCTAssertTrue(sheet.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Kimi Antonelli"].exists)
+        XCTAssertTrue(app.staticTexts["Race results before Belgium"].exists)
+        XCTAssertTrue(app.staticTexts["British Grand Prix"].exists)
+
+        sheet.swipeDown()
+        XCTAssertFalse(sheet.waitForExistence(timeout: 2))
+        XCTAssertTrue(antonelliForm.isHittable)
     }
 
     @MainActor
@@ -203,9 +283,45 @@ final class MainShellUITests: XCTestCase {
     }
 
     @MainActor
+    private func firstAvailableDriver(in app: XCUIApplication) -> XCUIElement {
+        let driver = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH 'driver-' AND enabled == true"
+            )
+        ).allElementsBoundByIndex.first(where: \.isHittable)
+            ?? app.buttons.matching(
+                NSPredicate(format: "identifier BEGINSWITH 'driver-' AND enabled == true")
+            ).firstMatch
+        XCTAssertTrue(driver.waitForExistence(timeout: 2))
+        return driver
+    }
+
+    @MainActor
     private func revealHittable(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<12 where !element.isHittable {
             app.swipeUp()
         }
+    }
+
+    private func assertFrame(
+        _ upper: CGRect,
+        isBefore lower: CGRect,
+        _ message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertLessThanOrEqual(
+            upper.maxY,
+            lower.minY,
+            message,
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            upper.intersects(lower),
+            message,
+            file: file,
+            line: line
+        )
     }
 }

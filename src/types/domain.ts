@@ -50,6 +50,8 @@ export type DriverSummary = {
   seasonAverageFinish?: number | null
   /** Non-classified finishes in earlier completed races of the same season/type. */
   seasonDnfCount?: number | null
+  /** Earlier completed same-season, same-type race results, newest first. */
+  seasonResults?: SerializedDriverSeasonResult[]
   constructor: {
     id: string
     name: string
@@ -99,6 +101,31 @@ export type RaceResultRecord = {
     dnf: number
   }
 }
+
+export type DriverSeasonResult = {
+  driverId: string
+  raceId: string
+  raceName: string
+  scheduledStartUtc: Date
+  position: number | null
+  status: ResultStatus
+}
+
+export type DriverSeasonForm = {
+  averageFinish: number | null
+  nonClassifiedCount: number
+  results: DriverSeasonResult[]
+}
+
+/**
+ * Wire form of {@link DriverSeasonResult}: `Date` cannot cross the API
+ * boundary, so `scheduledStartUtc` is serialized as an ISO string and the
+ * driver identity is dropped (results are already nested under their driver).
+ */
+export type SerializedDriverSeasonResult = Omit<
+  DriverSeasonResult,
+  'driverId' | 'scheduledStartUtc'
+> & { scheduledStartUtc: string }
 
 // ─────────────────────────────────────────────
 // Picks

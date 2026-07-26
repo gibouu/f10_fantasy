@@ -1,10 +1,9 @@
 import { db } from '@/lib/db/client'
-import type { RaceSummary } from '@/types/domain'
-
-export type DriverSeasonStats = {
-  averageFinish: number | null
-  dnfCount: number
-}
+import type {
+  DriverSeasonForm,
+  RaceSummary,
+  ResultStatus,
+} from '@/types/domain'
 
 export async function getDriverSeasonStats({
   seasonId,
@@ -14,49 +13,74 @@ export async function getDriverSeasonStats({
   seasonId: string
   raceType: RaceSummary['type']
   before: Date
-}): Promise<Map<string, DriverSeasonStats>> {
-  const race = {
-    seasonId,
-    type: raceType,
-    status: 'COMPLETED' as const,
-    scheduledStartUtc: { lt: before },
-  }
-
-  const [classified, nonClassified] = await Promise.all([
-    db.raceResult.groupBy({
-      by: ['driverId'],
-      where: {
-        race,
-        status: 'CLASSIFIED',
-        position: { not: null },
+}): Promise<Map<string, DriverSeasonForm>> {
+  const rows = await db.raceResult.findMany({
+    where: {
+      race: {
+        seasonId,
+        type: raceType,
+        status: 'COMPLETED',
+        scheduledStartUtc: { lt: before },
       },
-      _avg: { position: true },
-    }),
-    db.raceResult.groupBy({
-      by: ['driverId'],
-      where: {
-        race,
-        status: { not: 'CLASSIFIED' },
+    },
+    select: {
+      driverId: true,
+      raceId: true,
+      position: true,
+      status: true,
+      race: { select: { name: true, scheduledStartUtc: true } },
+    },
+    orderBy: [
+      { race: { scheduledStartUtc: 'desc' } },
+      { raceId: 'desc' },
+      { driverId: 'asc' },
+    ],
+  })
+
+  const forms = new Map<
+    string,
+    DriverSeasonForm & { classifiedFinishTotal: number; classifiedFinishCount: number }
+  >()
+
+  for (const row of rows) {
+    const form = forms.get(row.driverId) ?? {
+      averageFinish: null,
+      nonClassifiedCount: 0,
+      results: [],
+      classifiedFinishTotal: 0,
+      classifiedFinishCount: 0,
+    }
+
+    form.results.push({
+      driverId: row.driverId,
+      raceId: row.raceId,
+      raceName: row.race.name,
+      scheduledStartUtc: row.race.scheduledStartUtc,
+      position: row.position,
+      status: row.status as ResultStatus,
+    })
+
+    if (row.status === 'CLASSIFIED' && row.position !== null) {
+      form.classifiedFinishTotal += row.position
+      form.classifiedFinishCount += 1
+    } else if (row.status !== 'CLASSIFIED') {
+      form.nonClassifiedCount += 1
+    }
+
+    forms.set(row.driverId, form)
+  }
+
+  return new Map(
+    Array.from(forms, ([driverId, form]) => [
+      driverId,
+      {
+        averageFinish:
+          form.classifiedFinishCount === 0
+            ? null
+            : form.classifiedFinishTotal / form.classifiedFinishCount,
+        nonClassifiedCount: form.nonClassifiedCount,
+        results: form.results,
       },
-      _count: { _all: true },
-    }),
-  ])
-
-  const stats = new Map<string, DriverSeasonStats>()
-
-  for (const result of classified) {
-    stats.set(result.driverId, {
-      averageFinish: result._avg.position,
-      dnfCount: 0,
-    })
-  }
-
-  for (const result of nonClassified) {
-    stats.set(result.driverId, {
-      averageFinish: stats.get(result.driverId)?.averageFinish ?? null,
-      dnfCount: result._count._all,
-    })
-  }
-
-  return stats
+    ]),
+  )
 }

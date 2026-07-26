@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Single entrypoint for this project's iOS Simulator.
+#
+# Every Xcode project on a Mac shares one simulator device set
+# (~/Library/Developer/CoreSimulator/Devices). A device is a shared machine:
+# any app ever installed on it stays there, and any build targeting a generic
+# or "booted" destination lands on whichever simulator happens to be running.
+# That is how another project's app ends up in front of this one's.
+#
+# This script pins one dedicated, uniquely-named device by UDID so that:
+#   - no other project's `-destination 'name=iPhone 17 Pro'` can match it, and
+#   - nothing here ever targets "booted" or a bare platform destination.
+#
+# Usage:
+#   scripts/ios-sim doctor     report contamination and stale state
+#   scripts/ios-sim boot       boot the dedicated device (create if needed)
+#   scripts/ios-sim fresh      erase, boot, install, launch — clean first run
+#   scripts/ios-sim run        install + launch without erasing
+#   scripts/ios-sim udid       print the UDID (for -destination "id=$(...)")
+#
+# The device name is deliberately project-specific. Do not rename it to a
+# stock name like "iPhone 17 Pro" — that is what makes it collidable.
+
+set -euo pipefail
+
+DEVICE_NAME="FX Racing 17 Pro Max"
+DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
+BUNDLE_ID="com.fxracing.app"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+latest_runtime() {
+  xcrun simctl list runtimes -j \
+    | python3 -c 'import json,sys
+rs=[r for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and "iOS" in r["name"]]
+if not rs: sys.exit("no available iOS runtime")
+print(sorted(rs, key=lambda r: [int(p) for p in r["version"].split(".")])[-1]["identifier"])'
+}
+
+device_udid() {
+  xcrun simctl list devices -j \
+    | python3 -c 'import json,sys
+name=sys.argv[1]
+for devs in json.load(sys.stdin)["devices"].values():
+    for d in devs:
+        if d["name"]==name and d.get("isAvailable"):
+            print(d["udid"]); sys.exit(0)' "$DEVICE_NAME"
+}
+
+ensure_device() {
+  local udid
+  udid="$(device_udid || true)"
+  if [ -z "$udid" ]; then
+    printf 'creating dedicated device: %s\n' "$DEVICE_NAME" >&2
+    udid="$(xcrun simctl create "$DEVICE_NAME" "$DEVICE_TYPE" "$(latest_runtime)")"
+  fi
+  printf '%s' "$udid"
+}
+
+boot_device() {
+  local udid="$1"
+  xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 && return 0
+  xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$udid" -b >/dev/null 2>&1 || die "device failed to boot"
+}
+
+app_path() {
+  # Prefer an explicit build, else the most recent Release simulator build.
+  if [ -n "${FX_APP_PATH:-}" ]; then printf '%s' "$FX_APP_PATH"; return; fi
+  find "${HOME}/Library/Developer/Xcode/DerivedData" \
+       -name FXRacing.app -path '*Release-iphonesimulator*' -maxdepth 5 2>/dev/null \
+    | head -1
+}
+
+third_party_apps() {
+  # simctl emits an old-style plist; convert to JSON so ApplicationType is read
+  # per app rather than guessed from surrounding text. Only "User" apps count —
+  # Apple ships several system bundles that would otherwise look foreign.
+  xcrun simctl listapps "$1" 2>/dev/null \
+    | plutil -convert json - -o - 2>/dev/null \
+    | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+for k,v in sorted(d.items()):
+    if isinstance(v,dict) and v.get("ApplicationType")=="User":
+        print(k)'
+}
+
+cmd_doctor() {
+  local udid pref others
+  udid="$(device_udid || true)"
+  printf 'dedicated device : %s\n' "${udid:-<not created yet>}"
+
+  pref="$(defaults read com.apple.iphonesimulator CurrentDeviceUDID 2>/dev/null || true)"
+  if [ -n "$pref" ] && ! xcrun simctl list devices | grep -q "$pref"; then
+    printf 'WARNING          : Simulator.app points at %s, which no longer exists.\n' "$pref"
+    printf '                   Xcode recreates a stock device to satisfy this, which is\n'
+    printf '                   how phantom "iPhone 17 Pro" devices keep reappearing.\n'
+    printf '                   Fix: defaults write com.apple.iphonesimulator CurrentDeviceUDID -string "%s"\n' "${udid:-<udid>}"
+  fi
+
+  if [ -n "$udid" ]; then
+    others="$(third_party_apps "$udid" | grep -v "^${BUNDLE_ID}$" || true)"
+    if [ -n "$others" ]; then
+      printf 'CONTAMINATED     : foreign apps installed on this project'"'"'s device:\n'
+      printf '                   %s\n' $others
+      printf '                   Another project built onto it. Run: scripts/ios-sim fresh\n'
+    else
+      printf 'foreign apps     : none\n'
+    fi
+  fi
+
+  printf '\nall simulator devices on this Mac (shared across every project):\n'
+  xcrun simctl list devices available | grep -vE '^(--|==)' | grep -v '^$'
+}
+
+main() {
+  case "${1:-doctor}" in
+    udid)   ensure_device; printf '\n' ;;
+    doctor) cmd_doctor ;;
+    boot)   boot_device "$(ensure_device)"; printf 'booted\n' ;;
+    fresh|run)
+      local udid app
+      udid="$(ensure_device)"
+      [ "${1}" = "fresh" ] && { xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true; xcrun simctl erase "$udid"; }
+      boot_device "$udid"
+      app="$(app_path)"
+      [ -n "$app" ] || die "no Release simulator build found; build first or set FX_APP_PATH"
+      xcrun simctl install "$udid" "$app"
+      xcrun simctl launch "$udid" "$BUNDLE_ID" >/dev/null
+      printf 'launched %s from %s\n' "$BUNDLE_ID" "$app"
+      ;;
+    *) die "unknown command: $1 (try: doctor, boot, fresh, run, udid)" ;;
+  esac
+}
+
+main "$@"

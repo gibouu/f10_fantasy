@@ -93,6 +93,30 @@ test("legacy v1 picks become terminal legacy records before old keys are deleted
   )
 })
 
+test("legacy conflict decisions use an explicit atomic owner-safe API", () => {
+  assert.match(
+    localPickRecord,
+    /enum LegacyPickDecision:[\s\S]*case discard[\s\S]*case adopt[\s\S]*case keepCurrent\(expectedDestinationRevision: UInt64\?\)[\s\S]*case replace\(expectedDestinationRevision: UInt64\)/,
+  )
+  assert.match(
+    localPickRecord,
+    /enum LegacyPickResolutionResult:[\s\S]*case adopted\(LocalPickRecord\)[\s\S]*case discarded[\s\S]*case keptCurrent[\s\S]*case locked[\s\S]*case staleLegacy[\s\S]*case destinationOccupied\(LocalPickRecord\)[\s\S]*case destinationChanged\(LocalPickRecord\?\)[\s\S]*case invalidOwner[\s\S]*case persistenceFailed/,
+  )
+
+  const resolutionBlock = localPickStore.match(
+    /func resolveLegacyConflict\([\s\S]*?\n    \}\n\n    @discardableResult/,
+  )?.[0]
+  assert.ok(resolutionBlock, "atomic legacy resolution API should exist")
+  assert.match(resolutionBlock, /expectedLegacyRevision/)
+  assert.match(resolutionBlock, /records\[legacy\.id\] = nil/)
+  assert.match(resolutionBlock, /guard persistV2\(\) else/)
+  assert.equal(
+    resolutionBlock.match(/persistV2\(\)/g)?.length,
+    1,
+    "a legacy decision must persist exactly one complete envelope",
+  )
+})
+
 test("SyncManager serializes owner-scoped revisions through one worker", () => {
   assert.match(
     syncManager,

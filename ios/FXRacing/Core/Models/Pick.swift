@@ -9,6 +9,8 @@ struct Pick: Codable, Sendable {
     let version: String?
     let lockedAt: Date?
     let scoreBreakdown: ScoreBreakdown?
+    var updatedAt: Date? = nil
+    var lockedSubmittedBeforeQualifying: Bool? = nil
 
     init(
         id: String,
@@ -18,7 +20,9 @@ struct Pick: Codable, Sendable {
         dnfDriverId: String,
         version: String? = nil,
         lockedAt: Date?,
-        scoreBreakdown: ScoreBreakdown?
+        scoreBreakdown: ScoreBreakdown?,
+        updatedAt: Date? = nil,
+        lockedSubmittedBeforeQualifying: Bool? = nil
     ) {
         self.id = id
         self.raceId = raceId
@@ -28,6 +32,8 @@ struct Pick: Codable, Sendable {
         self.version = version
         self.lockedAt = lockedAt
         self.scoreBreakdown = scoreBreakdown
+        self.updatedAt = updatedAt
+        self.lockedSubmittedBeforeQualifying = lockedSubmittedBeforeQualifying
     }
 }
 
@@ -182,4 +188,27 @@ struct DriverPickerState: Sendable {
 
         return "Already selected for \(conflictingSlot.label)."
     }
+
+    mutating func apply(
+        _ updatedState: DriverPickerState,
+        outcome: PickSelectionOutcome
+    ) -> DriverPickerSelectionEffect {
+        switch outcome {
+        case .incomplete:
+            self = updatedState
+            return .advance
+        case .committed(let ticket):
+            self = updatedState
+            isPresented = false
+            return .dismiss(ticket)
+        case .rejected(let message):
+            return .showError(message)
+        }
+    }
+}
+
+enum DriverPickerSelectionEffect: Equatable, Sendable {
+    case advance
+    case dismiss(PickCommitTicket)
+    case showError(String)
 }

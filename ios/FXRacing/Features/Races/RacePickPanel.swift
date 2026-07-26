@@ -1,13 +1,15 @@
 import SwiftUI
 
 struct RacePickPanel: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     @Bindable var viewModel: RaceDetailViewModel
     let now: Date
     let onSelectSlot: (PickSlot) -> Void
-    let onSave: () -> Void
+    let onRetryCommit: () -> PickSelectionOutcome
     let onSignIn: () -> Void
+    let onResolveConflict: () -> Void
     let isAuthenticated: Bool
-    let onReviewDevicePicks: () -> Void
 
     private var isLocked: Bool {
         now >= viewModel.race.lockCutoffUtc || viewModel.serverPick?.lockedAt != nil
@@ -26,97 +28,60 @@ struct RacePickPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Your picks")
-                    .font(.headline)
-                Spacer()
-                progress
-            }
-            .padding(.bottom, 8)
-
-            pickRow(.winner, driver: viewModel.selectedWinner)
-            Divider().padding(.leading, 52)
-            pickRow(.p10, driver: viewModel.selectedP10)
-            Divider().padding(.leading, 52)
-            pickRow(.dnf, driver: viewModel.selectedDNF)
-
-            statusLine
-                .padding(.top, 12)
-
-            if let message = viewModel.errorMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(FXTheme.Colors.danger)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-            }
-
-            if viewModel.hasRecoverableDevicePick {
-                Button(action: onReviewDevicePicks) {
-                    Label("Review device picks", systemImage: "arrow.uturn.down.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 46)
+        VStack(spacing: pickRowSpacing) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Your picks")
+                        .font(.headline)
+                    accessibilityProgress
                 }
-                .buttonStyle(.plain)
-                .fxGlassControl(radius: FXTheme.Radius.md)
-                .accessibilityIdentifier("review-device-picks-\(viewModel.race.id)")
-                .padding(.top, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 2)
+            } else {
+                HStack {
+                    Text("Your picks")
+                        .font(.headline)
+                    Spacer()
+                    progress
+                }
+                .padding(.bottom, 8)
             }
 
-            if !isLocked {
-                Button(action: onSave) {
-                    Group {
-                        if viewModel.isSubmitting {
-                            ProgressView()
-                                .tint(.white)
-                        } else if viewModel.submitSuccess {
-                            Label("Picks saved", systemImage: "checkmark")
-                        } else if viewModel.submissionState == .reviewRequired {
-                            Text("Save reviewed picks")
-                        } else if viewModel.submissionState == .missingFromAccount {
-                            Text("Repair account pick")
-                        } else {
-                            Text(selectionCount == 3 ? "Save picks" : "Choose \(3 - selectionCount) more")
-                        }
-                    }
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
-                }
-                .buttonStyle(.plain)
-                .fxGlassControl(
-                    radius: FXTheme.Radius.md,
-                    emphasis: viewModel.canSave ? .prominent : .regular
-                )
-                .foregroundStyle(viewModel.canSave ? .white : .secondary)
-                .disabled(!viewModel.canSave || viewModel.isSubmitting)
-                .accessibilityIdentifier("save-picks-\(viewModel.race.id)")
-                .padding(.top, 12)
-            }
+            pickRow(.winner, presentation: viewModel.selectedPickPresentation(for: .winner))
+            Divider().padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 52)
+            pickRow(.p10, presentation: viewModel.selectedPickPresentation(for: .p10))
+            Divider().padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 52)
+            pickRow(.dnf, presentation: viewModel.selectedPickPresentation(for: .dnf))
 
-            if viewModel.isLocalOnly && !isAuthenticated {
-                Button(action: onSignIn) {
-                    Label("Sign in to sync these picks", systemImage: "icloud.and.arrow.up")
-                        .font(.caption.weight(.semibold))
-                        .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(FXTheme.Colors.accent)
-                .padding(.top, 10)
-            }
+            RacePickStatusRail(status: pickStatus, onAction: handleStatusAction)
+                .padding(.top, dynamicTypeSize.isAccessibilitySize ? 8 : 12)
+                .padding(.bottom, accessibilityFooterBottomInset)
         }
+    }
+
+    private var pickRowSpacing: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 10 : 0
+    }
+
+    private var accessibilityFooterBottomInset: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 28 : 0
+    }
+
+    private var accessibilityProgress: some View {
+        HStack(spacing: 8) {
+            progressDots
+            Text("\(selectionCount)/3 picks selected")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(selectionCount) of 3 picks selected")
     }
 
     private var progress: some View {
         HStack(spacing: 6) {
-            ForEach(0..<3, id: \.self) { index in
-                Circle()
-                    .fill(index < selectionCount ? FXTheme.Colors.accent : Color.secondary.opacity(0.22))
-                    .frame(width: 6, height: 6)
-            }
+            progressDots
             Text("\(selectionCount)/3")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -125,7 +90,54 @@ struct RacePickPanel: View {
         .accessibilityLabel("\(selectionCount) of 3 picks selected")
     }
 
-    private func pickRow(_ slot: PickSlot, driver: Driver?) -> some View {
+    private var progressDots: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(index < selectionCount ? FXTheme.Colors.accent : Color.secondary.opacity(0.22))
+                    .frame(width: 6, height: 6)
+            }
+        }
+    }
+
+    private var pickStatus: RacePickStatus {
+        let lookupIssue: RacePickSyncIssue? = switch viewModel.privatePickAuthority {
+        case .unauthorized: .unauthorized
+        case .unavailable: .offline
+        case .notRequired, .checking, .missing, .found: nil
+        }
+        return RacePickStatusResolver.resolve(
+            RacePickStatusContext(
+                selectionCount: selectionCount,
+                submissionState: viewModel.submissionState,
+                isAuthenticated: isAuthenticated,
+                syncIssue: viewModel.syncIssue ?? lookupIssue,
+                didLocalWriteFail: viewModel.didLocalWriteFail,
+                isLocked: isLocked,
+                localRevision: viewModel.currentLocalPickRevision,
+                acknowledgedRevision: viewModel.acknowledgedLocalPickRevision,
+                currentRevisionRejected: viewModel.currentRevisionRejected,
+                bonusAuthority: viewModel.pickBonusAuthority,
+                qualifyingStartUtc: viewModel.race.qualifyingStartUtc,
+                now: now
+            )
+        )
+    }
+
+    private func handleStatusAction(_ action: RacePickStatusAction) {
+        switch action {
+        case .none:
+            break
+        case .retry:
+            PickCommitFeedback.publish(for: .selection(onRetryCommit()))
+        case .signIn:
+            onSignIn()
+        case .resolveConflict:
+            onResolveConflict()
+        }
+    }
+
+    private func pickRow(_ slot: PickSlot, presentation: PickSlotPresentation) -> some View {
         Button {
             guard !isLocked else {
                 Haptics.locked()
@@ -135,36 +147,68 @@ struct RacePickPanel: View {
             Haptics.pick()
             onSelectSlot(slot)
         } label: {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    slotLabel(slot, fixedWidth: true)
-                    DriverBubbleView(driver: driver, size: 36)
-                    driverIdentity(slot, driver: driver, allowsWrapping: false)
-                    Spacer(minLength: 0)
-                    trailingIcon
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        slotLabel(slot, fixedWidth: false)
-                        Spacer()
-                        trailingIcon
-                    }
-                    HStack(alignment: .top, spacing: 12) {
-                        DriverBubbleView(driver: driver, size: 36)
-                        driverIdentity(slot, driver: driver, allowsWrapping: true)
-                        Spacer(minLength: 0)
-                    }
-                }
+            if dynamicTypeSize.isAccessibilitySize {
+                accessibilityPickRow(slot, presentation: presentation)
+            } else {
+                normalPickRow(slot, presentation: presentation)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 54)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isLocked || !isDriverSelectionReady)
         .accessibilityIdentifier("pick-slot-\(viewModel.race.id)-\(slot.rawValue)")
         .accessibilityHint(pickRowAccessibilityHint)
+    }
+
+    private func normalPickRow(
+        _ slot: PickSlot,
+        presentation: PickSlotPresentation
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                slotLabel(slot, fixedWidth: true)
+                DriverBubbleView(driver: presentation.driver, size: 36)
+                driverIdentity(presentation, allowsWrapping: false)
+                Spacer(minLength: 0)
+                trailingIcon
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    slotLabel(slot, fixedWidth: false)
+                    Spacer()
+                    trailingIcon
+                }
+                HStack(alignment: .top, spacing: 12) {
+                    DriverBubbleView(driver: presentation.driver, size: 36)
+                    driverIdentity(presentation, allowsWrapping: true)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 54)
+        .contentShape(Rectangle())
+    }
+
+    private func accessibilityPickRow(
+        _ slot: PickSlot,
+        presentation: PickSlotPresentation
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                slotLabel(slot, fixedWidth: false)
+                Spacer()
+                trailingIcon
+            }
+            HStack(alignment: .top, spacing: 12) {
+                DriverBubbleView(driver: presentation.driver, size: 36)
+                driverIdentity(presentation, allowsWrapping: true)
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 104)
+        .contentShape(Rectangle())
     }
 
     private func slotLabel(_ slot: PickSlot, fixedWidth: Bool) -> some View {
@@ -175,19 +219,20 @@ struct RacePickPanel: View {
     }
 
     private func driverIdentity(
-        _ slot: PickSlot,
-        driver: Driver?,
+        _ presentation: PickSlotPresentation,
         allowsWrapping: Bool
     ) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(driver.map { "\($0.firstName) \($0.lastName)" } ?? slot.sheetTitle)
+            Text(presentation.title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(driver == nil ? .secondary : .primary)
+                .foregroundStyle(presentation.isOccupied ? .primary : .secondary)
                 .lineLimit(allowsWrapping ? 3 : 1)
-            Text(driver?.constructor.shortName ?? slotDescription(slot))
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .lineLimit(allowsWrapping ? 2 : 1)
+            if let detail = presentation.detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(allowsWrapping ? 2 : 1)
+            }
         }
     }
 
@@ -214,32 +259,6 @@ struct RacePickPanel: View {
         return "Opens the driver picker"
     }
 
-    @ViewBuilder
-    private var statusLine: some View {
-        if isLocked {
-            Label("Picks locked", systemImage: "lock.fill")
-                .foregroundStyle(.secondary)
-        } else if let qualifying = viewModel.race.qualifyingStartUtc,
-                  now < qualifying {
-            Label("Save before qualifying for 2× points", systemImage: "bolt.fill")
-                .foregroundStyle(FXTheme.Colors.accent)
-        } else {
-            Label(
-                "Locks \(viewModel.race.lockCutoffUtc.formatted(date: .omitted, time: .shortened))",
-                systemImage: "clock"
-            )
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    private func slotDescription(_ slot: PickSlot) -> String {
-        switch slot {
-        case .winner: "Race winner"
-        case .p10: "Finishes tenth"
-        case .dnf: "Non-classified driver"
-        }
-    }
-
     private func slotColor(_ slot: PickSlot) -> Color {
         switch slot {
         case .winner: FXTheme.Colors.accent
@@ -250,34 +269,82 @@ struct RacePickPanel: View {
 }
 
 struct RacePickPanelPlaceholder: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Your picks").font(.headline)
-                Spacer()
-                ProgressView().controlSize(.small)
+        VStack(spacing: dynamicTypeSize.isAccessibilitySize ? 10 : 0) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Your picks").font(.headline)
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Picks are loading")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 2)
+            } else {
+                HStack {
+                    Text("Your picks").font(.headline)
+                    Spacer()
+                    ProgressView().controlSize(.small)
+                }
+                .padding(.bottom, 8)
             }
-            .padding(.bottom, 8)
 
             ForEach(Array(PickSlot.allCases.enumerated()), id: \.element.id) { index, slot in
-                HStack(spacing: 12) {
-                    Text(slot.label)
-                        .font(.system(size: 11, weight: .black, design: .monospaced))
-                        .frame(width: 36, alignment: .leading)
-                    Circle()
-                        .fill(Color.secondary.opacity(0.12))
-                        .frame(width: 36, height: 36)
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.12))
-                        .frame(width: 126, height: 13)
-                    Spacer()
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(slot.label)
+                            .font(.system(size: 11, weight: .black, design: .monospaced))
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(Color.secondary.opacity(0.12))
+                                .frame(width: 36, height: 36)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.secondary.opacity(0.12))
+                                .frame(width: 176, height: 18)
+                            Spacer()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
+                } else {
+                    HStack(spacing: 12) {
+                        Text(slot.label)
+                            .font(.system(size: 11, weight: .black, design: .monospaced))
+                            .frame(width: 36, alignment: .leading)
+                        Circle()
+                            .fill(Color.secondary.opacity(0.12))
+                            .frame(width: 36, height: 36)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.12))
+                            .frame(width: 126, height: 13)
+                        Spacer()
+                    }
+                    .frame(minHeight: 54)
                 }
-                .frame(minHeight: 54)
 
-                if index < 2 { Divider().padding(.leading, 52) }
+                if index < 2 {
+                    Divider().padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 52)
+                }
             }
+
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: 118, height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.secondary.opacity(0.12))
+                    .frame(width: 184, height: 8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.top, 12)
+            .padding(.bottom, accessibilityFooterBottomInset)
         }
         .redacted(reason: .placeholder)
         .accessibilityLabel("Loading picks")
+    }
+
+    private var accessibilityFooterBottomInset: CGFloat {
+        dynamicTypeSize.isAccessibilitySize ? 28 : 0
     }
 }

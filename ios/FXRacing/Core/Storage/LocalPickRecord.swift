@@ -47,6 +47,25 @@ enum LegacyPickRecoveryResult: Equatable, Sendable {
     case persistenceFailed
 }
 
+enum LegacyPickDecision: Equatable, Sendable {
+    case discard
+    case adopt
+    case keepCurrent(expectedDestinationRevision: UInt64?)
+    case replace(expectedDestinationRevision: UInt64)
+}
+
+enum LegacyPickResolutionResult: Equatable, Sendable {
+    case adopted(LocalPickRecord)
+    case discarded
+    case keptCurrent
+    case locked
+    case staleLegacy
+    case destinationOccupied(LocalPickRecord)
+    case destinationChanged(LocalPickRecord?)
+    case invalidOwner
+    case persistenceFailed
+}
+
 struct LocalPickRecord: Codable, Equatable, Sendable, Identifiable {
     let id: LocalPickRecordID
     let selection: PickSelection

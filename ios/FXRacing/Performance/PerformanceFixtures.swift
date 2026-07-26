@@ -120,6 +120,22 @@ enum PerformanceFixtures {
                 seatKey: "mercedes:2",
                 seasonAverageFinish: 5.8,
                 seasonDnfCount: 1,
+                seasonResults: [
+                    DriverSeasonResult(
+                        raceId: "silverstone",
+                        raceName: "British Grand Prix",
+                        scheduledStartUtc: now.addingTimeInterval(-86_400),
+                        position: 1,
+                        status: .classified
+                    ),
+                    DriverSeasonResult(
+                        raceId: "austria",
+                        raceName: "Austrian Grand Prix",
+                        scheduledStartUtc: now.addingTimeInterval(-691_200),
+                        position: nil,
+                        status: .dnf
+                    ),
+                ],
                 constructor: mercedes
             ),
             Driver(
@@ -452,6 +468,7 @@ enum PerformanceFixtures {
             seatKey: driver.seatKey,
             seasonAverageFinish: driver.seasonAverageFinish,
             seasonDnfCount: driver.seasonDnfCount,
+            seasonResults: driver.seasonResults,
             constructor: constructor
         )
     }
@@ -738,6 +755,9 @@ enum PerformanceFixtureState {
         }
 
         reset()
+        if arguments.contains("--legacy-recovery") {
+            seedLegacyRecoveryPick()
+        }
         return LocalPickStore(clock: PerformanceClock())
     }
 
@@ -755,6 +775,21 @@ enum PerformanceFixtureState {
     private static func reset() {
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
         UserDefaults.standard.removePersistentDomain(forName: bundleIdentifier)
+    }
+
+    private static func seedLegacyRecoveryPick() {
+        let legacy = LegacyLocalPickV1(
+            raceId: PerformanceFixtures.liveSpa.id,
+            winnerId: "norris",
+            p10Id: "hamilton",
+            dnfId: "leclerc",
+            savedAt: PerformanceFixtures.now,
+            synced: false
+        )
+        guard let data = try? JSONEncoder().encode([
+            PerformanceFixtures.liveSpa.id: legacy,
+        ]) else { return }
+        UserDefaults.standard.set(data, forKey: "localPicks_v1")
     }
 }
 

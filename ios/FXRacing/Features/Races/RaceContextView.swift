@@ -109,13 +109,14 @@ enum DriverSeasonForm {
         )
     }
 
-    static func dnfText(_ count: Int?) -> String {
+    static func outText(_ count: Int?) -> String {
         count.map(String.init) ?? "—"
     }
 }
 
 private struct SeasonFormContextView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var selectedDriver: Driver?
 
     let race: Race
     let entrants: [Driver]
@@ -143,7 +144,7 @@ private struct SeasonFormContextView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 16) {
                     Text("AVG")
-                    Text("DNF")
+                    Text("OUT")
                 }
             }
             .font(.caption.weight(.bold))
@@ -159,31 +160,40 @@ private struct SeasonFormContextView: View {
         }
         .fxCardSurface(radius: FXTheme.Radius.xl)
         .accessibilityElement(children: .contain)
+        .sheet(item: $selectedDriver) { driver in
+            DriverFormSheet(race: race, driver: driver)
+        }
     }
 
     private func driverRow(_ driver: Driver) -> some View {
-        ViewThatFits(in: .horizontal) {
-            if dynamicTypeSize.isAccessibilitySize {
+        Button {
+            selectedDriver = driver
+        } label: {
+            ViewThatFits(in: .horizontal) {
+                if dynamicTypeSize.isAccessibilitySize {
+                    wrappedRow(driver)
+                } else {
+                    horizontalRow(driver)
+                }
                 wrappedRow(driver)
-            } else {
-                horizontalRow(driver)
             }
-            wrappedRow(driver)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(driver.firstName) \(driver.lastName), average finish "
+                    + "\(DriverSeasonForm.averageText(driver.seasonAverageFinish)), "
+                    + "non-classified results \(DriverSeasonForm.outText(driver.seasonDnfCount))"
+            )
+            .accessibilityIdentifier("season-form-row-\(driver.id)")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 18)
         .padding(.vertical, 8)
         .overlay(alignment: .bottom) {
             Divider()
                 .opacity(0.3)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            "\(driver.firstName) \(driver.lastName), average finish "
-                + "\(DriverSeasonForm.averageText(driver.seasonAverageFinish)), "
-                + "DNF \(DriverSeasonForm.dnfText(driver.seasonDnfCount))"
-        )
-        .accessibilityIdentifier("season-form-row-\(driver.id)")
     }
 
     private func horizontalRow(_ driver: Driver) -> some View {
@@ -192,19 +202,32 @@ private struct SeasonFormContextView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 16) {
                 stat("AVG", value: DriverSeasonForm.averageText(driver.seasonAverageFinish))
-                stat("DNF", value: DriverSeasonForm.dnfText(driver.seasonDnfCount))
+                stat("OUT", value: DriverSeasonForm.outText(driver.seasonDnfCount))
             }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
     }
 
     private func wrappedRow(_ driver: Driver) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            driverIdentity(driver, allowsWrapping: true)
-            HStack(spacing: 20) {
-                stat("AVG", value: DriverSeasonForm.averageText(driver.seasonAverageFinish))
-                stat("DNF", value: DriverSeasonForm.dnfText(driver.seasonDnfCount))
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                driverIdentity(driver, allowsWrapping: true)
+                HStack(spacing: 20) {
+                    stat("AVG", value: DriverSeasonForm.averageText(driver.seasonAverageFinish))
+                    stat("OUT", value: DriverSeasonForm.outText(driver.seasonDnfCount))
+                }
+                .padding(.leading, 20)
             }
-            .padding(.leading, 20)
+
+            Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
     }
 

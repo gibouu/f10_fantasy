@@ -61,4 +61,9 @@ final class RaceContextResolverTests: XCTestCase {
         XCTAssertEqual(DriverSeasonForm.averageText(5), "5.0")
         XCTAssertEqual(DriverSeasonForm.averageText(nil), "—")
     }
+
+    func testSeasonOutFormattingHandlesCountAndMissingHistory() {
+        XCTAssertEqual(DriverSeasonForm.outText(3), "3")
+        XCTAssertEqual(DriverSeasonForm.outText(nil), "—")
+    }
 }

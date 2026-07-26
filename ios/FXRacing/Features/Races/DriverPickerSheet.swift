@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct DriverPickerSheet: View {
+    private struct RetrySelection {
+        let driver: Driver
+        let slot: PickSlot
+        let updatedState: DriverPickerState
+    }
+
     private enum PickerFocusTarget: Hashable {
         case slotHeading
         case driver(String)
@@ -9,18 +15,23 @@ struct DriverPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Binding private var state: DriverPickerState
     @AccessibilityFocusState private var focusTarget: PickerFocusTarget?
+    @State private var alertMessage: String?
+    @State private var retrySelection: RetrySelection?
 
     private let entrants: [Driver]
-    private let onSelect: (Driver, PickSlot) -> Bool
+    private let onSelect: (Driver, PickSlot) -> PickSelectionOutcome
+    private let onRetryCommit: () -> PickSelectionOutcome
 
     init(
         state: Binding<DriverPickerState>,
         entrants: [Driver],
-        onSelect: @escaping (Driver, PickSlot) -> Bool
+        onSelect: @escaping (Driver, PickSlot) -> PickSelectionOutcome,
+        onRetryCommit: @escaping () -> PickSelectionOutcome
     ) {
         _state = state
         self.entrants = entrants
         self.onSelect = onSelect
+        self.onRetryCommit = onRetryCommit
     }
 
     /// Drivers grouped by team slug (falls back to constructor name), sorted alphabetically.
@@ -98,6 +109,22 @@ struct DriverPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .alert(
+            "Selection not saved",
+            isPresented: Binding(
+                get: { alertMessage != nil },
+                set: { if !$0 { alertMessage = nil } }
+            )
+        ) {
+            if retrySelection != nil {
+                Button("Try again") { retryPendingSelection() }
+            }
+            Button("Not now", role: .cancel) {
+                retrySelection = nil
+            }
+        } message: {
+            Text(alertMessage ?? "Your picks weren't changed.")
+        }
     }
 
     private func driverRow(_ driver: Driver) -> some View {
@@ -157,28 +184,52 @@ struct DriverPickerSheet: View {
             return
         }
 
-        guard onSelect(driver, selectedSlot) else {
-            Haptics.locked()
-            AccessibilityNotification.Announcement(
-                "Picks are locked. Your selection was not changed."
-            ).post()
-            return
-        }
+        let outcome = onSelect(driver, selectedSlot)
+        handleSelectionOutcome(
+            outcome,
+            updatedState: updatedState,
+            driver: driver,
+            selectedSlot: selectedSlot
+        )
+    }
 
-        Haptics.select()
-        state = updatedState
-
-        if let nextSlot = selectedSlot.next {
+    private func handleSelectionOutcome(
+        _ outcome: PickSelectionOutcome,
+        updatedState: DriverPickerState,
+        driver: Driver,
+        selectedSlot: PickSlot
+    ) {
+        switch state.apply(updatedState, outcome: outcome) {
+        case .advance:
+            Haptics.select()
             focusTarget = .slotHeading
+            let nextSlot = state.activeSlot
             AccessibilityNotification.Announcement(
                 "\(selectedSlot.label) selected. Now choose \(nextSlot.label)."
             ).post()
-        } else {
-            focusTarget = .driver(driver.id)
-            AccessibilityNotification.Announcement(
-                "DNF selected. All three picks are complete."
-            ).post()
+        case .dismiss:
+            PickCommitFeedback.publish(for: .selection(outcome))
+            dismiss()
+        case .showError(let message):
+            retrySelection = RetrySelection(
+                driver: driver,
+                slot: selectedSlot,
+                updatedState: updatedState
+            )
+            alertMessage = message
         }
+    }
+
+    private func retryPendingSelection() {
+        guard let retrySelection else { return }
+        alertMessage = nil
+        self.retrySelection = nil
+        handleSelectionOutcome(
+            onRetryCommit(),
+            updatedState: retrySelection.updatedState,
+            driver: retrySelection.driver,
+            selectedSlot: retrySelection.slot
+        )
     }
 
     private func accessibilityValue(for driver: Driver) -> String {

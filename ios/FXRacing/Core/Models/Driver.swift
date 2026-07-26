@@ -10,6 +10,7 @@ struct Driver: Codable, Sendable, Identifiable {
     let seatKey: String?
     let seasonAverageFinish: Double?
     let seasonDnfCount: Int?
+    let seasonResults: [DriverSeasonResult]?
     let constructor: DriverConstructor
 
     init(
@@ -22,6 +23,7 @@ struct Driver: Codable, Sendable, Identifiable {
         seatKey: String?,
         seasonAverageFinish: Double? = nil,
         seasonDnfCount: Int? = nil,
+        seasonResults: [DriverSeasonResult]? = nil,
         constructor: DriverConstructor
     ) {
         self.id = id
@@ -33,6 +35,7 @@ struct Driver: Codable, Sendable, Identifiable {
         self.seatKey = seatKey
         self.seasonAverageFinish = seasonAverageFinish
         self.seasonDnfCount = seasonDnfCount
+        self.seasonResults = seasonResults
         self.constructor = constructor
     }
 
@@ -46,6 +49,25 @@ struct Driver: Codable, Sendable, Identifiable {
 
     var teamColor: Color {
         Color(hex: constructor.color) ?? .gray
+    }
+}
+
+struct DriverSeasonResult: Codable, Sendable, Identifiable, Equatable {
+    let raceId: String
+    let raceName: String
+    let scheduledStartUtc: Date
+    let position: Int?
+    let status: ResultStatus
+
+    var id: String { raceId }
+
+    var resultLabel: String {
+        switch status {
+        case .classified: position.map { "P\($0)" } ?? "—"
+        case .dnf: "DNF"
+        case .dns: "DNS"
+        case .dsq: "DSQ"
+        }
     }
 }
 

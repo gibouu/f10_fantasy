@@ -4,6 +4,54 @@ import XCTest
 
 @MainActor
 final class SyncManagerTests: XCTestCase {
+    func testCurrentSessionLeaseRevalidatesUserTokenAndInvalidation() {
+        let context = makeContext()
+        defer { context.cleanUp() }
+        let manager = SyncManager(
+            api: GatedAPIClientSpy(responses: [:]),
+            clock: TestClock.fixed
+        )
+        manager.setUnauthorizedHandler { _ in }
+
+        let first = manager.beginSession(
+            currentUserID: "user-a",
+            token: "token-a",
+            localPickStore: context.store
+        )
+
+        XCTAssertEqual(
+            manager.currentSessionLease(
+                currentUserID: "user-a",
+                token: "token-a"
+            ),
+            first
+        )
+        XCTAssertNil(
+            manager.currentSessionLease(
+                currentUserID: "user-b",
+                token: "token-a"
+            )
+        )
+        XCTAssertNil(
+            manager.currentSessionLease(
+                currentUserID: "user-a",
+                token: "token-b"
+            )
+        )
+        XCTAssertTrue(manager.isCurrent(first))
+
+        let replacement = manager.beginSession(
+            currentUserID: "user-a",
+            token: "token-b",
+            localPickStore: context.store
+        )
+
+        XCTAssertFalse(manager.isCurrent(first))
+        XCTAssertTrue(manager.isCurrent(replacement))
+        manager.invalidateSession(localPickStore: context.store)
+        XCTAssertFalse(manager.isCurrent(replacement))
+    }
+
     func testExplicitSavePostsWithoutPreflightGetAndConfirmsRevision() async throws {
         let context = makeContext()
         defer { context.cleanUp() }

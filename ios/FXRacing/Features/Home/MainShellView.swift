@@ -11,6 +11,8 @@ struct MainShellView: View {
     @State private var hasStartedRaceDeck = false
     @State private var sectionSwitchInterval: FXPerformanceSpan?
     @State private var leaderboardViewModel: LeaderboardViewModel
+    @State private var legacyRecoveryPresentationSession =
+        LegacyRecoveryPresentationSession()
 
     init(
         raceDeckViewModel: RaceDeckViewModel,
@@ -141,10 +143,18 @@ struct MainShellView: View {
     private var selectedContent: some View {
         switch selectedSection {
         case .upcoming:
-            RaceDeckView(viewModel: raceDeckViewModel, section: .upcoming)
+            RaceDeckView(
+                viewModel: raceDeckViewModel,
+                legacyRecoveryPresentationSession: legacyRecoveryPresentationSession,
+                section: .upcoming
+            )
                 .onAppear { finishSectionSwitch() }
         case .past:
-            RaceDeckView(viewModel: raceDeckViewModel, section: .past)
+            RaceDeckView(
+                viewModel: raceDeckViewModel,
+                legacyRecoveryPresentationSession: legacyRecoveryPresentationSession,
+                section: .past
+            )
                 .onAppear { finishSectionSwitch() }
         case .rankings:
             LeaderboardView(viewModel: leaderboardViewModel)

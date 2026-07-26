@@ -3,10 +3,10 @@ import SwiftUI
 struct RacePagerGeometry: Equatable, Sendable {
     let cardWidth: CGFloat
     let sideInset: CGFloat
-    let spacing: CGFloat = 10
+    let spacing: CGFloat = 18
 
     var adjacentPeek: CGFloat {
-        max(0, sideInset - spacing)
+        0
     }
 
     init(viewportWidth: CGFloat) {

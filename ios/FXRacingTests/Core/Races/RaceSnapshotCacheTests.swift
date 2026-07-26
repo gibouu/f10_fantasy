@@ -66,6 +66,26 @@ final class RaceSnapshotCacheTests: XCTestCase {
         XCTAssertEqual(restored.qualifyingResults.map(\.driverId), [DriverFixtures.norris.id])
     }
 
+    func testLegacyDetailWithoutSeasonResultsRemainsCompatible() async throws {
+        let cache = makeCache()
+        let snapshot = makeDetailSnapshot(race: RaceFixtures.liveSpa)
+
+        try await cache.writeDetail(snapshot)
+        let data = try Data(contentsOf: detailURL(id: RaceFixtures.liveSpa.id))
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let entrants = try XCTUnwrap(object["entrants"] as? [[String: Any]])
+        XCTAssertNil(entrants.first?["seasonResults"])
+
+        let stored = try await cache.readDetail(id: RaceFixtures.liveSpa.id)
+        let restored = try XCTUnwrap(stored)
+
+        XCTAssertEqual(restored.schemaVersion, 1)
+        XCTAssertNil(restored.entrants.first?.seasonResults)
+        XCTAssertTrue(fileManager.fileExists(atPath: detailURL(id: RaceFixtures.liveSpa.id).path))
+    }
+
     func testStoredDatesUseStableISO8601Encoding() async throws {
         let cache = makeCache()
         try await cache.writeList(makeListSnapshot())

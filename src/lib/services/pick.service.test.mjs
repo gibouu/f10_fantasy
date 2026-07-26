@@ -5,12 +5,18 @@ import { readFile } from "node:fs/promises"
 const source = await readFile(new URL("./pick.service.ts", import.meta.url), "utf8")
 const createOrUpdatePickStart = source.indexOf("export async function createOrUpdatePick")
 const getPickForRaceStart = source.indexOf("export async function getPickForRace")
+const getPicksForSeasonStart = source.indexOf("export async function getPicksForSeason")
 const createOrUpdatePickBody =
   createOrUpdatePickStart >= 0 && getPickForRaceStart > createOrUpdatePickStart
     ? source.slice(createOrUpdatePickStart, getPickForRaceStart)
     : null
+const getPickForRaceBody =
+  getPickForRaceStart >= 0 && getPicksForSeasonStart > getPickForRaceStart
+    ? source.slice(getPickForRaceStart, getPicksForSeasonStart)
+    : null
 
 assert.ok(createOrUpdatePickBody, "expected to find createOrUpdatePick body")
+assert.ok(getPickForRaceBody, "expected to find getPickForRace body")
 
 test("createOrUpdatePick rejects cancelled races before validating entrants or writing", () => {
   const raceStatusGuard = createOrUpdatePickBody.indexOf("race.status === 'CANCELLED'")
@@ -49,6 +55,25 @@ test("createOrUpdatePick reasserts cancelled race guards for update and create w
   )
   assert.doesNotMatch(createOrUpdatePickBody, /createPickSetIfRaceWritable/)
   assert.match(createOrUpdatePickBody, /if \(race\.status === ['"]CANCELLED['"]\)[\s\S]*?tx\.pickSet\.create/)
+})
+
+test("getPickForRace resolves saved seat identity against current entrants without mutating the row", () => {
+  assert.match(
+    source,
+    /import \{ resolvePickAgainstEntrants \} from ['"]@\/lib\/services\/pick-resolution['"]/,
+  )
+  assert.match(
+    source,
+    /import \{ getRaceEntrants \} from ['"]\.\/race\.service['"]/,
+  )
+  assert.match(getPickForRaceBody, /const entrants = await getRaceEntrants\(raceId\)/)
+  assert.match(getPickForRaceBody, /const resolved = resolvePickAgainstEntrants\(/)
+  assert.match(getPickForRaceBody, /\.\.\.resolved,/)
+  assert.doesNotMatch(
+    getPickForRaceBody,
+    /pickSet\.update|updateMany|upsert|create\(/,
+    "read-time resolution must not rewrite PickSet rows",
+  )
 })
 
 test("createOrUpdatePick exposes and validates a base version for optimistic concurrency", () => {

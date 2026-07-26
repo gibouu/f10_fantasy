@@ -2,24 +2,24 @@ import XCTest
 @testable import FXRacing
 
 final class CenteredRacePagerGeometryTests: XCTestCase {
-    func testPhoneWidthsUseSymmetricMarginsAndEightPointAdjacentPeek() {
+    func testPhoneWidthsUseSymmetricMarginsAndNoAdjacentPeek() {
         for width in [320.0, 375.0, 393.0, 402.0, 430.0] {
             let geometry = RacePagerGeometry(viewportWidth: width)
 
             XCTAssertEqual(geometry.cardWidth, width - 36, accuracy: 0.001)
             XCTAssertEqual(geometry.sideInset, 18, accuracy: 0.001)
-            XCTAssertEqual(geometry.spacing, 10, accuracy: 0.001)
-            XCTAssertEqual(geometry.adjacentPeek, 8, accuracy: 0.001)
+            XCTAssertEqual(geometry.spacing, 18, accuracy: 0.001)
+            XCTAssertEqual(geometry.adjacentPeek, 0, accuracy: 0.001)
         }
     }
 
-    func testWideViewportCapsCardsAndKeepsMarginsSymmetric() {
+    func testWideViewportCapsCardsAndKeepsCompleteCardsCentered() {
         let geometry = RacePagerGeometry(viewportWidth: 768)
 
         XCTAssertEqual(geometry.cardWidth, 430, accuracy: 0.001)
         XCTAssertEqual(geometry.sideInset, 169, accuracy: 0.001)
-        XCTAssertEqual(geometry.spacing, 10, accuracy: 0.001)
-        XCTAssertEqual(geometry.adjacentPeek, 159, accuracy: 0.001)
+        XCTAssertEqual(geometry.spacing, 18, accuracy: 0.001)
+        XCTAssertEqual(geometry.adjacentPeek, 0, accuracy: 0.001)
         XCTAssertEqual(
             geometry.sideInset * 2 + geometry.cardWidth,
             768,

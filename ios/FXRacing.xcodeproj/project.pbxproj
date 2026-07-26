@@ -13,6 +13,8 @@
 		04322B7922C7C69E71C36E81 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */; };
 		06DA7DE5EBDACF2F364058A5 /* PastRaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */; };
 		09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33055120839B5B4689A6659 /* RaceRepositoryCoreTests.swift */; };
+		0AA15C3ED7B5B83468B5FBC7 /* LegacyRecoveryPresentationSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */; };
+		107B193C54672BDF07C00458 /* RacePickStatusRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */; };
 		12092150C4EDD14BEDDD0CE7 /* RaceScheduleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F7BFA78AE9988B7DE59FB7 /* RaceScheduleSheet.swift */; };
 		13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB930FED2C9918990560892D /* ProfileView.swift */; };
 		151AA313C6ACC9BECA05F016 /* RaceScheduleRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B947A443645D3B868599D46A /* RaceScheduleRow.swift */; };
@@ -39,6 +41,8 @@
 		5771DC391FADB666B9DFE228 /* APIRequesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718194229A0DEFC8E011350D /* APIRequesting.swift */; };
 		5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5DC608F5043DC5E71554B62 /* Pick.swift */; };
 		63DAEC10E9ECEDAF88DCBA1F /* FXTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 729249B04B9379843CF60133 /* FXTheme.swift */; };
+		667D8D35474345402E06DEF7 /* LegacyPickRecoverySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */; };
+		66BD16767CE574428D60B7C2 /* LegacyRecoveryActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */; };
 		69D38A4E3DB82884C468F535 /* FXPerformance.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB19BEA1291D1C965AE340A9 /* FXPerformance.swift */; };
 		6A0B9B3F5A9DC34AEABDB6A4 /* FXGlassSurfaceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734BB3905A648BEA9DB0860F /* FXGlassSurfaceResolverTests.swift */; };
 		6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */; };
@@ -48,8 +52,10 @@
 		6D4FB8B0E17AE0B635CC694A /* FriendSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */; };
 		6F8B59597A821398F5A7C7E3 /* RaceScheduleSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8DE41DC39A2A9790AFDE69 /* RaceScheduleSheetTests.swift */; };
 		730F85A4392CF36F04644DAD /* StatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8988563A3F8E4E3D66BB4771 /* StatusBadge.swift */; };
+		75F72ED5C89C765B556F996E /* PickCommitFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */; };
 		787538A847C0C72104EA9282 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38466ACFC9DCC1DC84C22141 /* Haptics.swift */; };
 		787D8958572B1E7531E02439 /* APIClientSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C808C928ABC015907CF35F4 /* APIClientSpy.swift */; };
+		7A5E88D88DD6027EDA886DF5 /* UpcomingCardLayoutMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5724B58A10FDEFA8BF517F /* UpcomingCardLayoutMetrics.swift */; };
 		7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */; };
 		7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */; };
 		7D51D8FC98611EA655B899C3 /* RaceDeckViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */; };
@@ -80,6 +86,7 @@
 		AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */; };
 		B539AE28DBF60E6E6BD3B539 /* FriendProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89D6F2921C74496E154358E /* FriendProfile.swift */; };
 		B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68411961C10248D3714B7E98 /* UsernamePickerView.swift */; };
+		B8A66C5D8A7E443308633004 /* DriverFormSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CC323C1ED58017E45B580EF /* DriverFormSheet.swift */; };
 		B8C1F6B3F3CFD9B81A0E3570 /* LocalPickRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */; };
 		BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ADE9A0A87BBC8A893D98DED /* Logger.swift */; };
 		BD33D81A7938D759F624B4EB /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9059D4BC746CBD1E9B5AE6F1 /* APIClientTests.swift */; };
@@ -101,13 +108,18 @@
 		D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */; };
 		D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B893A7A9D248C607360F4 /* AuthManagerTests.swift */; };
 		D905E3A317D0C48464E8BDFB /* RaceResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3998F13F6F6EFF48C8D38A /* RaceResultsView.swift */; };
+		D944476C73629A7297A2563F /* RacePickStatusResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */; };
 		DA114802501720E26721CB6D /* GuestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA877484EEF85B2D263F7702 /* GuestStore.swift */; };
 		DB7793B70AE87FDCB622A364 /* LeaderboardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156C9FDBA40F8F1292C579A0 /* LeaderboardRow.swift */; };
+		DE42D8F82A03C9251264FEDD /* race-detail-22x24.json in Resources */ = {isa = PBXBuildFile; fileRef = 8DA9EA75E2BB093C7FE2818F /* race-detail-22x24.json */; };
 		E06EDD1519160858A1262EBB /* TokenStoreSpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C35891E3E81C2D88EF83431 /* TokenStoreSpy.swift */; };
 		E60D296D9ACA985C52D4FB27 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */; };
 		ECDDF6C368290A22CBFEBD50 /* CenteredRacePager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BC4C761521F761AC1C8FDE /* CenteredRacePager.swift */; };
 		ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D94FC78956634A850E6122 /* RaceRepositoryRolloverTests.swift */; };
 		F1C484E415257624A34C25AC /* PerformanceResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9611A96FA6D5FF451F54BD /* PerformanceResult.swift */; };
+		F32B3E6C6676C9AF8CD786CD /* LegacyRecoveryPresentationSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */; };
+		F39C32DA49B1F4C6489C168E /* DriverFormSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD4110A6C32DC6B56CB5D95 /* DriverFormSheetTests.swift */; };
+		F4859D62D64F5D12B543DC79 /* UpcomingCardLayoutMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F849DAB23B3386809453636 /* UpcomingCardLayoutMetricsTests.swift */; };
 		F4E2477299E2F5A82EE7C678 /* RaceDeckViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AE3160AD8D4B0D6C05FED63 /* RaceDeckViewModel.swift */; };
 		F836B54966B7599C327828F4 /* HomeSectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A537F31BBF66358925FCC4 /* HomeSectionPicker.swift */; };
 		FBB3B3C9E8BAEDF5EE0D4303 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E895B67C753E0E25B5AFBCD8 /* RootView.swift */; };
@@ -135,6 +147,7 @@
 
 /* Begin PBXFileReference section */
 		01036942B56AA148BF82E8C5 /* DeterministicFailureURLProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeterministicFailureURLProtocol.swift; sourceTree = "<group>"; };
+		0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryPresentationSession.swift; sourceTree = "<group>"; };
 		081B893A7A9D248C607360F4 /* AuthManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManagerTests.swift; sourceTree = "<group>"; };
 		092C369B26A52C1665C301C2 /* FXRacingTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FXRacingTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0AEA36AA0DE5797FE43ECA51 /* FXImagePipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXImagePipeline.swift; sourceTree = "<group>"; };
@@ -158,6 +171,7 @@
 		347020C4691D77E3D65C73AD /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		35A864F93E4C4068E6DF3A9C /* UpcomingRaceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingRaceCard.swift; sourceTree = "<group>"; };
 		38466ACFC9DCC1DC84C22141 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryPresentationSessionTests.swift; sourceTree = "<group>"; };
 		3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QualifyingResultsView.swift; sourceTree = "<group>"; };
 		3CAC3C5CFC0D51F8624FEDFA /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		3F9611A96FA6D5FF451F54BD /* PerformanceResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceResult.swift; sourceTree = "<group>"; };
@@ -170,6 +184,7 @@
 		4FD9E9826EDF14D20BD6C10F /* DriverPickerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverPickerStateTests.swift; sourceTree = "<group>"; };
 		511006B7D3AD223980C4CCF8 /* DriverBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverBubbleView.swift; sourceTree = "<group>"; };
 		5362BBB4B470202A06020494 /* RaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceSnapshotCache.swift; sourceTree = "<group>"; };
+		5CC323C1ED58017E45B580EF /* DriverFormSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFormSheet.swift; sourceTree = "<group>"; };
 		5EE2CC51C4103C26FBF4BDCC /* LocalPickStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickStoreTests.swift; sourceTree = "<group>"; };
 		6052BA536B600AB0E918C6DD /* MainShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainShellUITests.swift; sourceTree = "<group>"; };
 		6183F6B1C59EF2BD450EDE9A /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
@@ -188,6 +203,7 @@
 		7B3998F13F6F6EFF48C8D38A /* RaceResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceResultsView.swift; sourceTree = "<group>"; };
 		7BB89CF02DD72D99E58D3C81 /* FriendSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendSearchView.swift; sourceTree = "<group>"; };
 		7F7851A4A80C4541512FFC54 /* ProfileTeamOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTeamOption.swift; sourceTree = "<group>"; };
+		7F849DAB23B3386809453636 /* UpcomingCardLayoutMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingCardLayoutMetricsTests.swift; sourceTree = "<group>"; };
 		825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModelFactory.swift; sourceTree = "<group>"; };
 		87A537F31BBF66358925FCC4 /* HomeSectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionPicker.swift; sourceTree = "<group>"; };
 		883ECD5CF4C6FD9E3C2F0E87 /* TutorialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialCard.swift; sourceTree = "<group>"; };
@@ -196,9 +212,11 @@
 		8A60BAF6F4718AC861439AD0 /* FXRacingPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXRacingPerformanceTests.swift; sourceTree = "<group>"; };
 		8ADE9A0A87BBC8A893D98DED /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		8CC4C61D463EB675FAA2C65F /* UsernamePickerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernamePickerViewModel.swift; sourceTree = "<group>"; };
+		8DA9EA75E2BB093C7FE2818F /* race-detail-22x24.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "race-detail-22x24.json"; sourceTree = "<group>"; };
 		9059D4BC746CBD1E9B5AE6F1 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		957CB0DDA5D11B3C6694D4CD /* Race.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Race.swift; sourceTree = "<group>"; };
 		96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModel.swift; sourceTree = "<group>"; };
+		975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PickCommitFeedback.swift; sourceTree = "<group>"; };
 		98D2367A25C738D1170388BC /* DriverFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFixtures.swift; sourceTree = "<group>"; };
 		99919F21BDE4D7EEA4C67324 /* FriendsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsViewModel.swift; sourceTree = "<group>"; };
 		9A9C0516C0908D6B5781DFB0 /* LeaderboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardView.swift; sourceTree = "<group>"; };
@@ -206,6 +224,7 @@
 		9C106BCB0D5B4B6BAC1C583F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9C808C928ABC015907CF35F4 /* APIClientSpy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientSpy.swift; sourceTree = "<group>"; };
 		9D7CBD18D52D7BFD5C9AD3F8 /* FriendProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileViewModel.swift; sourceTree = "<group>"; };
+		9DD4110A6C32DC6B56CB5D95 /* DriverFormSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriverFormSheetTests.swift; sourceTree = "<group>"; };
 		A7F9481C7CC2978C8951133C /* TokenStoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStoring.swift; sourceTree = "<group>"; };
 		A7FB64FA47AB498AC8707E4A /* ClockProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockProviding.swift; sourceTree = "<group>"; };
 		AF272627CBEFA6E4197F290B /* RaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceFixtures.swift; sourceTree = "<group>"; };
@@ -221,6 +240,7 @@
 		B89D6F2921C74496E154358E /* FriendProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfile.swift; sourceTree = "<group>"; };
 		B93F2A851054E21570EFBF91 /* RaceSnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceSnapshotCacheTests.swift; sourceTree = "<group>"; };
 		B947A443645D3B868599D46A /* RaceScheduleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceScheduleRow.swift; sourceTree = "<group>"; };
+		BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusRail.swift; sourceTree = "<group>"; };
 		BB14888FFB5F6A3AEEB8C6B4 /* SignInViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInViewModel.swift; sourceTree = "<group>"; };
 		BD00667AD2257E9B85982312 /* RacePickPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickPanel.swift; sourceTree = "<group>"; };
 		C4329F2DF15B6BD5B94C411C /* LocalPickStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickStore.swift; sourceTree = "<group>"; };
@@ -234,14 +254,18 @@
 		D55E6FF6B7C97CDF29C34DB7 /* FXRacing.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FXRacing.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D66381CE286FF95DF2FD9FCE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DB930FED2C9918990560892D /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyRecoveryActionTests.swift; sourceTree = "<group>"; };
+		DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RacePickStatusResolverTests.swift; sourceTree = "<group>"; };
 		E3EF6FAD6CFA910A57812578 /* LocalPickRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPickRecord.swift; sourceTree = "<group>"; };
 		E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDeckViewModelTests.swift; sourceTree = "<group>"; };
 		E895B67C753E0E25B5AFBCD8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EA877484EEF85B2D263F7702 /* GuestStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestStore.swift; sourceTree = "<group>"; };
 		EC0A458DF57443BD97BC63D4 /* RaceRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceRepository.swift; sourceTree = "<group>"; };
+		F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyPickRecoverySheet.swift; sourceTree = "<group>"; };
 		F40A855BDB590560551CE328 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryRaceSnapshotCache.swift; sourceTree = "<group>"; };
 		F599EF2628CFFAEE368E1255 /* PerformanceScenario.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceScenario.swift; sourceTree = "<group>"; };
+		FA5724B58A10FDEFA8BF517F /* UpcomingCardLayoutMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingCardLayoutMetrics.swift; sourceTree = "<group>"; };
 		FB19BEA1291D1C965AE340A9 /* FXPerformance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FXPerformance.swift; sourceTree = "<group>"; };
 		FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaceDetailViewModelTests.swift; sourceTree = "<group>"; };
 		FDC43683F942244EF021F55C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -253,8 +277,12 @@
 			isa = PBXGroup;
 			children = (
 				B1BC4C761521F761AC1C8FDE /* CenteredRacePager.swift */,
+				5CC323C1ED58017E45B580EF /* DriverFormSheet.swift */,
 				C6AF6F8F82DA33938272DA35 /* DriverPickerSheet.swift */,
+				F04BFF54C0C48D20C4E9A823 /* LegacyPickRecoverySheet.swift */,
+				0137FD319CFD6B1C6C78C54A /* LegacyRecoveryPresentationSession.swift */,
 				68B2B7F6CA0AD854191788DD /* PastRaceCard.swift */,
+				975542BFB5B2749B888BFD8F /* PickCommitFeedback.swift */,
 				3AB1315BDB8A835E3A958563 /* QualifyingResultsView.swift */,
 				4469E358F5D2657310E7A1E9 /* RaceContextView.swift */,
 				0DDD234C2CF79BC4C0824234 /* RaceDeckView.swift */,
@@ -262,9 +290,11 @@
 				96A29CDAB02734EE39C7AA0D /* RaceDetailViewModel.swift */,
 				825E20FC308534D927882CFD /* RaceDetailViewModelFactory.swift */,
 				BD00667AD2257E9B85982312 /* RacePickPanel.swift */,
+				BAA074804A6A1A2298A8DCCB /* RacePickStatusRail.swift */,
 				7B3998F13F6F6EFF48C8D38A /* RaceResultsView.swift */,
 				B947A443645D3B868599D46A /* RaceScheduleRow.swift */,
 				73F7BFA78AE9988B7DE59FB7 /* RaceScheduleSheet.swift */,
+				FA5724B58A10FDEFA8BF517F /* UpcomingCardLayoutMetrics.swift */,
 				35A864F93E4C4068E6DF3A9C /* UpcomingRaceCard.swift */,
 			);
 			path = Races;
@@ -309,11 +339,16 @@
 			isa = PBXGroup;
 			children = (
 				7313B959186C22E187ED400F /* CenteredRacePagerGeometryTests.swift */,
+				9DD4110A6C32DC6B56CB5D95 /* DriverFormSheetTests.swift */,
 				4FD9E9826EDF14D20BD6C10F /* DriverPickerStateTests.swift */,
+				DD442F2EEEE588AB6184A104 /* LegacyRecoveryActionTests.swift */,
+				38536475B73A38A948B2E3F6 /* LegacyRecoveryPresentationSessionTests.swift */,
 				FE31EF43B1EF82B0DF50150E /* RaceContextResolverTests.swift */,
 				E7E72F7FA3BF5A510B58AD84 /* RaceDeckViewModelTests.swift */,
 				FC7D4D80736A0831D9BCF4F7 /* RaceDetailViewModelTests.swift */,
+				DFF6794FC4A7798E1A6DB696 /* RacePickStatusResolverTests.swift */,
 				0B8DE41DC39A2A9790AFDE69 /* RaceScheduleSheetTests.swift */,
+				7F849DAB23B3386809453636 /* UpcomingCardLayoutMetricsTests.swift */,
 			);
 			path = Races;
 			sourceTree = "<group>";
@@ -410,6 +445,7 @@
 				98D2367A25C738D1170388BC /* DriverFixtures.swift */,
 				0CD285ABDDAD6753ADDB60B3 /* GatedAPIClientSpy.swift */,
 				F40BDE99C7AC850C1A2C4E32 /* MemoryRaceSnapshotCache.swift */,
+				8DA9EA75E2BB093C7FE2818F /* race-detail-22x24.json */,
 				AF272627CBEFA6E4197F290B /* RaceFixtures.swift */,
 				C8E6904CAEBFA0F9A5DADBDB /* RaceRepositoryStub.swift */,
 				1F08159ED08D5C973E155610 /* TestClock.swift */,
@@ -663,6 +699,7 @@
 			buildConfigurationList = 29B94ADE32AC8DED9FB1DD8D /* Build configuration list for PBXNativeTarget "FXRacingTests" */;
 			buildPhases = (
 				264776337720CDB013251903 /* Sources */,
+				5CFA3DC66345FBDAE17B6070 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -752,6 +789,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5CFA3DC66345FBDAE17B6070 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DE42D8F82A03C9251264FEDD /* race-detail-22x24.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C7BE8FD0EA6DE2735D5943BE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -773,16 +818,20 @@
 				D87C3882132BCB64D1E24AC3 /* AuthManagerTests.swift in Sources */,
 				2461DC8C425E5F507FBA56C7 /* CenteredRacePagerGeometryTests.swift in Sources */,
 				6BA998CCFD67976DC59CE964 /* DriverFixtures.swift in Sources */,
+				F39C32DA49B1F4C6489C168E /* DriverFormSheetTests.swift in Sources */,
 				D1A442320374E9871B675F25 /* DriverPickerStateTests.swift in Sources */,
 				6A0B9B3F5A9DC34AEABDB6A4 /* FXGlassSurfaceResolverTests.swift in Sources */,
 				891E6F8893B0C988E12B9442 /* FXImagePipelineTests.swift in Sources */,
 				6ABD31BBC683A2A06DDCD3CA /* GatedAPIClientSpy.swift in Sources */,
+				66BD16767CE574428D60B7C2 /* LegacyRecoveryActionTests.swift in Sources */,
+				0AA15C3ED7B5B83468B5FBC7 /* LegacyRecoveryPresentationSessionTests.swift in Sources */,
 				A766F8B99C009EB6CB3E54D9 /* LocalPickStoreTests.swift in Sources */,
 				C17BA18584DD16C5288509B9 /* MemoryRaceSnapshotCache.swift in Sources */,
 				ADD7CCDC124F8246882EA5D0 /* RaceContextResolverTests.swift in Sources */,
 				7D51D8FC98611EA655B899C3 /* RaceDeckViewModelTests.swift in Sources */,
 				9CA847720054D425717BB2EC /* RaceDetailViewModelTests.swift in Sources */,
 				97A78FD5B913BB04819DDAA8 /* RaceFixtures.swift in Sources */,
+				D944476C73629A7297A2563F /* RacePickStatusResolverTests.swift in Sources */,
 				09D598223B4733835BDD199B /* RaceRepositoryCoreTests.swift in Sources */,
 				ED458B4D6871FFE940857256 /* RaceRepositoryRolloverTests.swift in Sources */,
 				454107C25E1738896541119C /* RaceRepositoryStub.swift in Sources */,
@@ -791,6 +840,7 @@
 				02CE196FD6B18BC37F014CDC /* SyncManagerTests.swift in Sources */,
 				394C92F0F9D71CB1FF425EB9 /* TestClock.swift in Sources */,
 				E06EDD1519160858A1262EBB /* TokenStoreSpy.swift in Sources */,
+				F4859D62D64F5D12B543DC79 /* UpcomingCardLayoutMetricsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -824,6 +874,7 @@
 				7E54F75CF49477117712FFBC /* DiagnosticsView.swift in Sources */,
 				A5232EDCA0F08EC91B7878C3 /* Driver.swift in Sources */,
 				928081846B311B94C143DB60 /* DriverBubbleView.swift in Sources */,
+				B8A66C5D8A7E443308633004 /* DriverFormSheet.swift in Sources */,
 				7FD635CF8E30583403E0B972 /* DriverPickerSheet.swift in Sources */,
 				6CDA97F174415BB802878078 /* ErrorBanner.swift in Sources */,
 				8B8AB2951A95CDB31ECBBCB4 /* Extensions.swift in Sources */,
@@ -848,6 +899,8 @@
 				8DDEC8406C5A0D7FACC61884 /* LeaderboardRowView.swift in Sources */,
 				44B1EEFC5B9F3F2BB04B2F02 /* LeaderboardView.swift in Sources */,
 				C4C85616ED338F71C3C5DCD1 /* LeaderboardViewModel.swift in Sources */,
+				667D8D35474345402E06DEF7 /* LegacyPickRecoverySheet.swift in Sources */,
+				F32B3E6C6676C9AF8CD786CD /* LegacyRecoveryPresentationSession.swift in Sources */,
 				B8C1F6B3F3CFD9B81A0E3570 /* LocalPickRecord.swift in Sources */,
 				7FC7B8B1BB56E29EE8328F11 /* LocalPickStore.swift in Sources */,
 				BA0194533AC7B94E9FCE96AF /* Logger.swift in Sources */,
@@ -856,6 +909,7 @@
 				88AFED4DEE2074C378FC2DEE /* PerformanceAppDependencies.swift in Sources */,
 				C29CC74AAF88D1F8A544BD24 /* PerformanceFixtures.swift in Sources */,
 				5DDCD49AEE5F4674AF87505F /* Pick.swift in Sources */,
+				75F72ED5C89C765B556F996E /* PickCommitFeedback.swift in Sources */,
 				AFF140E1B44702FB86590F3D /* ProfileTeamOption.swift in Sources */,
 				13306DF53702FF7E53EE5DE1 /* ProfileView.swift in Sources */,
 				7D2D8ABBCE2B1B49AF030941 /* QualifyingResultsView.swift in Sources */,
@@ -866,6 +920,7 @@
 				C482D5B36DC2BCD789810FBB /* RaceDetailViewModel.swift in Sources */,
 				D82536A74C449B331D384620 /* RaceDetailViewModelFactory.swift in Sources */,
 				461780E5853E170778E57147 /* RacePickPanel.swift in Sources */,
+				107B193C54672BDF07C00458 /* RacePickStatusRail.swift in Sources */,
 				03CFEA19C1FE68CB040CCB7E /* RaceRepository.swift in Sources */,
 				D905E3A317D0C48464E8BDFB /* RaceResultsView.swift in Sources */,
 				151AA313C6ACC9BECA05F016 /* RaceScheduleRow.swift in Sources */,
@@ -883,6 +938,7 @@
 				389AF06E388BE942DCCAB690 /* TokenStoring.swift in Sources */,
 				7D37C5032E3AE02E1A26C0B9 /* TutorialCard.swift in Sources */,
 				97AC697C8CCCB950B42FB717 /* TutorialStore.swift in Sources */,
+				7A5E88D88DD6027EDA886DF5 /* UpcomingCardLayoutMetrics.swift in Sources */,
 				C40DEB52EECE1EA540FA6608 /* UpcomingRaceCard.swift in Sources */,
 				D5225AA736C9F73800DDBCD0 /* User.swift in Sources */,
 				B76B35A0FE47FA55A0D80AEE /* UsernamePickerView.swift in Sources */,
@@ -982,7 +1038,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 45;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1001,7 +1057,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1130,7 +1186,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 45;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1143,7 +1199,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1231,7 +1287,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 45;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -1244,7 +1300,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MARKETING_VERSION = 1.7.1;
+				MARKETING_VERSION = 1.8.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

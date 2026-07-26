@@ -201,6 +201,88 @@ final class LocalPickStore {
 
     // MARK: - Owner-scoped mutations
 
+    func resolveLegacyConflict(
+        race: Race,
+        owner: PickOwnerScope,
+        expectedLegacyRevision: UInt64,
+        decision: LegacyPickDecision,
+        now: Date? = nil
+    ) -> LegacyPickResolutionResult {
+        guard owner != .legacyAmbiguous else { return .invalidOwner }
+        guard let legacy = legacyConflict(for: race.id),
+              legacy.revision == expectedLegacyRevision
+        else { return .staleLegacy }
+
+        let destinationID = LocalPickRecordID(owner: owner, raceID: race.id)
+        let previousDestination = records[destinationID]
+        let savedAt = now ?? clock.now()
+        let result: LegacyPickResolutionResult
+        let previousNextRevision = nextRevision
+
+        switch decision {
+        case .discard:
+            result = .discarded
+        case .keepCurrent(let expectedDestinationRevision):
+            guard previousDestination?.revision == expectedDestinationRevision else {
+                return .destinationChanged(previousDestination)
+            }
+            result = .keptCurrent
+        case .adopt:
+            guard savedAt < race.lockCutoffUtc else { return .locked }
+            if let previousDestination {
+                return .destinationOccupied(previousDestination)
+            }
+            guard let adopted = adoptedLegacyRecord(
+                legacy,
+                destinationID: destinationID,
+                savedAt: savedAt
+            ) else { return .persistenceFailed }
+            result = .adopted(adopted)
+        case .replace(let expectedDestinationRevision):
+            guard savedAt < race.lockCutoffUtc else { return .locked }
+            guard previousDestination?.revision == expectedDestinationRevision else {
+                return .destinationChanged(previousDestination)
+            }
+            guard let adopted = adoptedLegacyRecord(
+                legacy,
+                destinationID: destinationID,
+                savedAt: savedAt
+            ) else { return .persistenceFailed }
+            result = .adopted(adopted)
+        }
+
+        records[legacy.id] = nil
+        guard persistV2() else {
+            nextRevision = previousNextRevision
+            records[legacy.id] = legacy
+            records[destinationID] = previousDestination
+            return .persistenceFailed
+        }
+        return result
+    }
+
+    private func adoptedLegacyRecord(
+        _ legacy: LocalPickRecord,
+        destinationID: LocalPickRecordID,
+        savedAt: Date
+    ) -> LocalPickRecord? {
+        let revision = nextRevision
+        let (incrementedRevision, overflow) = revision.addingReportingOverflow(1)
+        guard revision > 0, !overflow, incrementedRevision < .max else {
+            return nil
+        }
+        let adopted = LocalPickRecord(
+            id: destinationID,
+            selection: legacy.selection,
+            savedAt: savedAt,
+            revision: revision,
+            syncState: .queued
+        )
+        nextRevision = incrementedRevision
+        records[destinationID] = adopted
+        return adopted
+    }
+
     @discardableResult
     func preserveAuthoritative(
         _ pick: Pick,

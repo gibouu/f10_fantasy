@@ -3,24 +3,64 @@ import { readFile } from "node:fs/promises"
 import test from "node:test"
 import ts from "typescript"
 
-const groupByCalls = []
+const findManyCalls = []
 
 globalThis.__driverSeasonStatsTestDeps = {
   db: {
     raceResult: {
-      async groupBy(options) {
-        groupByCalls.push(options)
-
-        if (options._avg) {
-          return [
-            { driverId: "norris", _avg: { position: 3.25 } },
-            { driverId: "leclerc", _avg: { position: 5 } },
-          ]
-        }
-
+      async findMany(options) {
+        findManyCalls.push(options)
         return [
-          { driverId: "norris", _count: { _all: 1 } },
-          { driverId: "antonelli", _count: { _all: 2 } },
+          {
+            driverId: "norris",
+            raceId: "britain",
+            position: 5,
+            status: "CLASSIFIED",
+            race: {
+              name: "British Grand Prix",
+              scheduledStartUtc: new Date("2026-07-05T14:00:00.000Z"),
+            },
+          },
+          {
+            driverId: "norris",
+            raceId: "austria",
+            position: null,
+            status: "DNF",
+            race: {
+              name: "Austrian Grand Prix",
+              scheduledStartUtc: new Date("2026-06-28T13:00:00.000Z"),
+            },
+          },
+          {
+            driverId: "norris",
+            raceId: "canada",
+            position: 2,
+            status: "CLASSIFIED",
+            race: {
+              name: "Canadian Grand Prix",
+              scheduledStartUtc: new Date("2026-06-14T18:00:00.000Z"),
+            },
+          },
+          {
+            driverId: "norris",
+            raceId: "monaco",
+            position: null,
+            status: "DSQ",
+            race: {
+              name: "Monaco Grand Prix",
+              scheduledStartUtc: new Date("2026-05-24T13:00:00.000Z"),
+            },
+          },
+          {
+            driverId: "leclerc",
+            raceId: "britain",
+            position: 1,
+            status: "CLASSIFIED",
+            race: {
+              name: "British Grand Prix",
+              scheduledStartUtc: new Date("2026-07-05T14:00:00.000Z"),
+            },
+          },
         ]
       },
     },
@@ -49,8 +89,8 @@ async function loadStatsModule() {
   return import(`data:text/javascript;base64,${encoded}`)
 }
 
-test("season form aggregates earlier completed races of the same type for the whole field", async () => {
-  groupByCalls.length = 0
+test("season form reads earlier completed races of the same type once and retains result history", async () => {
+  findManyCalls.length = 0
   const { getDriverSeasonStats } = await loadStatsModule()
   const before = new Date("2026-07-19T13:00:00.000Z")
 
@@ -61,29 +101,75 @@ test("season form aggregates earlier completed races of the same type for the wh
   })
 
   assert.deepEqual(stats.get("norris"), {
-    averageFinish: 3.25,
-    dnfCount: 1,
+    averageFinish: 3.5,
+    nonClassifiedCount: 2,
+    results: [
+      {
+        driverId: "norris",
+        raceId: "britain",
+        raceName: "British Grand Prix",
+        scheduledStartUtc: new Date("2026-07-05T14:00:00.000Z"),
+        position: 5,
+        status: "CLASSIFIED",
+      },
+      {
+        driverId: "norris",
+        raceId: "austria",
+        raceName: "Austrian Grand Prix",
+        scheduledStartUtc: new Date("2026-06-28T13:00:00.000Z"),
+        position: null,
+        status: "DNF",
+      },
+      {
+        driverId: "norris",
+        raceId: "canada",
+        raceName: "Canadian Grand Prix",
+        scheduledStartUtc: new Date("2026-06-14T18:00:00.000Z"),
+        position: 2,
+        status: "CLASSIFIED",
+      },
+      {
+        driverId: "norris",
+        raceId: "monaco",
+        raceName: "Monaco Grand Prix",
+        scheduledStartUtc: new Date("2026-05-24T13:00:00.000Z"),
+        position: null,
+        status: "DSQ",
+      },
+    ],
   })
   assert.deepEqual(stats.get("leclerc"), {
-    averageFinish: 5,
-    dnfCount: 0,
-  })
-  assert.deepEqual(stats.get("antonelli"), {
-    averageFinish: null,
-    dnfCount: 2,
+    averageFinish: 1,
+    nonClassifiedCount: 0,
+    results: [
+      {
+        driverId: "leclerc",
+        raceId: "britain",
+        raceName: "British Grand Prix",
+        scheduledStartUtc: new Date("2026-07-05T14:00:00.000Z"),
+        position: 1,
+        status: "CLASSIFIED",
+      },
+    ],
   })
 
-  assert.equal(groupByCalls.length, 2)
-  for (const call of groupByCalls) {
-    assert.deepEqual(call.by, ["driverId"])
-    assert.deepEqual(call.where.race, {
-      seasonId: "season-2026",
-      type: "MAIN",
-      status: "COMPLETED",
-      scheduledStartUtc: { lt: before },
-    })
-  }
-  assert.equal(groupByCalls[0].where.status, "CLASSIFIED")
-  assert.deepEqual(groupByCalls[0].where.position, { not: null })
-  assert.deepEqual(groupByCalls[1].where.status, { not: "CLASSIFIED" })
+  assert.equal(findManyCalls.length, 1)
+  assert.deepEqual(findManyCalls[0].where.race, {
+    seasonId: "season-2026",
+    type: "MAIN",
+    status: "COMPLETED",
+    scheduledStartUtc: { lt: before },
+  })
+  assert.deepEqual(findManyCalls[0].select, {
+    driverId: true,
+    raceId: true,
+    position: true,
+    status: true,
+    race: { select: { name: true, scheduledStartUtc: true } },
+  })
+  assert.deepEqual(findManyCalls[0].orderBy, [
+    { race: { scheduledStartUtc: "desc" } },
+    { raceId: "desc" },
+    { driverId: "asc" },
+  ])
 })

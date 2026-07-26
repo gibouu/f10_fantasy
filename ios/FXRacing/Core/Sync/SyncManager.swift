@@ -77,6 +77,13 @@ final class SyncManager {
         return lease
     }
 
+    func currentSessionLease(
+        currentUserID: String,
+        token: String
+    ) -> SessionLease? {
+        activeLease(currentUserID: currentUserID, token: token)
+    }
+
     func invalidateSession(localPickStore: LocalPickStore?) {
         guard let sessionID = activeSession?.id else { return }
 
@@ -114,7 +121,7 @@ final class SyncManager {
         token: String,
         localPickStore: LocalPickStore
     ) async -> PickSyncResult {
-        let sessionLease = activeLease(
+        let sessionLease = currentSessionLease(
             currentUserID: currentUserID,
             token: token
         )
@@ -736,12 +743,14 @@ final class SyncManager {
         }
     }
 
-    private func isCurrent(
+    func isCurrent(
         _ sessionLease: SessionLease?
     ) -> Bool {
-        guard let sessionLease else { return !requiresActiveSession }
-        return !Task.isCancelled
-            && activeSession == sessionLease
+        guard !Task.isCancelled else { return false }
+        guard let sessionLease else {
+            return activeSession == nil && !requiresActiveSession
+        }
+        return activeSession == sessionLease
     }
 
     private func activeLease(

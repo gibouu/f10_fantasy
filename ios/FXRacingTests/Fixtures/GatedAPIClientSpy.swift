@@ -2,6 +2,12 @@ import Foundation
 @testable import FXRacing
 
 actor GatedAPIClientSpy: APIRequesting {
+    enum Event: Equatable, Sendable {
+        case started(Int)
+        case released(Int)
+        case completed(Int)
+    }
+
     enum Stub: @unchecked Sendable {
         case data(Data)
         case failure(APIError)
@@ -36,6 +42,7 @@ actor GatedAPIClientSpy: APIRequesting {
     private var gatedRequestIDs: [String: Set<Int>] = [:]
     private var callWaiters: [String: [CallWaiter]] = [:]
     private var requests: [Request] = []
+    private var events: [Event] = []
 
     init(
         responses: [String: [Stub]],
@@ -67,6 +74,7 @@ actor GatedAPIClientSpy: APIRequesting {
                 bodyData: endpoint.bodyData
             )
         )
+        events.append(.started(requestID))
         requestKeys[requestID] = key
 
         guard var stubs = responses[key], !stubs.isEmpty else {
@@ -83,6 +91,7 @@ actor GatedAPIClientSpy: APIRequesting {
                 gatedRequestIDs[key, default: []].insert(requestID)
             }
         }
+        events.append(.completed(requestID))
 
         switch stub {
         case .data(let data):
@@ -120,6 +129,7 @@ actor GatedAPIClientSpy: APIRequesting {
         if let key = requestKeys[id] {
             gatedRequestIDs[key]?.remove(id)
         }
+        events.append(.released(id))
         continuation.resume()
     }
 
@@ -128,7 +138,11 @@ actor GatedAPIClientSpy: APIRequesting {
         gatedKeys.remove(key)
         let ids = gatedRequestIDs.removeValue(forKey: key) ?? []
         for id in ids {
-            requestWaiters.removeValue(forKey: id)?.resume()
+            guard let continuation = requestWaiters.removeValue(forKey: id) else {
+                continue
+            }
+            events.append(.released(id))
+            continuation.resume()
         }
     }
 
@@ -138,6 +152,15 @@ actor GatedAPIClientSpy: APIRequesting {
 
     func recordedRequests() -> [Request] {
         requests
+    }
+
+    func recordedEvents(requestIDs: Set<Int>) -> [Event] {
+        events.filter { event in
+            switch event {
+            case .started(let id), .released(let id), .completed(let id):
+                return requestIDs.contains(id)
+            }
+        }
     }
 
     private func calls(for key: String) -> Int {

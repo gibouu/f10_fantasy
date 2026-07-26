@@ -21,6 +21,9 @@ export const REQUIRED_SCREENSHOT_IDS = [
   },
 ]
 
+// App Store Connect requires only the 6.9-inch set for iPhone and scales it
+// down for smaller devices, so that is the single required size here. Keeping
+// it to one size also means the whole set can be captured on one simulator.
 export const REQUIRED_DIMENSIONS = [
   {
     id: "iphone-6-9",
@@ -28,15 +31,15 @@ export const REQUIRED_DIMENSIONS = [
     width: 1320,
     height: 2868,
   },
+]
+
+export const OPTIONAL_DIMENSIONS = [
   {
     id: "iphone-6-7",
     label: "iPhone 6.7-inch",
     width: 1290,
     height: 2796,
   },
-]
-
-export const OPTIONAL_DIMENSIONS = [
   {
     id: "iphone-6-5",
     label: "iPhone 6.5-inch",

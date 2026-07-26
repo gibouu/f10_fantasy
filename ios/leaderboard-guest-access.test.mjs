@@ -22,6 +22,14 @@ const deckSource = await readFile(
   new URL("./FXRacing/Features/Races/RaceDeckView.swift", import.meta.url),
   "utf8",
 )
+const upcomingCardSource = await readFile(
+  new URL("./FXRacing/Features/Races/UpcomingRaceCard.swift", import.meta.url),
+  "utf8",
+)
+const scheduleSheetSource = await readFile(
+  new URL("./FXRacing/Features/Races/RaceScheduleSheet.swift", import.meta.url),
+  "utf8",
+)
 
 test("LeaderboardView loads global rankings for signed-out users", () => {
   const loadBlock = source.match(/private func loadIfAllowed\(\) async \{[\s\S]*?\n    \}/)?.[0]
@@ -99,6 +107,32 @@ test("persistent shell owns live polling and the deck remains Dynamic Type safe"
     /CenteredRacePager[\s\S]{0,500}\.frame\(height:/,
     "The pager may set a minimum but must remain free to grow for Dynamic Type",
   )
+})
+
+test("upcoming card geometry uses deterministic metrics instead of content-driven height", () => {
+  assert.match(upcomingCardSource, /@Environment\(\\\.dynamicTypeSize\)/)
+  assert.match(
+    upcomingCardSource,
+    /UpcomingCardLayoutMetrics\.cardHeight\(\s*for:\s*dynamicTypeSize/,
+  )
+  assert.match(
+    upcomingCardSource,
+    /\.frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*cardHeight,\s*alignment:\s*\.topLeading\)/,
+  )
+  assert.match(
+    upcomingCardSource,
+    /maxHeight:\s*dynamicTypeSize\.isAccessibilitySize \? nil : cardHeight/,
+  )
+  assert.doesNotMatch(upcomingCardSource, /\.frame\(maxWidth:\s*\.infinity,\s*minHeight:\s*412/)
+})
+
+test("Schedule sheet uses an opaque centered presentation", () => {
+  assert.match(scheduleSheetSource, /\.presentationDetents\(\[\.medium, \.large\]\)/)
+  assert.match(scheduleSheetSource, /\.presentationDragIndicator\(\.visible\)/)
+  assert.match(scheduleSheetSource, /\.presentationBackground\(Color\(uiColor:\s*\.systemBackground\)\)/)
+  assert.match(scheduleSheetSource, /\.frame\(maxWidth:\s*430,\s*alignment:\s*\.center\)/)
+  assert.match(scheduleSheetSource, /Text\("Schedule"\)[\s\S]*?\.frame\(maxWidth:\s*\.infinity,\s*alignment:\s*\.center\)/)
+  assert.doesNotMatch(scheduleSheetSource, /\.presentationBackground\(\.ultraThinMaterial\)/)
 })
 
 test("ranking rows open player profiles in a dismissible native sheet", () => {
