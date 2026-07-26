@@ -54,3 +54,6 @@ ios/DerivedData/
 
 # Source assets not needed in repo
 favicon2.png
+
+# Python bytecode from scripts/
+__pycache__/
