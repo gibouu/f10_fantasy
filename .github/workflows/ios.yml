@@ -1,0 +1,67 @@
+name: iOS
+
+# Separate from Verify because macOS runners bill at 10x Linux minutes.
+# Only changes that can actually break the Swift build trigger this, so
+# web-only pull requests stay on the cheap Linux job.
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push to the same ref makes an in-flight macOS run pointless.
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: iOS build
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        # FXGlassSurface calls glassEffect behind #available(iOS 26.0, *).
+        # Compiling that needs the iOS 26 SDK, so an older default Xcode
+        # fails even though the deployment target is iOS 17.
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Report toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        # ios/project.yml is the source of truth; the checked-in .xcodeproj
+        # is generated. Regenerating here also catches manifest drift.
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build
+        # Build only. UI tests need a booted device and are far slower; the
+        # gap this closes is "does it compile", which is what reached main.
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project FXRacing.xcodeproj \
+            -scheme FXRacing \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            build

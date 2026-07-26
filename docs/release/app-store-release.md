@@ -33,8 +33,11 @@ npm run test:ios-config
 
 ## 2. Verify before archiving
 
-CI (`.github/workflows/verify.yml`) never runs `xcodebuild` — a green badge
-says nothing about whether the iOS app compiles. Run the native build yourself.
+`.github/workflows/ios.yml` compiles the app on every pull request that
+touches `ios/**`, so a plain compile break no longer reaches `main`. It is a
+Release **build** only — no UI tests, no performance scenarios, and it does
+not run at all for web-only changes (macOS runners bill at 10x, so the job is
+path-filtered). Run the rest yourself before archiving.
 
 ```bash
 npx tsc --noEmit && npm run lint && npm run build
