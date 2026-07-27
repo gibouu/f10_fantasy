@@ -3,7 +3,7 @@ import test from "node:test"
 import { readFile } from "node:fs/promises"
 
 const TEAM_ID = "U6Z87CS4W3"
-const MARKETING_VERSION = "1.8.0"
+const MARKETING_VERSION = "1.8.1"
 const BUILD_NUMBER = "46"
 
 const projectYml = await readFile(new URL("./project.yml", import.meta.url), "utf8")
