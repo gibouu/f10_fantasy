@@ -14,8 +14,12 @@ private struct FXCardSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(FXTheme.Colors.surface)
-            .cornerRadius(radius)
+            .background(FXTheme.Colors.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(FXTheme.Colors.cardBorder(isSelected: false), lineWidth: 1)
+            }
     }
 }
 
