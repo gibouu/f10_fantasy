@@ -8,7 +8,7 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
+                .foregroundStyle(FXTheme.Colors.warning)
                 .font(.subheadline)
             Text(message)
                 .font(.footnote)
@@ -28,7 +28,7 @@ struct ErrorBanner: View {
         .background(Color(uiColor: .secondarySystemBackground))
         .overlay(
             RoundedRectangle(cornerRadius: FXTheme.Radius.md)
-                .stroke(Color.yellow.opacity(0.4), lineWidth: 1)
+                .stroke(FXTheme.Colors.warning.opacity(0.5), lineWidth: 1)
         )
         .cornerRadius(FXTheme.Radius.md)
         .padding(.horizontal, FXTheme.Spacing.md)
@@ -67,7 +67,7 @@ struct RetryView: View {
                 }
                 .frame(width: 100, height: 40)
                 .background(FXTheme.Colors.accent)
-                .foregroundStyle(.black)
+                .foregroundStyle(FXTheme.Colors.onAccent)
                 .cornerRadius(FXTheme.Radius.md)
             }
             .disabled(isRetrying)
