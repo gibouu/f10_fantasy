@@ -53,11 +53,14 @@ struct UpcomingRaceCard: View {
         )
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
+        // No drop shadow: the card sits inside `CenteredRacePager`'s horizontal
+        // ScrollView, which clips its content, so a shadow gets sliced off flat
+        // at the viewport edge instead of fading. The border above carries both
+        // the separation and the selected/unselected distinction.
         .overlay {
             RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
                 .strokeBorder(FXTheme.Colors.cardBorder(isSelected: isSelected), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("race-card-\(race.id)")
     }
