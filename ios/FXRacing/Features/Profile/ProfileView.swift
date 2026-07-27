@@ -211,22 +211,29 @@ struct ProfileView: View {
 
     /// Colour encodes outcome, not team.
     ///
+    /// `exact` and `correct` are both full marks — the API emits `exact` for a
+    /// P10 pick that scored its cap and `correct` for a P1/DNF pick, which are
+    /// binary and have no middle state. Only P10 is graded by proximity, so
+    /// `partial` is the single status that means "scored, but not everything".
+    ///
     /// Tokens are adaptive: system `.green` and a raw #FFCC00 sit at roughly
-    /// 1.9:1 and 1.4:1 on white, so a partial hit was indistinguishable from
-    /// an empty slot in light mode.
+    /// 1.9:1 and 1.4:1 on white, so amber was indistinguishable from an empty
+    /// slot in light mode.
     private func outcomeColor(_ status: String) -> Color {
         switch status {
-        case "exact": FXTheme.Colors.success
-        case "correct", "partial": FXTheme.Colors.warning
+        case "exact", "correct": FXTheme.Colors.success
+        case "partial": FXTheme.Colors.warning
         case "miss": FXTheme.Colors.danger
         default: Color(uiColor: .tertiaryLabel)
         }
     }
 
+    /// One word that stays true across all three slots: "Hit" reads correctly
+    /// for a binary P1/DNF call and for a P10 pick that landed exactly.
     private func outcomeLabel(_ status: String) -> String {
         switch status {
-        case "exact": "Exact"
-        case "correct", "partial": "Partial"
+        case "exact", "correct": "Hit"
+        case "partial": "Partial"
         case "miss": "Miss"
         default: "Pending"
         }
