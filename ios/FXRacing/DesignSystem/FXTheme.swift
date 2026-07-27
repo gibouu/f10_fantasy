@@ -45,6 +45,21 @@ enum FXTheme {
                 : .white
         })
 
+        /// Card edge that stays visible in both modes.
+        ///
+        /// A hardcoded white stroke disappears on a light card, which is what
+        /// made the race card lose its edge in light mode and left the fill
+        /// gradient reading as a stray line.
+        static func cardBorder(isSelected: Bool) -> Color {
+            Color(uiColor: UIColor { traits in
+                let isDark = traits.userInterfaceStyle == .dark
+                let alpha: CGFloat = isSelected ? 0.16 : 0.09
+                return isDark
+                    ? UIColor(white: 1, alpha: alpha)
+                    : UIColor(white: 0, alpha: alpha)
+            })
+        }
+
         static let textPrimary   = Color.primary
         static let textSecondary = Color.secondary
         static let textTertiary  = Color(uiColor: .tertiaryLabel)
