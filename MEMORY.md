@@ -2,7 +2,7 @@
 
 > Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-Last updated: 2026-07-27
+Last updated: 2026-07-27 (build 45 submitted for review; 46 staged)
 
 ## Project purpose
 
@@ -46,15 +46,30 @@ Existing stash observed:
 
 Deployment/release state:
 
-- Version 1.8.0, build 45 (`ios/project.yml`).
-- `ios/ExportOptions.plist` and `docs/release/app-store-release.md` exist; the
-  runbook is the entry point for a release.
-- A 1.8.0 (45) archive was built on 2026-07-26 and deleted on 2026-07-27 at the
-  owner's request — it predated `#412`/`#414`/`#415`. The owner re-archives from
-  Xcode himself; do not build the shipping archive for him.
-- No App Store submission has been performed.
-- No screenshots or builds have been uploaded for release.
+- **1.8.0 (45) was submitted for App Store review on 2026-07-27** by the owner,
+  archived from Xcode by him. Outcome not yet known — check App Store Connect
+  before assuming anything about it.
+- **`ios/project.yml` is now at 1.8.0 build 46**, which is *not* submitted. It
+  carries one fix on top of the submitted binary (`#419`, full P1/DNF hits no
+  longer reported as "Partial"). The owner's plan: 46 rides along with whatever
+  he fixes next, rather than being resubmitted on its own.
+- **If 1.8.0 (45) is approved and released, a build bump alone is not enough for
+  the next submission** — App Store Connect will not take a second release under
+  the same marketing version, so `MARKETING_VERSION` must go to 1.8.1 or higher.
+  `ios/project-signing.test.mjs` pins both values and will fail until it is
+  updated to match; that failure is the intended reminder.
+- `ios/ExportOptions.plist`, `docs/release/app-store-release.md` (runbook) and
+  `docs/release/app-store-submission-notes.md` (store metadata, reviewer notes,
+  privacy answers) exist. The submission notes are written against 1.8.0 (45)
+  and say to update per release.
+- The owner archives and submits from Xcode himself; do not build the shipping
+  archive for him. A 1.8.0 (45) archive built on 2026-07-26 was deleted on
+  2026-07-27 at his request because it predated `#412`/`#414`/`#415`.
 - No signing identities, certificates, or provisioning profiles have been changed.
+- Unresolved, not a blocker: the app ships driver headshots and team logos from
+  `public/drivers` and `public/teamlogos` and uses F1 marks throughout. The
+  content-rights question in App Store Connect is the owner's call; see §6 of
+  the submission notes.
 
 ## Architecture
 
@@ -231,6 +246,25 @@ Nothing is open. Everything below is a closed record.
   - Status: CLOSED via PR #415. `ProfileView` renders a season ledger: one row
     per race (round, name, three outcome dots, points), drivers on tap. The old
     per-race `Section` + `slotCell` layout is gone.
+- #417 — race card shadow clipped into a hard grey line.
+  - Status: CLOSED via PR #418. The cards sit inside `CenteredRacePager`'s
+    `ScrollView(.horizontal)`, which clips content, so `.shadow(...)` was sliced
+    off flat at the viewport edge instead of fading — a ~10-level step in the
+    light-mode background. **Do not add a drop shadow to anything inside that
+    pager.** `ios/race-card-surface.test.mjs` enforces it and will also fail if
+    scroll clipping is ever disabled without revisiting the rule.
+  - Method worth reusing: the cause was found by sampling pixel columns of a
+    screenshot with PIL, not by eye. Three earlier "fixed" claims in this area
+    were wrong because they were visual judgements.
+- #419 — a full P1/DNF hit was reported as amber "Partial".
+  - Status: CLOSED via PR #421. **The API's slot status vocabulary differs per
+    slot** (`src/app/api/users/[userId]/route.ts`): `p10` is graded by proximity
+    and yields `exact`/`partial`/`miss`, while `winner` and `dnf` are binary and
+    yield only `correct`/`miss`. `correct` means the slot scored its cap — full
+    marks. Grouping it with `partial` told players their best possible result
+    was a half-success. `ios/pick-outcome-status.test.mjs` pins the client
+    mapping *and* asserts the API still emits that vocabulary, so a backend
+    change cannot silently invalidate the client.
 
 ## Operational knowledge
 
