@@ -172,11 +172,14 @@ struct FriendProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// `correct` is a full-marks P1/DNF hit, not a half-success — the API only
+    /// emits it when the slot scored its cap. Only P10 is graded by proximity,
+    /// so `partial` is the one status that earns amber.
     @ViewBuilder
     private func statusDot(_ status: String) -> some View {
         let color: Color = switch status {
-        case "exact": FXTheme.Colors.success
-        case "correct", "partial": FXTheme.Colors.warning
+        case "exact", "correct": FXTheme.Colors.success
+        case "partial": FXTheme.Colors.warning
         case "miss": .red
         default: .gray
         }
