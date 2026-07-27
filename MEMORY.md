@@ -2,7 +2,7 @@
 
 > Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-Last updated: 2026-07-27 (build 45 submitted for review; 46 staged)
+Last updated: 2026-07-27 (1.8.0 build 45 in review; 1.8.1 build 46 staged)
 
 ## Project purpose
 
@@ -49,15 +49,19 @@ Deployment/release state:
 - **1.8.0 (45) was submitted for App Store review on 2026-07-27** by the owner,
   archived from Xcode by him. Outcome not yet known — check App Store Connect
   before assuming anything about it.
-- **`ios/project.yml` is now at 1.8.0 build 46**, which is *not* submitted. It
-  carries one fix on top of the submitted binary (`#419`, full P1/DNF hits no
-  longer reported as "Partial"). The owner's plan: 46 rides along with whatever
-  he fixes next, rather than being resubmitted on its own.
-- **If 1.8.0 (45) is approved and released, a build bump alone is not enough for
-  the next submission** — App Store Connect will not take a second release under
-  the same marketing version, so `MARKETING_VERSION` must go to 1.8.1 or higher.
-  `ios/project-signing.test.mjs` pins both values and will fail until it is
-  updated to match; that failure is the intended reminder.
+- **`ios/project.yml` is now at 1.8.1 build 46**, which is *not* submitted and
+  has never been archived. It carries one fix on top of the submitted binary
+  (`#419`, full P1/DNF hits no longer reported as "Partial"). The owner's plan:
+  it rides along with whatever he fixes next, rather than being resubmitted on
+  its own.
+- The version was moved to **1.8.1 deliberately, ahead of need**, because App
+  Store Connect will not take a second release under a marketing version that
+  has already shipped. Doing it now means the next submission is not blocked on
+  remembering. If 1.8.0 (45) is *rejected* rather than released, shipping 1.8.1
+  instead is harmless — the number need not be reused.
+- `ios/project-signing.test.mjs` pins both the marketing version and the build
+  number. Change one without the other and `npm run test:ios` fails; that is
+  intentional, not an obstacle to route around.
 - `ios/ExportOptions.plist`, `docs/release/app-store-release.md` (runbook) and
   `docs/release/app-store-submission-notes.md` (store metadata, reviewer notes,
   privacy answers) exist. The submission notes are written against 1.8.0 (45)

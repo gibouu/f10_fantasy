@@ -1,8 +1,14 @@
 # FX Racing 1.8.0 (45) — App Store Connect submission notes
 
-Build: **1.8.0 (45)**, from `main` @ `2bc7e5f`.
+Build: **1.8.0 (45)**, from `main` @ `2bc7e5f`. **Submitted for review on
+2026-07-27** — this file is the record of what went with it.
 Assumes the last public release was **1.7.0 (11)** — check the Versions list in
 App Store Connect and adjust the release notes if something shipped after that.
+
+**Next submission:** the repo is staged at **1.8.1 (46)**, which adds the #419
+fix (a full P1/DNF hit no longer reported as "Partial"). Add a line for that to
+the release notes below, and re-check the privacy table against
+`PrivacyInfo.xcprivacy` before submitting again.
 
 ---
 
