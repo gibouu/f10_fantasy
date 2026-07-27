@@ -4,6 +4,7 @@ struct ProfileView: View {
     @Environment(AuthManager.self) private var authManager
     @State private var vm: FriendProfileViewModel? = nil
     @State private var showSettings = false
+    @State private var expandedPickIDs: Set<String> = []
 
     private var profileRefreshKey: ProfileRefreshKey {
         ProfileRefreshKey(user: authManager.authenticatedUser)
@@ -79,19 +80,17 @@ struct ProfileView: View {
                 .padding(.vertical, 4)
             }
 
-            // Picks history
-            if profile.picks.isEmpty {
-                Section("My Picks") {
+            // Picks history — a season ledger. One row per race so the whole
+            // season is scannable; drivers expand on tap rather than costing
+            // vertical space on every row.
+            Section("My picks") {
+                if profile.picks.isEmpty {
                     Text("No picks yet. Pick your drivers for upcoming races!")
                         .foregroundStyle(.secondary)
                         .font(.subheadline)
-                }
-            } else {
-                ForEach(profile.picks) { pick in
-                    Section {
-                        pickRow(pick)
-                    } header: {
-                        Text("\(pick.race.roundLabel) · \(pick.race.name)")
+                } else {
+                    ForEach(profile.picks) { pick in
+                        ledgerRow(pick)
                     }
                 }
             }
@@ -124,63 +123,139 @@ struct ProfileView: View {
         }
     }
 
-    private func pickRow(_ pick: ProfilePick) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                slotCell(label: "P1", entry: pick.slotSummaries.winner)
-                Divider()
-                slotCell(label: "P10", entry: pick.slotSummaries.p10)
-                Divider()
-                slotCell(label: "DNF", entry: pick.slotSummaries.dnf)
-            }
-            .frame(height: 64)
+    /// One race per row: round, name, three outcome dots, points.
+    ///
+    /// Colour encodes **outcome**, not team. The previous layout ringed each
+    /// driver photo in its team colour — decorative — while the question this
+    /// screen answers is "did I score?", which was left to a 6pt dot.
+    @ViewBuilder
+    private func ledgerRow(_ pick: ProfilePick) -> some View {
+        let isExpanded = expandedPickIDs.contains(pick.id)
 
-            if let score = pick.scoreBreakdown {
-                HStack {
-                    Spacer()
-                    Text("\(score.totalScore) pts")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    if isExpanded { expandedPickIDs.remove(pick.id) }
+                    else { expandedPickIDs.insert(pick.id) }
                 }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(pick.race.roundLabel)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .frame(minWidth: 34, alignment: .leading)
+
+                    Text(pick.race.name)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 6)
+
+                    HStack(spacing: 3) {
+                        outcomeDot(pick.slotSummaries.winner.status)
+                        outcomeDot(pick.slotSummaries.p10.status)
+                        outcomeDot(pick.slotSummaries.dnf.status)
+                    }
+
+                    Text(pointsLabel(pick))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(pick.scoreBreakdown == nil ? .secondary : .primary)
+                        .frame(minWidth: 46, alignment: .trailing)
+                        .monospacedDigit()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(pick.race.roundLabel), \(pick.race.name)")
+            .accessibilityValue(accessibilitySummary(pick))
+            .accessibilityHint(isExpanded ? "Hides drivers" : "Shows drivers")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("picks-ledger-row-\(pick.id)")
+
+            if isExpanded {
+                VStack(spacing: 6) {
+                    expandedSlot("P1", pick.slotSummaries.winner)
+                    expandedSlot("P10", pick.slotSummaries.p10)
+                    expandedSlot("DNF", pick.slotSummaries.dnf)
+                }
+                .padding(.top, 10)
+                .transition(.opacity)
             }
         }
     }
 
-    private func slotCell(label: String, entry: SlotEntry) -> some View {
-        VStack(spacing: 4) {
+    private func expandedSlot(_ label: String, _ entry: SlotEntry) -> some View {
+        HStack(spacing: 10) {
             Text(label)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-            if let driver = entry.driver {
-                SlotDriverBubble(
-                    code: driver.code,
-                    photoURL: driver.photoFullURL,
-                    teamColor: driver.color,
-                    size: 36
-                )
-            } else {
-                Circle()
-                    .fill(.quaternary)
-                    .frame(width: 36, height: 36)
-                    .overlay { Text("—").font(.caption2).foregroundStyle(.tertiary) }
-            }
-            statusDot(entry.status)
+                .frame(width: 34, alignment: .leading)
+
+            outcomeDot(entry.status)
+
+            Text(entry.driver.map { "\($0.firstName) \($0.lastName)" } ?? "No pick")
+                .font(.caption)
+                .foregroundStyle(entry.driver == nil ? .tertiary : .secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 4)
+
+            Text(outcomeLabel(entry.status))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder
-    private func statusDot(_ status: String) -> some View {
-        let color: Color = switch status {
+    /// Colour encodes outcome, not team.
+    ///
+    /// Tokens are adaptive: system `.green` and a raw #FFCC00 sit at roughly
+    /// 1.9:1 and 1.4:1 on white, so a partial hit was indistinguishable from
+    /// an empty slot in light mode.
+    private func outcomeColor(_ status: String) -> Color {
+        switch status {
         case "exact": FXTheme.Colors.success
         case "correct", "partial": FXTheme.Colors.warning
-        case "miss": .red
-        default: .gray
+        case "miss": FXTheme.Colors.danger
+        default: Color(uiColor: .tertiaryLabel)
         }
-        Circle()
-            .fill(color)
-            .frame(width: 6, height: 6)
     }
+
+    private func outcomeLabel(_ status: String) -> String {
+        switch status {
+        case "exact": "Exact"
+        case "correct", "partial": "Partial"
+        case "miss": "Miss"
+        default: "Pending"
+        }
+    }
+
+    private func outcomeDot(_ status: String) -> some View {
+        Circle()
+            .fill(outcomeColor(status))
+            .frame(width: 8, height: 8)
+    }
+
+    private func pointsLabel(_ pick: ProfilePick) -> String {
+        guard let score = pick.scoreBreakdown else { return "—" }
+        return "\(score.totalScore) pts"
+    }
+
+    private func accessibilitySummary(_ pick: ProfilePick) -> String {
+        let slots = [
+            ("P1", pick.slotSummaries.winner),
+            ("P10", pick.slotSummaries.p10),
+            ("DNF", pick.slotSummaries.dnf),
+        ]
+        let outcomes = slots
+            .map { "\($0.0) \(outcomeLabel($0.1.status).lowercased())" }
+            .joined(separator: ", ")
+        guard let score = pick.scoreBreakdown else { return "\(outcomes). Not scored yet" }
+        return "\(outcomes). \(score.totalScore) points"
+    }
+
 }
 
 private struct ProfileRefreshKey: Equatable {
