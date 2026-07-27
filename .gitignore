@@ -57,3 +57,7 @@ favicon2.png
 
 # Python bytecode from scripts/
 __pycache__/
+
+# Agent tooling state — local only, not part of the project
+/.clawpatch/
+/.superpowers/
