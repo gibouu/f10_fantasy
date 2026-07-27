@@ -55,8 +55,12 @@ struct SignInPromptView: View {
                     .overlay {
                         if vm.isLoading {
                             RoundedRectangle(cornerRadius: FXTheme.Radius.md)
-                                .fill(.black.opacity(0.35))
-                            ProgressView().tint(.white)
+                                .fill(
+                                    colorScheme == .dark
+                                        ? Color.white.opacity(0.45)
+                                        : Color.black.opacity(0.35)
+                                )
+                            ProgressView().tint(colorScheme == .dark ? .black : .white)
                         }
                     }
 

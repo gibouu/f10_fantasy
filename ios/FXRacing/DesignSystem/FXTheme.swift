@@ -31,7 +31,14 @@ enum FXTheme {
         /// Text color to use on top of accent-colored backgrounds.
         static let onAccent: Color = .white
         /// #C9A227 — gold, used for P10 exact hits.
-        static let gold   = Color(red: 0.79, green: 0.64, blue: 0.15)
+        /// Adaptive: the original #C9A227 is tuned for dark surfaces and only
+        /// reaches 2.4:1 on white, which is too weak for the small monospaced
+        /// score numerals it labels. Dark mode keeps the original value.
+        static let gold = Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.79, green: 0.64, blue: 0.15, alpha: 1)
+                : UIColor(red: 0.55, green: 0.42, blue: 0.02, alpha: 1)
+        })
         /// #ff453a — danger/DNF red.
         static let danger = Color(red: 1.00, green: 0.27, blue: 0.23)
 
@@ -47,6 +54,22 @@ enum FXTheme {
             traits.userInterfaceStyle == .dark
                 ? UIColor(white: 0.17, alpha: 1)
                 : .white
+        })
+
+        /// Status colours that hold contrast on BOTH a white and a black
+        /// surface. The system `.yellow` and `.green` are tuned for dark
+        /// backgrounds — on white they land near 1.3:1 and 1.9:1, so a status
+        /// dot painted with them simply disappears in light mode.
+        static let warning = Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 1.00, green: 0.84, blue: 0.20, alpha: 1)
+                : UIColor(red: 0.72, green: 0.52, blue: 0.00, alpha: 1)
+        })
+
+        static let success = Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.35, green: 0.85, blue: 0.42, alpha: 1)
+                : UIColor(red: 0.11, green: 0.48, blue: 0.18, alpha: 1)
         })
 
         /// Card edge that stays visible in both modes.

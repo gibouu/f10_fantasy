@@ -175,8 +175,8 @@ struct FriendProfileView: View {
     @ViewBuilder
     private func statusDot(_ status: String) -> some View {
         let color: Color = switch status {
-        case "exact": .green
-        case "correct", "partial": Color(red: 1, green: 0.8, blue: 0)
+        case "exact": FXTheme.Colors.success
+        case "correct", "partial": FXTheme.Colors.warning
         case "miss": .red
         default: .gray
         }

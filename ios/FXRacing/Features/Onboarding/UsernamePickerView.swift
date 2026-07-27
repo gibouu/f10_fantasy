@@ -49,8 +49,14 @@ struct UsernamePickerView: View {
                                 }
                                 .padding(.horizontal, FXTheme.Spacing.md)
                                 .padding(.vertical, 14)
-                                .background(FXTheme.Colors.surface)
-                                .cornerRadius(FXTheme.Radius.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: FXTheme.Radius.md)
+                                        .fill(Color(uiColor: .secondarySystemBackground))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: FXTheme.Radius.md)
+                                        .stroke(Color(uiColor: .separator), lineWidth: 1)
+                                )
 
                             if let format = viewModel.formatError {
                                 Text(format)
