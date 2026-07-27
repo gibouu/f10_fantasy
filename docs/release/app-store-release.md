@@ -158,4 +158,9 @@ confirm support/privacy URLs, age rating, export compliance
 privacy answers, and review contact. The app is playable as a guest, so give
 the reviewer guest-mode instructions rather than a test account.
 
+See `app-store-submission-notes.md` for the copy-paste release notes and
+reviewer notes, the privacy answers that must match `PrivacyInfo.xcprivacy`,
+and the age-rating and content-rights questions worth thinking about before
+ticking a box. It is written against 1.8.0 (45); update it per release.
+
 Do not accept new Apple legal agreements on the owner's behalf.
