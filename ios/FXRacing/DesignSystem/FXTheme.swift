@@ -14,8 +14,12 @@ private struct FXCardSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(FXTheme.Colors.surface)
-            .cornerRadius(radius)
+            .background(FXTheme.Colors.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(FXTheme.Colors.cardBorder(isSelected: false), lineWidth: 1)
+            }
     }
 }
 
@@ -44,6 +48,21 @@ enum FXTheme {
                 ? UIColor(white: 0.17, alpha: 1)
                 : .white
         })
+
+        /// Card edge that stays visible in both modes.
+        ///
+        /// A hardcoded white stroke disappears on a light card, which is what
+        /// made the race card lose its edge in light mode and left the fill
+        /// gradient reading as a stray line.
+        static func cardBorder(isSelected: Bool) -> Color {
+            Color(uiColor: UIColor { traits in
+                let isDark = traits.userInterfaceStyle == .dark
+                let alpha: CGFloat = isSelected ? 0.16 : 0.09
+                return isDark
+                    ? UIColor(white: 1, alpha: alpha)
+                    : UIColor(white: 0, alpha: alpha)
+            })
+        }
 
         static let textPrimary   = Color.primary
         static let textSecondary = Color.secondary

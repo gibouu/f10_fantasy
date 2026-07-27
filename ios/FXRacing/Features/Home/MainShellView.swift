@@ -40,7 +40,7 @@ struct MainShellView: View {
 
             selectedContent
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("main-shell")
         .onAppear {

@@ -55,7 +55,7 @@ struct UpcomingRaceCard: View {
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
-                .strokeBorder(.white.opacity(isSelected ? 0.14 : 0.07), lineWidth: 1)
+                .strokeBorder(FXTheme.Colors.cardBorder(isSelected: isSelected), lineWidth: 1)
         }
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
@@ -208,14 +208,11 @@ struct UpcomingRaceCard: View {
         return "Starts in \(hours / 24)d \(hours % 24)h"
     }
 
+    /// Flat elevated surface rather than a gradient. In light mode the old
+    /// gradient ran pure white -> 0.97 against a white page, so its darker end
+    /// was the only visible boundary and read as a stray line. Separation now
+    /// comes from the page being a grouped background, plus a real border.
     private var cardBackground: some ShapeStyle {
-        LinearGradient(
-            colors: [
-                FXTheme.Colors.surfaceElevated,
-                FXTheme.Colors.surface,
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        FXTheme.Colors.surfaceElevated
     }
 }

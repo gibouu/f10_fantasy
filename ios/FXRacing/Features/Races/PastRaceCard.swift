@@ -24,7 +24,7 @@ struct PastRaceCard: View {
         .frame(maxWidth: .infinity, minHeight: 344, alignment: .topLeading)
         .background(
             LinearGradient(
-                colors: [FXTheme.Colors.surfaceElevated, FXTheme.Colors.surface],
+                colors: [FXTheme.Colors.surfaceElevated, FXTheme.Colors.surfaceElevated],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -32,7 +32,7 @@ struct PastRaceCard: View {
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
-                .strokeBorder(.white.opacity(isSelected ? 0.14 : 0.07), lineWidth: 1)
+                .strokeBorder(FXTheme.Colors.cardBorder(isSelected: isSelected), lineWidth: 1)
         }
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
