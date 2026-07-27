@@ -22,19 +22,13 @@ struct PastRaceCard: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, minHeight: 344, alignment: .topLeading)
-        .background(
-            LinearGradient(
-                colors: [FXTheme.Colors.surfaceElevated, FXTheme.Colors.surfaceElevated],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        .background(FXTheme.Colors.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous))
+        // See UpcomingRaceCard: no drop shadow inside the clipping pager.
         .overlay {
             RoundedRectangle(cornerRadius: FXTheme.Radius.xl, style: .continuous)
                 .strokeBorder(FXTheme.Colors.cardBorder(isSelected: isSelected), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: 18, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("race-card-\(race.id)")
     }
