@@ -2,7 +2,7 @@
 
 > Before making changes in this repository, read this entire file, then read `AGENTS.md` and the current open GitHub issues. Verify all statements against the current repository and GitHub state because this document is a handoff record, not an infallible source of truth.
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Project purpose
 
@@ -20,32 +20,41 @@ Primary journeys:
 
 - Repository: `gibouu/f10_fantasy`
 - Default branch: `main`
-- Active branch: `feat/367-ios-autosave-release-polish`
-- Active branch: verify exact current HEAD with `git rev-parse HEAD` before starting; committed handoff milestones are listed below.
+- Active branch: none. All release work has landed; `main` is the only branch,
+  local and remote. Verify with `git branch -a` and `git rev-parse HEAD`.
 - Remote: `https://github.com/gibouu/f10_fantasy.git`
-- Upstream: `origin/feat/367-ios-autosave-release-polish`
-- Draft PR: #373 — `Polish FX Racing iOS autosave and release handoff`
-- Onboarding issue: #374 — `Start here: FX Racing release handoff and repository state`
-- Umbrella issue: #367
+- Open PRs: none.
+- Open issues: none.
 
-Important worktrees observed:
+The whole `#367` release train (`#368`–`#374`) is closed, as are the follow-up
+issues `#390`, `#396`, `#398`, `#404`, `#409`–`#413`. Historical detail below is
+kept as a record of *why* the code looks the way it does; do not treat any of it
+as outstanding work.
 
-- `/Users/gibou/code/github/f10_fantasy` — primary checkout, dirty and unrelated; do not touch without explicit approval.
-- `/Users/gibou/code/github/f10_fantasy/.worktrees/feat-367-ios-autosave-release-polish` — active handoff branch.
-- `/Users/gibou/code/github/f10_fantasy/.worktrees/feat-360-ios-race-deck-performance` — clean related historical worktree.
-- `/Users/gibou/code/github/f10_fantasy/.worktrees/fix-313-privacy-manifest` — dirty unrelated privacy-manifest work; do not touch without explicit approval.
+Worktrees:
+
+- `/Users/gibou/code/github/f10_fantasy` — the only checkout, clean, on `main`.
+- All `.worktrees/*` entries were removed on 2026-07-27 after their branches
+  merged. Earlier revisions of this file told agents to preserve
+  `.worktrees/fix-313-privacy-manifest`; that protection is now obsolete —
+  `#313` is closed and its content shipped in a better form on `main`
+  (`ios/FXRacing/PrivacyInfo.xcprivacy` plus `ios/privacy-manifest.test.mjs`).
 
 Existing stash observed:
 
-- `stash@{0}: WIP on feat/sprint-round-label-suffix: 850c754 ui: append 'S' to sprint round labels on web (closes #29)` — unrelated; do not apply/drop without explicit approval.
+- `stash@{0}: WIP on feat/sprint-round-label-suffix: 850c754 ui: append 'S' to sprint round labels on web (closes #29)` — unrelated; do not apply/drop without explicit approval. Still present and untouched.
 
 Deployment/release state:
 
-- PR #373 is intentionally draft.
-- PR #373 checks observed: Web checks success, Vercel success, Vercel Preview Comments success.
+- Version 1.8.0, build 45 (`ios/project.yml`).
+- `ios/ExportOptions.plist` and `docs/release/app-store-release.md` exist; the
+  runbook is the entry point for a release.
+- A 1.8.0 (45) archive was built on 2026-07-26 and deleted on 2026-07-27 at the
+  owner's request — it predated `#412`/`#414`/`#415`. The owner re-archives from
+  Xcode himself; do not build the shipping archive for him.
 - No App Store submission has been performed.
 - No screenshots or builds have been uploaded for release.
-- No signing identities, certificates, or provisioning profiles were changed during handoff.
+- No signing identities, certificates, or provisioning profiles have been changed.
 
 ## Architecture
 
@@ -77,7 +86,8 @@ git diff --check
 
 ## Completed work
 
-Grouped milestones on `feat/367-ios-autosave-release-polish`:
+Grouped milestones, all merged into `main` (the branch and its worktree are
+gone; the SHAs below are pre-squash and will not resolve):
 
 - Task 1 — season form/history contract.
   - Commits include `3acd2ee`, `4c13ee5`.
@@ -117,11 +127,30 @@ Grouped milestones on `feat/367-ios-autosave-release-polish`:
 - Do not reintroduce card-level `Review device picks` without an approved spec.
 - Task 6A uses an accessibility-specific layout path instead of squeezing content into normal card height.
 - App Store/release work remains gated by native simulator/manual verification.
-- Unrelated dirty worktrees/stashes must be preserved and not cleaned/reset/stashed by future agents.
+- Unrelated stashes must be preserved and not applied/dropped by future agents.
 
 ## Verification status
 
-Recorded Task 6A automated verification:
+Full sweep on `main` at `67c5bdc` (owner's Mac, 2026-07-27):
+
+```bash
+npm run test:ios        # 126/126 passed
+# all ten web suites    # 219/219 passed, 0 failures
+npx tsc --noEmit        # clean
+npm run lint            # no ESLint warnings or errors
+npm run build           # succeeded
+xcodebuild -configuration Release -destination 'generic/platform=iOS'  # BUILD SUCCEEDED
+```
+
+GitHub Actions on `67c5bdc`: `iOS` success, `Verify` success.
+
+The `iOS` workflow (`.github/workflows/ios.yml`) now runs `xcodebuild` on any
+`ios/**` change. It exists because `APIEndpoint.submitPick` once reached `main`
+missing an explicit `return` — the app did not compile and nothing caught it.
+It pins `xcode-version: latest-stable`; `glassEffect` needs the iOS 26 SDK to
+*compile*, so an older Xcode fails the build.
+
+### Historical — Task 6A automated verification
 
 ```bash
 node --test ios/accessibility-race-card-layout.test.mjs  # 5/5 passed
@@ -131,59 +160,30 @@ xcodegen generate --spec ios/project.yml                # no project drift
 git diff --check                                        # clean
 ```
 
-PR #373 checks observed on 2026-07-19:
-
-- Web checks: success.
-- Vercel: success.
-- Vercel Preview Comments: success.
-- Merge state observed: clean.
-
-Still mandatory before claiming Task 6A fully verified:
-
-- focused Task 6A UI regression:
-  - `FXRacingUITests/MainShellUITests/testAccessibilitySizeRaceCardKeepsCriticalContentVisibleAndOrdered`
-- broader `MainShellUITests` slice
-- four-state manual inspection:
-  - normal Dynamic Type, dark
-  - normal Dynamic Type, light
-  - `accessibility-extra-extra-extra-large`, dark
-  - `accessibility-extra-extra-extra-large`, light
-- screenshots for all four states
-
-Known blocker evidence:
-
-```text
-CoreSimulatorService connection became invalid
-simdiskimaged crashed or is not responding
-Unable to locate device set
-Connection refused
-```
-
-Known simulator device:
-
-```text
-9184C625-91BA-4DB0-B467-3D364F2554B5
-```
+The Task 6A gates listed here (the focused `MainShellUITests` regression, the
+`MainShellUITests` slice, and four-state Dynamic Type inspection in both
+appearances) were completed on 2026-07-26. `#368` is closed. The
+`CoreSimulatorService`/`simdiskimaged` blocker recorded earlier was specific to
+a cloud box and does not reproduce on the owner's Mac.
 
 ## Known issues and unfinished work
 
+Nothing is open. Everything below is a closed record.
+
 - #374 — onboarding and continuation guide.
-  - Status: open.
-  - Purpose: first issue future agents should read.
+  - Status: CLOSED. This file supersedes it.
 - #368 — Task 6A simulator verification.
-  - Status: open, release gate.
-  - Matters because accessibility layout cannot be called fully verified until native UI/manual checks pass.
+  - Status: CLOSED 2026-07-26. All gates passed on the owner's Mac.
 - #369 — Task 7 static landing cleanup and screenshot validator.
   - Status: CLOSED 2026-07-25 by PR #382. Do not treat as remaining work.
 - #370 — Task 8 full verification and visual feedback loop.
-  - Status: open. The non-simulator half passes on this branch (see
-    "Verification performed" below). Simulator/performance slices remain.
+  - Status: CLOSED. All seven enforced performance gates pass; see
+    `ios/CLAUDE.md` for the gate values and `scripts/ios-performance`.
 - #372 — Task 9 release identifiers, screenshots, and landing assets.
-  - Status: open. Version/build and the App Store screenshot set are DONE
-    (below). Remaining: landing `-v2` images and the per-release handoff doc,
-    plus the App Store Connect side, which only the owner can do.
+  - Status: CLOSED at the owner's request; he handles the remaining
+    landing/App Store Connect assets himself.
 - #371 — Task 10 PR merge, deployment, upload, and App Store submission.
-  - Status: open, final release step; do last. Owner-only from archive onward.
+  - Status: CLOSED at the owner's request; owner-only from the archive onward.
 - #365 — align iOS DNF tutorial copy with scoring behavior.
   - Status: CLOSED. Landed on `main`. Note the fix originally lived in
     `RacePickPanel.swift`, which this branch deletes; the copy now lives in
@@ -192,20 +192,45 @@ Known simulator device:
 - #362 — optimistic concurrency for cross-device pick edits.
   - Status: CLOSED. Landed on `main` via PR #385 and merged into this branch.
 - #361 — public race API / production TTFB optimization.
-  - Status: open but code-complete on `main` (PRs #381, #389). What remains is
-    production measurement, not code. Known caveat: these are plain dynamic
-    route handlers with no `unstable_cache`/`'use cache'` entries, so
-    `revalidatePublicRaceCache()` has nothing registered to purge — public race
-    caching is effectively TTL-only today and the tagged-invalidation criterion
-    is unproven.
+  - Status: CLOSED. The caveat recorded earlier was real and has been acted on:
+    `revalidatePublicRaceCache()` had nothing registered to purge, so it was
+    removed rather than left as a misleading no-op. `src/lib/api/public-race-cache.ts`
+    now emits the correct `Vercel-Cache-Tag` header (not `Cache-Tag`) and
+    exposes `stalePublicRaceCacheTags()` for cron logging. Public race caching
+    is CDN-TTL-based by design; do not reintroduce `revalidateTag` without
+    registering cache entries first.
+  - `vercel.json` pins `"regions": ["lhr1"]` to sit next to Supabase in
+    `eu-west-2`. Moving it back to `iad1` costs ~28x on DB round trips.
+    Guarded by `scripts/vercel-region.test.mjs`.
 - #377 — activate current-year season when sync-schedule finds it inactive.
   - Status: CLOSED 2026-07-26. Was already fixed on `main` by PR #384.
 - #390 — guests could not read the global leaderboard.
-  - Status: fixed on `fix/390-guest-leaderboard` (PR #391), branched off `main`
-    rather than this branch so the production fix does not wait on the release.
-  - `/api/leaderboard` was missing from `isPublicApiRoute()`, so guest GETs were
-    redirected to `/signin` and the app decoded HTML as JSON. Found by running
-    the Release build against production during screenshot capture.
+  - Status: CLOSED via PR #391. `/api/leaderboard` was missing from
+    `isPublicApiRoute()`, so guest GETs were redirected to `/signin` and the app
+    decoded HTML as JSON. Guarded by `ios/leaderboard-guest-access.test.mjs`.
+    Any new public GET route must be added to `isPublicApiRoute()`.
+- #396 — the iOS app did not compile on `main`.
+  - Status: CLOSED. `APIEndpoint.submitPick` was missing an explicit `return`;
+    Swift drops the implicit single-expression return once another statement
+    precedes it. `.github/workflows/ios.yml` exists so this cannot recur.
+- #404 / #398 — race deck and ranking-row interaction defects.
+  - Status: CLOSED. Two lessons worth keeping:
+    `Button` + `.buttonStyle(.plain)` wrapped around a custom label did not
+    deliver taps in the rankings `List`; the rows now use `.contentShape` +
+    `.onTapGesture` with explicit `.isButton` traits. And a `LazyVStack` will
+    not instantiate an off-screen child, so the `FX_PERF_HARNESS` readiness
+    marker must stay *above* tall content like the season-form table.
+- #410 / #413 — light-mode contrast.
+  - Status: CLOSED via PRs #412 and #414. `FXTheme.Colors.warning`, `.success`,
+    and `.gold` are adaptive `UIColor { traits in ... }` values; system `.green`
+    and raw `#FFCC00` sit at ~1.9:1 and ~1.4:1 on white and are not usable as
+    status colours. `FXCardSurfaceModifier` uses `surfaceElevated` + `clipShape`
+    + a `FXTheme.cardBorder(isSelected:)` overlay. Do not reintroduce a
+    gradient-edged card surface.
+- #411 — Me picks history redesign.
+  - Status: CLOSED via PR #415. `ProfileView` renders a season ledger: one row
+    per race (round, name, three outcome dots, points), drivers on tap. The old
+    per-race `Section` + `slotCell` layout is gone.
 
 ## Operational knowledge
 
@@ -233,7 +258,6 @@ Safe recovery guidance:
 
 ## External dependencies and blockers
 
-- CoreSimulator/simdiskimaged health is required for #368 and later native visual/performance verification.
 - App Store Connect access, legal agreements, content rights, screenshots, and owner approval are required before release/upload/submission.
 - Vercel/GitHub CI must pass before PR merge.
 - Supabase/database access must use the documented CLI entrypoint only.
@@ -259,7 +283,7 @@ Two defects the `origin/main` merge surfaced, both fixed here:
 - The #365 DNF copy fix lived in a file this branch deletes; reapplied at the
   copy's new home.
 
-## Simulator devices
+## Simulator and device
 
 The owner keeps exactly one simulator, **iPhone 17 Pro Max**, whose native
 1320x2868 is exactly the 6.9-inch App Store size. iPhone 17 Pro and a
@@ -267,33 +291,38 @@ temporary iPhone 16 Plus were deleted on 2026-07-26 at the owner's request to
 reclaim disk. Do not assume any other device exists; older plan documents that
 name "iPhone 17 Pro" are historical.
 
+Simulators are shared across the owner's other projects, so a stock device name
+will collide. Always go through `scripts/ios-sim` (doctor/boot/fresh/run/udid),
+which pins "FX Racing 17 Pro Max" by UDID.
+
+Physical device: IPHG, `00008130-001E318020FA8D3A` (build destination),
+`AD325C50-2819-5D71-9F26-2A7CCDE06102` (`devicectl` identifier). If an install
+hangs, restart `CoreDeviceService` — do not `kill -9` the install, which wedges
+the channel.
+
 ## Recommended continuation order
 
-1. Read #374, this file, `AGENTS.md`, the implementation plan, and #368–#372.
-2. Confirm branch/HEAD and PR #373 checks.
-3. Merge PR #391 (#390 guest leaderboard) — it is a live production bug and is
-   independent of this release branch.
-4. Remaining for #372: landing `-v2` images and the per-release handoff doc.
-5. Complete #371 last; everything from the archive onward is owner-only.
-6. Update this file and related GitHub issues after every material state change.
+There is no in-flight work. For a new task: read `AGENTS.md`, this file, and
+`ios/CLAUDE.md` if the change is native, then open only the files you need.
 
-## Explicit prohibitions until separately authorized
+For a release, follow `docs/release/app-store-release.md`. The owner archives
+and submits from Xcode himself.
 
-- ~~Do not merge PR #373.~~ Superseded 2026-07-26: the owner authorized
-  opening and merging PRs for this work ("fix them and pr and merge if
-  necessary"). Still require green CI and a self-reviewed diff first.
-- ~~Do not mark PR #373 ready for review.~~ Superseded by the same instruction.
+## Standing constraints
+
 - Do not submit to App Store — the owner does the App Store Connect side.
 - Do not upload screenshots or builds.
+- Do not build the shipping archive; the owner archives from Xcode.
 - Do not change signing identities, certificates, or provisioning profiles.
 - Do not accept Apple legal agreements for the owner.
 - Do not expose credentials, secrets, tokens, or 2FA.
-- Do not touch the unrelated dirty primary checkout or privacy-manifest worktree.
 - Do not apply/drop the unrelated stash.
+- Do not force-push, reset, or clean without explicit approval.
+- Do not delete simulator devices/runtimes without explicit approval.
 
 ## Last updated
 
-- UTC timestamp: 2026-07-19T18:08:02Z
-- Branch: `feat/367-ios-autosave-release-polish`
-- Commit SHA: verify exact current HEAD with `git rev-parse HEAD`; this file records stable task/handoff milestones, not an infallible live branch pointer.
-- Authoring environment: Codex desktop session
+- Date: 2026-07-27
+- Branch: `main` (only branch)
+- Commit SHA: verify with `git rev-parse HEAD`; this file records stable
+  handoff state, not a live branch pointer.
