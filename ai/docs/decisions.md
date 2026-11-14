@@ -20,6 +20,15 @@ Do not log temporary debugging notes here.
 ## Entries
 
 
+### 2026-11-14 — Production ships once a day from a `production` branch
+- Status: accepted
+- Context: #424. Every merge to `main` started a paid Vercel production build, and agents merge many times a day. Gib's deploy-cost standard (global `AGENTS.md`, "Deployments (cost)") caps production at one release a day.
+- Decision: Vercel's production branch is `production`. `vercel.json` sets `git.deploymentEnabled` to `{"**": false, "production": true, "preview/**": true}`, so a push to `main` or a PR branch builds nothing. `.github/workflows/release.yml` runs daily at 16:30 UTC and fast-forwards `production` to the newest first-parent `main` commit whose `Web checks` check is green.
+- Reason: One build a day instead of one per merge; nothing reaches production without a green `Web checks`.
+- Tradeoffs: A merged fix waits for the next release unless a human runs the workflow by hand (`gh workflow run release.yml --ref main`). GITHUB_TOKEN cannot push a release that changes `.github/workflows/`; Gib pushes that one by hand. Previews exist only on request (`preview/<slug>` branch or `vercel deploy`).
+- Affected areas: `vercel.json` (guarded by `scripts/vercel-region.test.mjs`), `.github/workflows/release.yml`, `.github/CODEOWNERS`.
+- Follow-up: —
+
 ### 2026-07-26 — Vercel Functions run in lhr1, co-located with the database
 - Status: accepted
 - Context: #398. A cache miss on the public race APIs cost 1.5-1.9s. `Server-Timing` split the phases and showed a single primary-key `findUnique` taking **393 ms** (`db.race;dur=393.0`) with four concurrent related queries at 941 ms — two orders of magnitude above a warm indexed lookup, and not a request waterfall since the route already parallelises. The cause was geography: `x-vercel-id` showed functions executing in `iad1` (Washington DC) while the Supabase project is in **eu-west-2 (London)**. Every query crossed the Atlantic, and a TLS + auth handshake is several round trips on top.

@@ -17,3 +17,14 @@ test("functions run in the same region as the database", () => {
 test("cron routes keep their extended duration", () => {
   assert.equal(config.functions["src/app/api/cron/**"].maxDuration, 60)
 })
+
+// Deploy cost (#424): only `production` (moved once a day by
+// .github/workflows/release.yml) and `preview/**` build. A push to main or
+// to a PR branch builds nothing.
+test("only production and preview/** branches deploy", () => {
+  assert.deepEqual(config.git.deploymentEnabled, {
+    "**": false,
+    production: true,
+    "preview/**": true,
+  })
+})

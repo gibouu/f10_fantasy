@@ -5,5 +5,12 @@
     "src/app/api/cron/**": {
       "maxDuration": 60
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "production": true,
+      "preview/**": true
+    }
   }
 }
