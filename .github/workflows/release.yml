@@ -1,0 +1,186 @@
+# Ship to production once a day (#424).
+#
+# Vercel builds only two kinds of branch (vercel.json, `git.deploymentEnabled`):
+# `production`, which is the live site, and `preview/**`. A push to main or to
+# a PR branch builds nothing. This workflow moves `production` forward:
+#
+#   - every day at 16:30 UTC (the GitHub cron has no daylight saving time);
+#   - on demand: gh workflow run release.yml --ref main -R gibouu/f10_fantasy
+#     (the newest green commit of main), or add -f commit=<sha> for one commit.
+#
+# It takes the newest commit of main (first parent, so one per merged PR)
+# whose CI check "Web checks" is green, and fast-forwards `production` to it.
+# When `production` already has that commit, it pushes nothing and Vercel
+# builds nothing. A main commit whose CI still runs, or failed, waits for the
+# next day; an older green commit ships in its place.
+#
+# GITHUB_TOKEN pushes `production`. A push with this token starts no workflow,
+# but Vercel gets it through its GitHub App and builds.
+
+name: Release
+
+on:
+  schedule:
+    - cron: '30 16 * * *'
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'The main commit to ship (empty: the newest green one)'
+        required: false
+        default: ''
+        type: string
+
+# One release at a time; a second one waits for the first.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push `production`
+  checks: read # the CI check of a main commit
+
+jobs:
+  release:
+    name: Ship to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: From main only
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error title=Release refused::Run this workflow from main (--ref main). Nothing was pushed."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - id: pick
+        name: Pick the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASKED: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error title=Release refused::$1 Nothing was pushed."
+            exit 1
+          }
+          # The CI job of .github/workflows/verify.yml, by its name.
+          CHECK="Web checks"
+          check_q=$(jq -rn --arg n "$CHECK" '$n | @uri')
+          # Is $1 green? The newest "Web checks" check run of GitHub Actions on
+          # this commit (the highest id: a re-run that is still queued has no
+          # start time yet) has finished with success. A failed API call stops
+          # the job: it must never read as "not green" and end in "Nothing to
+          # ship". (`refuse` exits the shell, even when `green` runs inside an
+          # `if`.)
+          green() {
+            state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$1/check-runs?check_name=$check_q&filter=all&per_page=100" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.id) | last | "\(.status)/\(.conclusion)"') \
+              || refuse "GitHub API error while reading the CI of ${1:0:7}."
+            [ "$state" = completed/success ]
+          }
+
+          main=$(git rev-parse origin/main)
+          if prod=$(git rev-parse --verify --quiet origin/production); then
+            git merge-base --is-ancestor "$prod" "$main" \
+              || refuse "production (${prod:0:7}) is not an ancestor of main: someone pushed to it by hand. Bring it back onto main first."
+            range="$prod..$main"
+          else
+            # Gib creates the branch once by hand; until then this job tries
+            # to create it.
+            prod=""
+            range="$main"
+          fi
+
+          if [ -n "$ASKED" ]; then
+            printf '%s' "$ASKED" | grep -Eq '^[0-9a-f]{7,40}$' || refuse "\"$ASKED\" is not a commit id."
+            commit=$(git rev-parse --verify --quiet "$ASKED^{commit}") || refuse "Commit $ASKED does not exist."
+            git merge-base --is-ancestor "$commit" "$main" || refuse "Commit ${commit:0:7} is not on main."
+            green "$commit" || refuse "\"$CHECK\" is not green on ${commit:0:7} (or still runs)."
+            if [ -n "$prod" ] && ! git merge-base --is-ancestor "$prod" "$commit"; then
+              refuse "Commit ${commit:0:7} is older than production (${prod:0:7}). To go back, use Instant Rollback in Vercel."
+            fi
+          else
+            commit=""
+            # Newest first, merges of main only, all of them after
+            # production. Without production yet, the last 50 commits are
+            # enough to find a green one.
+            if [ -n "$prod" ]; then
+              candidates=$(git rev-list --first-parent "$range")
+            else
+              candidates=$(git rev-list --first-parent --max-count=50 "$range")
+            fi
+            while read -r c; do
+              [ -n "$c" ] || continue
+              if green "$c"; then
+                commit=$c
+                break
+              fi
+            done <<< "$candidates"
+          fi
+
+          if [ -z "$commit" ] || [ "$commit" = "$prod" ]; then
+            echo "ship=no" >> "$GITHUB_OUTPUT"
+            if [ -n "$ASKED" ]; then
+              why="the requested commit ${commit:0:7} is already in production."
+            elif [ "$main" = "$prod" ]; then
+              why="production is already at main (${main:0:7})."
+            elif [ -z "$prod" ]; then
+              why="no production branch yet, and none of the last 50 commits of main has a green \"$CHECK\"."
+            else
+              why="no commit of main after production (${prod:0:7}) has a green \"$CHECK\" yet."
+            fi
+            echo "::notice title=Nothing to ship::${why}"
+            echo "## Nothing to ship: ${why}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "ship=yes" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Shipping to production"
+            echo
+            if [ -n "$prod" ]; then
+              echo "From \`${prod:0:7}\` to \`${commit:0:7}\`: $(git rev-list --count --first-parent "$prod..$commit") merge(s); \"$CHECK\" is green on \`${commit:0:7}\`."
+              echo
+              git log --first-parent --format="- \`%h\` %s" "$prod..$commit"
+            else
+              echo "First release: \`production\` is created at \`${commit:0:7}\`."
+            fi
+            if [ "$commit" != "$main" ]; then
+              echo
+              if [ -n "$ASKED" ]; then
+                echo "Not in this release (requested commit \`${commit:0:7}\`):"
+              else
+                echo "Waiting for a green CI (next release):"
+              fi
+              echo
+              git log --first-parent --format="- \`%h\` %s" "$commit..$main"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A plain push, never forced: git refuses it if it is not a
+      # fast-forward. GitHub refuses a push by GITHUB_TOKEN that brings a
+      # change to .github/workflows (the token can never get the `workflows`
+      # permission). Then Gib pushes this one release with his own login,
+      # and the next ones go through this job again.
+      - name: Push production
+        if: steps.pick.outputs.ship == 'yes'
+        env:
+          COMMIT: ${{ steps.pick.outputs.commit }}
+        run: |
+          set -euo pipefail
+          if out=$(git push origin "$COMMIT:refs/heads/production" 2>&1); then
+            printf '%s\n' "$out"
+            exit 0
+          fi
+          printf '%s\n' "$out"
+          if printf '%s' "$out" | grep -qi 'workflow'; then
+            echo "::error title=Push refused::GitHub does not let GITHUB_TOKEN push a change to .github/workflows. Push this release once with your own login: git fetch origin && git push origin ${COMMIT}:refs/heads/production"
+          else
+            echo "::error title=Push failed::git push to production failed; the error is above. Nothing changed on Vercel."
+          fi
+          exit 1
